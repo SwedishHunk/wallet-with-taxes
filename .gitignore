@@ -1,0 +1,40 @@
+# =========================
+# Node / JS / TS
+# =========================
+node_modules/
+dist/
+*.tsbuildinfo
+
+# =========================
+# Frontend
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.app.tsbuildinfo
+
+# =========================
+# Backend
+# =========================
+backend/node_modules/
+backend/dist/
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+backend/.env
+
+# =========================
+# OS / Editor / Junk
+# =========================
+.DS_Store
+nul
+*.log
+
+# =========================
+# Notes / temp docs
+# =========================
+*_GUIDE.md
+*_CHECKLIST.md
+*_DEBUG_*.md

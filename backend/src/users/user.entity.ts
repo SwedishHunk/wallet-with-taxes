@@ -4,11 +4,13 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+  OneToMany,
+} from "typeorm";
+import { StudioMember } from "../platform/entities/studio-member.entity";
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ unique: true })
@@ -17,17 +19,17 @@ export class User {
   @Column()
   passwordHash: string;
 
-  @Column({ type: 'varchar' })
-  custodyMode: 'custodial' | 'self';
+  @Column({ type: "varchar" })
+  custodyMode: "custodial" | "self";
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   encryptedPrivateKey: string | null;
 
   @Column()
   walletAddress: string;
 
-  @Column({ type: 'varchar', default: 'pending' })
-  kycStatus: 'pending' | 'verified' | 'rejected';
+  @Column({ type: "varchar", default: "pending" })
+  kycStatus: "pending" | "verified" | "rejected";
 
   @CreateDateColumn()
   createdAt: Date;
@@ -40,4 +42,7 @@ export class User {
 
   @Column({ default: false })
   isAdmin: boolean;
+
+  @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
+  studioMemberships: StudioMember[];
 }

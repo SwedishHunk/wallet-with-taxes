@@ -1,23 +1,51 @@
-.dashboard-container {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    background: #0e0f1a;
-    color: white;
-    min-height: 100vh;
-  }
-  
-  .dashboard-title {
-    font-size: 1.75rem;
-    font-weight: bold;
-    color: white;
-  }
-  
-  .loading-text {
-    color: #ccc;
-    text-align: center;
-    margin-top: 2rem;
-    font-size: 1.2rem;
-  }
-  
+/* Layout & spacing (tokens-based colors applied via components) */
+
+.dashboard-member-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-member-info h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dashboard-member-ids {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dashboard-permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-permissions h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dashboard-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

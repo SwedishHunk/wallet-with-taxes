@@ -5,7 +5,7 @@ MashaVaverova – Solidity, backend & protocol development.
 This a next-generation modular Web3 platform combining NFT-based asset ownership, wallet abstraction, tax compliance, and marketplace infrastructure. 
 This repository contains the full-stack proof of concept (PoC), including smart contracts, a NestJS backend, and a frontend UI.
 Tests exist ONLY FOR MAIN FLOW for now
-Smart contracts part is fully dockumented 
+Smart contracts part is fully documented 
 
 ---
 

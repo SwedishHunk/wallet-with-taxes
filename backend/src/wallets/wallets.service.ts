@@ -20,14 +20,29 @@ export class WalletsService {
     return this.walletRepo.findOne({ where: { owner } });
   }
   async getBalance(address: string) {
-    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-    const balanceBigInt = await provider.getBalance(address);
-    const balanceEth = ethers.formatEther(balanceBigInt);
+    try {
+      if (!process.env.RPC_URL) {
+        return {
+          address,
+          balance: '0 ETH',
+        };
+      }
 
-    return {
-      address,
-      balance: `${balanceEth} ETH`,
-    };
+      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+      const balanceBigInt = await provider.getBalance(address);
+      const balanceEth = ethers.formatEther(balanceBigInt);
+
+      return {
+        address,
+        balance: `${balanceEth} ETH`,
+      };
+    } catch (err) {
+      console.warn('Error fetching balance:', err);
+      return {
+        address,
+        balance: '0 ETH (unavailable)',
+      };
+    }
   }
   getAssets(address: string) {
     // Mocked token holdings response

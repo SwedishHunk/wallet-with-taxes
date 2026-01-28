@@ -7,9 +7,16 @@
     background: linear-gradient(to bottom right, #0e0f1a, #1b1c2e);
   }
   
+  .login-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 960px;
+  }
+  
   .login-box {
     width: 100%;
-    max-width: 400px;
     padding: 2rem;
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.05);
@@ -24,6 +31,16 @@
     font-size: 1.8rem;
     margin-bottom: 1.5rem;
   }
+
+  .login-alert-close {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
   
   .login-fields {
     display: flex;
@@ -33,16 +50,18 @@
   
   .login-input {
     padding: 0.5rem 1rem;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
+    color: #ffffff;
     border-radius: 0.5rem;
     font-size: 1rem;
     outline: none;
+    -webkit-text-fill-color: #ffffff;
   }
   
   .login-input::placeholder {
-    color: #aaa;
+    color: #999;
+    -webkit-text-fill-color: #999;
   }
   
   .login-input:focus {
@@ -59,10 +78,25 @@
     border-radius: 0.5rem;
     cursor: pointer;
     transition: background 0.2s ease-in-out;
+    width: 100%;
   }
   
   .login-button:hover {
     background-color: #2563eb;
+  }
+
+  .login-button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+  }
+
+  .login-button-secondary {
+    background-color: #6b7280;
+    margin-top: 0.5rem;
+  }
+
+  .login-button-secondary:hover {
+    background-color: #4b5563;
   }
   
   .login-footer {
@@ -76,5 +110,17 @@
     color: #60a5fa;
     cursor: pointer;
     text-decoration: underline;
+  }
+
+  .login-box-secondary {
+    background: rgba(255, 255, 255, 0.03);
+    border-style: dashed;
+  }
+
+  .login-note {
+    color: #d1d5db;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    padding: 0.5rem 0;
   }
   

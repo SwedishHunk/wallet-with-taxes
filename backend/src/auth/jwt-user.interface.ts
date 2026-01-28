@@ -1,5 +1,6 @@
 export interface JwtUser {
-  id: number;
-  walletAddress: string;
+  id: string;
   email?: string;
+  studioId: string;
+  role: "owner" | "admin" | "member";
 }

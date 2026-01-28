@@ -1,13 +1,21 @@
-import { api } from './api';
-import type { User } from '../types/User';
+import { api } from "./api";
+import type { User } from "../types/user";
 
-export const signup = (email: string, password: string) =>
-  api.post('/users/signup', { email, password });
+export const signup = (email: string, password: string, studioName?: string) =>
+  api.post("/users/signup", { email, password, studioName });
 
-export const login = (email: string, password: string) =>
-  api.post('/users/login', { email, password });
+export const login = (email: string, password: string, studioId?: string) =>
+  api.post("/users/login", { email, password, studioId });
+
+export const getStudios = () => api.get("/users/studios");
+
+export const getMemberSession = (studioId: string) =>
+  api.get(`/users/member-session/${studioId}`);
+
+export const getMembersCount = (studioId: string) =>
+  api.get(`/studios/${studioId}/members`);
 
 export const linkWallet = (email: string, walletAddress: string) =>
-  api.post('/users/link-wallet', { email, walletAddress });
+  api.post("/users/link-wallet", { email, walletAddress });
 
-export const getMe = () => api.get<User>('/users/me');
+export const getMe = () => api.get<User>("/users/me");
