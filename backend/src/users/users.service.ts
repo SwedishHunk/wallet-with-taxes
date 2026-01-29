@@ -63,7 +63,7 @@ export class UsersService {
     const encryptionIv = process.env.ENCRYPTION_IV;
     if (!encryptionKey || !encryptionIv) {
       throw new AppException(
-        ERROR_MESSAGES.MISSING_ENV_VAR('ENCRYPTION_KEY or ENCRYPTION_IV'),
+        ERROR_MESSAGES.MISSING_ENV_VAR("ENCRYPTION_KEY or ENCRYPTION_IV"),
         500,
       );
     }
@@ -99,13 +99,20 @@ export class UsersService {
         if (receipt && receipt.status === 1) {
           onChainWallet = wallet.address;
         } else {
-          console.warn("On-chain wallet creation returned non-success status; continuing without on-chain wallet");
+          console.warn(
+            "On-chain wallet creation returned non-success status; continuing without on-chain wallet",
+          );
         }
       } catch (err) {
-        console.warn("Skipping on-chain wallet creation (RPC unavailable?):", err);
+        console.warn(
+          "Skipping on-chain wallet creation (RPC unavailable?):",
+          err,
+        );
       }
     } else {
-      console.warn("Blockchain env vars missing; skipping on-chain wallet creation");
+      console.warn(
+        "Blockchain env vars missing; skipping on-chain wallet creation",
+      );
     }
 
     const user = this.userRepository.create({
@@ -130,7 +137,10 @@ export class UsersService {
 
     // Create owner membership via StudioMemberService
     // This sets isOwner=true and all permissions
-    const membership = await this.studioMemberService.createBootstrapOwner(savedStudio, user);
+    const membership = await this.studioMemberService.createBootstrapOwner(
+      savedStudio,
+      user,
+    );
 
     // Generate JWT token for auto-login
     const token = this.jwtService.sign(
@@ -159,7 +169,9 @@ export class UsersService {
         studioId: savedStudio.id,
         email: user.email,
         isOwner: membership.isOwner,
-        permissions: this.studioMemberService.maskToPermissionStrings(membership.permissionsMask),
+        permissions: this.studioMemberService.maskToPermissionStrings(
+          membership.permissionsMask,
+        ),
         gameAccessIds: membership.gameAccessIds ?? [],
       },
     };
@@ -205,7 +217,7 @@ export class UsersService {
         where: { user: { id: user.id } },
         relations: ["studio"],
       });
-      
+
       // Auto-migrate old users without studios
       if (!membership) {
         // Check if a studio with this name already exists
@@ -223,7 +235,9 @@ export class UsersService {
           studio = await this.studioRepository.save(studio);
           console.log(`Created new studio ${studio.id} for user ${user.email}`);
         } else {
-          console.log(`Studio ${studio.id} already exists for user ${user.email}`);
+          console.log(
+            `Studio ${studio.id} already exists for user ${user.email}`,
+          );
         }
 
         // Check if membership already exists before creating
@@ -234,14 +248,21 @@ export class UsersService {
 
         if (!existingMembership) {
           // Create membership via StudioMemberService (sets isOwner + permissions)
-          membership = await this.studioMemberService.createBootstrapOwner(studio, user);
-          console.log(`Created bootstrap owner membership for user ${user.email} in studio ${studio.id}`);
+          membership = await this.studioMemberService.createBootstrapOwner(
+            studio,
+            user,
+          );
+          console.log(
+            `Created bootstrap owner membership for user ${user.email} in studio ${studio.id}`,
+          );
         } else {
           membership = existingMembership;
-          console.log(`Membership already exists for user ${user.email} in studio ${studio.id}`);
+          console.log(
+            `Membership already exists for user ${user.email} in studio ${studio.id}`,
+          );
         }
       }
-      
+
       if (membership) {
         selectedStudio = membership.studio;
         selectedRole = membership.role;
@@ -331,7 +352,9 @@ export class UsersService {
       email: membership.user.email,
       isOwner: membership.isOwner,
       role: membership.role,
-      permissions: this.studioMemberService.maskToPermissionStrings(membership.permissionsMask),
+      permissions: this.studioMemberService.maskToPermissionStrings(
+        membership.permissionsMask,
+      ),
       gameAccessIds: membership.gameAccessIds ?? [],
     };
   }

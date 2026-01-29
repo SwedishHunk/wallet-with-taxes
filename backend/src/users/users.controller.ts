@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Req, UseGuards, Param } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Req,
+  UseGuards,
+  Param,
+} from "@nestjs/common";
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Request } from "express";
@@ -8,7 +16,9 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post("signup")
-  async signup(@Body() body: { email: string; password: string; studioName?: string }) {
+  async signup(
+    @Body() body: { email: string; password: string; studioName?: string },
+  ) {
     const { email, password, studioName } = body;
     return this.usersService.signup(email, password, studioName);
   }
@@ -42,7 +52,10 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get("member-session/:studioId")
-  async getMemberSession(@Req() req: Request, @Param("studioId") studioId: string) {
+  async getMemberSession(
+    @Req() req: Request,
+    @Param("studioId") studioId: string,
+  ) {
     const jwtUser = req.user as { id: string };
     return this.usersService.getMemberSession(jwtUser.id, studioId);
   }

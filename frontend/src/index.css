@@ -1,45 +1,50 @@
 @import "./styles/tokens.css";
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html,
 body {
-	margin: 0;
-	background: var(--bg);
-	color: var(--text);
-	font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-	line-height: 1.5;
-	text-rendering: optimizeLegibility;
-	-webkit-font-smoothing: antialiased;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
-	min-height: 100vh;
-	background: var(--bg);
-	color: var(--text);
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
 }
 
 a {
-	color: var(--primary);
-	text-decoration: none;
+  color: var(--primary);
+  text-decoration: none;
 }
 
 a:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 input,
 select,
 textarea {
-	background: var(--surface2);
-	color: var(--text);
-	border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 input::placeholder,
 select::placeholder,
 textarea::placeholder {
-	color: var(--muted);
+  color: var(--muted);
 }

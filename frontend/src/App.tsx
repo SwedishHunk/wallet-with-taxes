@@ -1,5 +1,11 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { useEffect } from "react";
 import { setAuthToken } from "./lib/api";
 import { AuthProvider } from "./lib/AuthContext";
@@ -34,7 +40,9 @@ function NotFound() {
       <PageHeader title="404 - Rutt inte hittad" />
       <Card>
         <p>Aktuell URL: {window.location.pathname}</p>
-        <a href={ROUTES.login} style={{ color: "var(--primary)", textDecoration: "underline" }}>
+        <a
+          href={ROUTES.login}
+          style={{ color: "var(--primary)", textDecoration: "underline" }}>
           Gå till inloggning
         </a>
       </Card>
@@ -130,7 +138,10 @@ function AppRoutes() {
           }
         />
 
-        <Route path="/home" element={<Navigate to={ROUTES.dashboard} replace />} />
+        <Route
+          path="/home"
+          element={<Navigate to={ROUTES.dashboard} replace />}
+        />
         <Route
           path="/create-first-account"
           element={
@@ -189,4 +200,3 @@ function App() {
 }
 
 export default App;
-

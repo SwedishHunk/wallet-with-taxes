@@ -1,15 +1,15 @@
-import axios from 'axios';
+import axios from "axios";
 
 export const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: "http://localhost:3000",
 });
 
 // Optionally!  attached token automatically
 export const setAuthToken = (token: string | null) => {
   if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   } else {
-    delete api.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common["Authorization"];
   }
 };
 
@@ -28,9 +28,9 @@ api.interceptors.response.use(
 
     if ((status === 401 || status === 403) && !isAuthEndpoint) {
       try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('studio_session');
-        localStorage.removeItem('member_session');
+        localStorage.removeItem("token");
+        localStorage.removeItem("studio_session");
+        localStorage.removeItem("member_session");
         setAuthToken(null);
       } catch (e) {
         // ignore
@@ -38,6 +38,5 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     return Promise.reject(error);
-  }
+  },
 );
-

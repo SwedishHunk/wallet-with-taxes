@@ -2,7 +2,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../../lib/AuthContext";
 import { useCanManageMembers } from "../../lib/useAuth";
 import { ROUTES } from "../../routes";
-import { Page, PageHeader, Card, Button, Badge } from "../../components/ui/index";
+import {
+  Page,
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+} from "../../components/ui/index";
 import "../../style/Dashboard.css";
 
 export default function Dashboard() {
@@ -20,18 +26,25 @@ export default function Dashboard() {
         subtitle={`ID: ${studio?.studioId ?? "-"}`}
       />
 
-      {!member && membersCount !== null && membersCount > 1 && authContext.state === "StudioAuthenticated" && (
-        <Card>
-          <h2>Ingen medlem aktiv</h2>
-          <p>Logga in som medlem för att få åtkomst till admin-funktioner.</p>
-          <Button onClick={() => {
-            console.log("[Dashboard] Go to member-login", ROUTES.memberLogin);
-            navigate(ROUTES.memberLogin);
-          }}>
-            Logga in som medlem
-          </Button>
-        </Card>
-      )}
+      {!member &&
+        membersCount !== null &&
+        membersCount > 1 &&
+        authContext.state === "StudioAuthenticated" && (
+          <Card>
+            <h2>Ingen medlem aktiv</h2>
+            <p>Logga in som medlem för att få åtkomst till admin-funktioner.</p>
+            <Button
+              onClick={() => {
+                console.log(
+                  "[Dashboard] Go to member-login",
+                  ROUTES.memberLogin,
+                );
+                navigate(ROUTES.memberLogin);
+              }}>
+              Logga in som medlem
+            </Button>
+          </Card>
+        )}
 
       {member && (
         <Card>
@@ -61,7 +74,9 @@ export default function Dashboard() {
 
             {canManageMembers && (
               <div className="dashboard-actions">
-                <Button variant="secondary" onClick={() => navigate(ROUTES.members)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(ROUTES.members)}>
                   Hantera medlemmar
                 </Button>
               </div>

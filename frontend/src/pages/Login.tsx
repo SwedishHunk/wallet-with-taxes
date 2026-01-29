@@ -48,7 +48,8 @@ export default function Login() {
 
       try {
         const studiosResponse = await getStudios();
-        const studios: Array<{ id: string; name?: string }> = studiosResponse.data ?? [];
+        const studios: Array<{ id: string; name?: string }> =
+          studiosResponse.data ?? [];
         const matched = studios.find((s) => s.id === studioId) ?? studios[0];
         if (matched) {
           studioId = matched.id || studioId;
@@ -67,7 +68,8 @@ export default function Login() {
       navigate(ROUTES.dashboard, { replace: true });
     } catch (err) {
       const error = err as ApiError;
-      const message = error.response?.data?.message || "Login failed. Please try again.";
+      const message =
+        error.response?.data?.message || "Login failed. Please try again.";
       setStudioError(message);
     } finally {
       setStudioLoading(false);
@@ -87,8 +89,7 @@ export default function Login() {
               <button
                 type="button"
                 className="login-alert-close"
-                onClick={() => setStudioError(null)}
-              >
+                onClick={() => setStudioError(null)}>
                 Stäng
               </button>
             </div>
@@ -113,17 +114,24 @@ export default function Login() {
                 autoComplete="current-password"
                 required
               />
-              <button type="submit" className="login-button" disabled={studioLoading}>
+              <button
+                type="submit"
+                className="login-button"
+                disabled={studioLoading}>
                 {studioLoading ? "Signing in..." : "Sign in to studio"}
               </button>
             </form>
           ) : (
-            <div className="login-note">Studio-session redan aktiv. Fortsätt till member-login.</div>
+            <div className="login-note">
+              Studio-session redan aktiv. Fortsätt till member-login.
+            </div>
           )}
           {showStudioForm && (
             <p className="login-footer">
               Har du ingen studio?{" "}
-              <span className="signup-link" onClick={() => navigate(ROUTES.createStudio)}>
+              <span
+                className="signup-link"
+                onClick={() => navigate(ROUTES.createStudio)}>
                 Skapa studio
               </span>
             </p>
