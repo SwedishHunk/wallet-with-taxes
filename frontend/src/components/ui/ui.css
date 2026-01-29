@@ -1,0 +1,137 @@
+:root {
+}
+
+.ui-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.ui-page-header-content {
+  flex: 1;
+}
+
+.ui-page-header-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ui-page-header-subtitle {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.ui-page-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ui-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.ui-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  padding: 20px;
+}
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ui-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.ui-button:active {
+  transform: translateY(0);
+}
+
+.ui-button[data-variant="primary"] {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.ui-button[data-variant="secondary"] {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.ui-button[data-variant="danger"] {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.ui-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.ui-badge[data-variant="owner"] {
+  background: var(--success);
+  color: #fff;
+  border-color: var(--success);
+}
+
+.ui-badge[data-variant="studio"] {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.ui-badge[data-variant="permission"] {
+  background: var(--warning);
+  color: #fff;
+  border-color: var(--warning);
+}

@@ -1,0 +1,215 @@
+/* Shared bright theme colors */
+:root {
+  --primary-color: #3b82f6; /* Bright blue */
+  --primary-hover: #2563eb; /* Darker blue on hover */
+  --success-color: #10b981; /* Emerald green */
+  --danger-color: #ef4444; /* Red */
+  --warning-color: #f59e0b; /* Amber */
+  --light-bg: #f8fafc; /* Very light blue-gray */
+  --card-bg: #ffffff; /* White */
+  --border-color: #e2e8f0; /* Light gray */
+  --text-primary: #0f172a; /* Dark slate */
+  --text-secondary: #64748b; /* Gray */
+  --success-bg: #dcfce7; /* Light green */
+  --success-text: #166534; /* Dark green */
+  --error-bg: #fee2e2; /* Light red */
+  --error-text: #991b1b; /* Dark red */
+}
+
+body {
+  background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+  color: var(--text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
+}
+
+/* Card/Container styles */
+.bright-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.bright-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Button styles */
+.bright-button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.bright-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bright-button-primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.bright-button-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.bright-button-success {
+  background: var(--success-color);
+  color: white;
+}
+
+.bright-button-success:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.bright-button-danger {
+  background: var(--danger-color);
+  color: white;
+}
+
+.bright-button-danger:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.bright-button-secondary {
+  background: var(--light-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.bright-button-secondary:hover:not(:disabled) {
+  background: var(--border-color);
+  transform: translateY(-1px);
+}
+
+/* Input styles */
+.bright-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.bright-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Alert/Message styles */
+.bright-alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bright-alert-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid #86efac;
+}
+
+.bright-alert-error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid #fca5a5;
+}
+
+/* Header styles */
+.bright-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.bright-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Grid layouts */
+.bright-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .bright-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Badge styles */
+.bright-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--light-bg);
+  color: var(--text-secondary);
+}
+
+.bright-badge-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+/* Section title */
+.bright-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+/* Text utilities */
+.bright-text-secondary {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.bright-text-large {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-color);
+}

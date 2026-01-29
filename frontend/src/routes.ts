@@ -1,0 +1,17 @@
+export const ROUTES = {
+  root: "/",
+  login: "/login",
+  signup: "/signup",
+  createStudio: "/create-studio",
+  dashboard: "/dashboard",
+  memberLogin: "/member-login",
+  studios: "/studios",
+  members: "/members",
+  games: "/games",
+  settings: "/settings",
+  home: "/home",
+  createFirstAccount: "/create-first-account",
+  accountLogin: "/account-login",
+  personalAccounts: "/personal-accounts",
+  game: (gameId: string) => `/game/${gameId}`,
+};
