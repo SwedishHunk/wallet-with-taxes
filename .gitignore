@@ -38,3 +38,15 @@ nul
 *_GUIDE.md
 *_CHECKLIST.md
 *_DEBUG_*.md
+
+
+
+# Backups / archives
+*.bak
+*.zip
+
+
+# Temp notes (local only)
+POINT_*.md
+STEG_*.md
+VERIFICATION_*.md
