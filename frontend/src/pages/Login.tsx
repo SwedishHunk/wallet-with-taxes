@@ -124,6 +124,13 @@ export default function Login() {
           ) : (
             <div className="login-note">
               Studio-session redan aktiv. Fortsätt till member-login.
+              <button
+                type="button"
+                className="login-button"
+                style={{ marginTop: "12px" }}
+                onClick={() => navigate(ROUTES.memberLogin)}>
+                Logga in som medlem
+              </button>
             </div>
           )}
           {showStudioForm && (

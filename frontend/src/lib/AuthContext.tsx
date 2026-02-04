@@ -105,11 +105,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const savedMember = localStorage.getItem(MEMBER_SESSION_KEY);
 
       if (savedStudio) {
-        setStudioSessionState(JSON.parse(savedStudio));
+        const parsedStudio = JSON.parse(savedStudio);
+        if (parsedStudio?.studioId) {
+          setStudioSessionState(parsedStudio);
+        } else {
+          localStorage.removeItem(STUDIO_SESSION_KEY);
+        }
       }
 
       if (savedMember) {
-        setMemberSessionState(JSON.parse(savedMember));
+        const parsedMember = JSON.parse(savedMember);
+        if (parsedMember?.memberId && parsedMember?.studioId) {
+          setMemberSessionState(parsedMember);
+        } else {
+          localStorage.removeItem(MEMBER_SESSION_KEY);
+        }
       }
     } catch (error) {
       console.error("Failed to load auth sessions from localStorage:", error);
@@ -140,6 +150,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       membersCount,
     });
   }, [currentState, studioSession, memberSession, isLoading, membersCount]);
+
+  // Ensure membersCount is loaded even when studioSession is hydrated from localStorage
+  useEffect(() => {
+    if (isLoading) return;
+    if (!studioSession || !studioSession.studioId) return;
+    if (membersCount !== null) return;
+
+    console.log("[AuthContext] Loading membersCount for studio:", {
+      studioId: studioSession.studioId,
+      studioName: studioSession.studioName,
+    });
+
+    (async () => {
+      try {
+        const { data } = await getMembersCount(studioSession.studioId);
+        const count = data?.length ?? 0;
+        console.log(`[AuthContext] Hydration loaded membersCount: ${count}`);
+        setMembersCount(count);
+      } catch (err) {
+        console.warn(
+          "[AuthContext] Failed to load members count on hydration:",
+          err,
+        );
+        setMembersCount(0);
+      }
+    })();
+  }, [studioSession, membersCount, isLoading]);
 
   // Auto-activate owner if studio is authenticated, no member active, and exactly 1 member exists
   useEffect(() => {
@@ -192,6 +229,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Persist member session to localStorage
   const setMemberSession = (session: MemberSession | null) => {
+    console.log("[AuthContext] setMemberSession:", session);
     if (session) {
       localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session));
       setMemberSessionState(session);
