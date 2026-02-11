@@ -26,9 +26,17 @@ import {
 } from "../types/auth";
 import { setAuthToken } from "./api";
 import { getMemberSession, getMembersCount } from "./users";
+import { validateSystemState } from "./stateGuards";
 
 const STUDIO_SESSION_KEY = "studio_session";
 const MEMBER_SESSION_KEY = "member_session";
+const ACTIVE_GAME_KEY = "activeGame";
+
+interface ActiveGame {
+  gameId: string;
+  name: string;
+  slug: string;
+}
 
 // Migration: Move old keys to new ones
 function migrateOldKeys() {
@@ -54,6 +62,8 @@ interface AuthContextType {
   logoutMember: () => void; // Clear only member
   isLoading: boolean;
   membersCount: number | null; // Total members in current studio
+  activeGame: ActiveGame | null;
+  setActiveGame: (game: ActiveGame | null) => void;
 }
 
 const AuthContextDefault: AuthContextType = {
@@ -68,6 +78,8 @@ const AuthContextDefault: AuthContextType = {
   logoutMember: () => {},
   isLoading: true,
   membersCount: null,
+  activeGame: null,
+  setActiveGame: () => {},
 };
 
 const AuthContext = createContext<AuthContextType>(AuthContextDefault);
@@ -94,6 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [membersCount, setMembersCount] = useState<number | null>(null);
+  const [activeGame, setActiveGameState] = useState<ActiveGame | null>(null);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -121,6 +134,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           localStorage.removeItem(MEMBER_SESSION_KEY);
         }
       }
+
+      const savedGame = localStorage.getItem(ACTIVE_GAME_KEY);
+      if (savedGame) {
+        const parsedGame = JSON.parse(savedGame);
+        if (parsedGame?.gameId && parsedGame?.name && parsedGame?.slug) {
+          setActiveGameState(parsedGame);
+        } else {
+          localStorage.removeItem(ACTIVE_GAME_KEY);
+        }
+      }
     } catch (error) {
       console.error("Failed to load auth sessions from localStorage:", error);
     } finally {
@@ -140,6 +163,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const currentState = getAuthState();
+
+  const validation = validateSystemState({
+    studioSession,
+    memberSession,
+    activeGame,
+  });
+
+  if (!validation.valid) {
+    console.error("[STATE VIOLATION]", validation.violations, {
+      studioSession,
+      memberSession,
+      activeGame,
+    });
+  }
 
   // Debug log
   useEffect(() => {
@@ -257,6 +294,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.location.href = "/dashboard";
   };
 
+  // Set active game (persists to localStorage)
+  const setActiveGame = (game: ActiveGame | null) => {
+    if (game) {
+      localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify(game));
+      setActiveGameState(game);
+    } else {
+      localStorage.removeItem(ACTIVE_GAME_KEY);
+      setActiveGameState(null);
+    }
+  };
+
   const authContext: AuthContextData = {
     state: currentState,
     studioSession,
@@ -271,6 +319,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logoutMember,
     isLoading,
     membersCount,
+    activeGame,
+    setActiveGame,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

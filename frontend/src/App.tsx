@@ -31,6 +31,7 @@ import HomePage from "./pages/HomePage";
 import CreateFirstPersonalAccount from "./pages/CreateFirstPersonalAccount";
 import PersonalAccountLogin from "./pages/PersonalAccountLogin";
 import { GameControl } from "./pages/GameControl";
+import Games from "./pages/Games";
 import { ROUTES } from "./routes";
 import "./index.css";
 
@@ -119,10 +120,7 @@ function AppRoutes() {
           path={ROUTES.games}
           element={
             <ProtectedMemberAuth>
-              <Page>
-                <PageHeader title="Games" />
-                <Card>TODO: Games page</Card>
-              </Page>
+              <Games />
             </ProtectedMemberAuth>
           }
         />

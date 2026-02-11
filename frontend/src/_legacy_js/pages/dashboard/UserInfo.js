@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export default function UserInfo({ user }) {
+    return (_jsxs("div", { className: "border p-4 rounded shadow", children: [_jsx("h2", { className: "text-xl font-semibold mb-2", children: "User Info" }), _jsxs("p", { children: [_jsx("strong", { children: "Email:" }), " ", user.email] }), _jsxs("p", { children: [_jsx("strong", { children: "Wallet:" }), " ", user.walletAddress] }), _jsxs("p", { children: [_jsx("strong", { children: "Custody Mode:" }), " ", user.custodyMode] }), _jsxs("p", { children: [_jsx("strong", { children: "KYC Status:" }), " ", user.kycStatus] }), user.studioId && (_jsxs("p", { children: [_jsx("strong", { children: "Studio ID:" }), " ", user.studioId] })), _jsxs("p", { children: [_jsx("strong", { children: "Admin:" }), " ", user.isAdmin ? "Yes" : "No"] })] }));
+}

@@ -13,11 +13,30 @@ import "../../style/Dashboard.css";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { authContext, membersCount } = useAuthState();
+  const { authContext, membersCount, activeGame } = useAuthState();
   const canManageMembers = useCanManageMembers();
 
   const studio = authContext.studioSession;
   const member = authContext.memberSession;
+
+  // If no active game is selected, show message
+  if (!activeGame) {
+    return (
+      <Page>
+        <PageHeader
+          title={studio?.studioName ?? "Okänd studio"}
+          subtitle={`ID: ${studio?.studioId ?? "-"}`}
+        />
+        <Card>
+          <h2>No active game selected</h2>
+          <p>Du måste välja ett game för att fortsätta.</p>
+          <Button onClick={() => navigate(ROUTES.games)}>
+            Gå till Games
+          </Button>
+        </Card>
+      </Page>
+    );
+  }
 
   return (
     <Page>
