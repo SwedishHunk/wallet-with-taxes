@@ -15,16 +15,34 @@ import { PlatformModule } from "./platform/platform.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: process.env.NODE_ENV === "test" ? ".env.test" : ".env",
     }),
     TypeOrmModule.forRoot({
       type: "postgres",
-      host: process.env.DATABASE_HOST,
-      port: Number(process.env.DATABASE_PORT),
-      username: process.env.DATABASE_USER,
-      password: process.env.DATABASE_PASSWORD,
-      database: process.env.DATABASE_NAME,
+      host:
+        process.env.NODE_ENV === "test"
+          ? process.env.TEST_DATABASE_HOST
+          : process.env.DATABASE_HOST,
+      port: Number(
+        process.env.NODE_ENV === "test"
+          ? process.env.TEST_DATABASE_PORT
+          : process.env.DATABASE_PORT,
+      ),
+      username:
+        process.env.NODE_ENV === "test"
+          ? process.env.TEST_DATABASE_USER
+          : process.env.DATABASE_USER,
+      password:
+        process.env.NODE_ENV === "test"
+          ? process.env.TEST_DATABASE_PASSWORD
+          : process.env.DATABASE_PASSWORD,
+      database:
+        process.env.NODE_ENV === "test"
+          ? process.env.TEST_DATABASE_NAME
+          : process.env.DATABASE_NAME,
       synchronize: true,
       autoLoadEntities: true,
+      dropSchema: process.env.NODE_ENV === "test" ? true : false,
     }),
     UsersModule,
     WalletsModule,

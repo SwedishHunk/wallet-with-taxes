@@ -47,6 +47,17 @@ export class PlatformController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get("games/:gameId/wallet/ledger")
+  getGameWalletLedger(@Req() req: Request, @Param("gameId") gameId: string) {
+    const jwtUser = req.user as JwtUser;
+    return this.platformService.getGameWalletLedger(
+      gameId,
+      jwtUser.id,
+      jwtUser.studioId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get("games/:gameId")
   getGameDetails(@Req() req: Request, @Param("gameId") gameId: string) {
     const jwtUser = req.user as JwtUser;
@@ -81,6 +92,7 @@ export class PlatformController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post("games/:gameId/wallet/withdraw")
   withdrawFromWallet(
     @Req() req: Request,
@@ -93,6 +105,24 @@ export class PlatformController {
       jwtUser.id,
       jwtUser.studioId,
       data.amount,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("games/:gameId/wallet/transfer")
+  transferToPlayer(
+    @Req() req: Request,
+    @Param("gameId") gameId: string,
+    @Body() data: { toUserId: string; amount: string; description?: string },
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.platformService.transferBetweenPlayersInGame(
+      gameId,
+      jwtUser.id,
+      data.toUserId,
+      jwtUser.studioId,
+      data.amount,
+      data.description,
     );
   }
 
@@ -194,12 +224,19 @@ export class PlatformController {
   @Post("personal-accounts")
   createPersonalAccount(
     @Req() req: Request,
-    @Body() data: { email: string; password: string; accessPoints?: Record<string, boolean> },
+    @Body()
+    data: {
+      email: string;
+      password: string;
+      accessPoints?: Record<string, boolean>;
+    },
   ) {
     const jwtUser = req.user as JwtUser;
     // Only studio owners can create personal accounts
     if (jwtUser.role !== "owner") {
-      throw new ForbiddenException("Only studio owners can create personal accounts");
+      throw new ForbiddenException(
+        "Only studio owners can create personal accounts",
+      );
     }
     return this.platformService.createPersonalAccount(
       jwtUser.studioId,

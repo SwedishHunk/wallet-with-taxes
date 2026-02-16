@@ -17,7 +17,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json",
+    "test:e2e:env": "bash scripts/test-e2e-env.sh",
+    "test:e2e:ci": "bash scripts/test-e2e-ci.sh",
+    "db:create:test": "bash scripts/db-create-test.sh",
+    "db:drop:test": "bash scripts/db-drop-test.sh",
+    "db:reset:test": "bash scripts/db-reset-test.sh"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -39,6 +44,7 @@
     "typeorm": "^0.3.23"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",

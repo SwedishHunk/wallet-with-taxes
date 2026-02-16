@@ -30,9 +30,7 @@ export default function Dashboard() {
         <Card>
           <h2>No active game selected</h2>
           <p>Du måste välja ett game för att fortsätta.</p>
-          <Button onClick={() => navigate(ROUTES.games)}>
-            Gå till Games
-          </Button>
+          <Button onClick={() => navigate(ROUTES.games)}>Gå till Games</Button>
         </Card>
       </Page>
     );

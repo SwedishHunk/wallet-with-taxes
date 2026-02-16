@@ -77,7 +77,13 @@ export default function MemberLogin() {
 
     void loadMembers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, authContext.studioSession, authContext.state, navigate, studioId]);
+  }, [
+    isLoading,
+    authContext.studioSession,
+    authContext.state,
+    navigate,
+    studioId,
+  ]);
 
   const loadMembers = async () => {
     try {
@@ -141,11 +147,7 @@ export default function MemberLogin() {
       });
 
       // 1) Logga in som den valda usern i denna studio → få ny token
-      const loginRes = await login(
-        selectedMember.email,
-        password,
-        studioId,
-      );
+      const loginRes = await login(selectedMember.email, password, studioId);
 
       const token = loginRes.data?.token;
       if (!token) {
@@ -159,7 +161,9 @@ export default function MemberLogin() {
       const nextStudioId =
         loginRes.data?.studioId ?? loginRes.data?.user?.studioId ?? studioId;
       const nextStudioName =
-        loginRes.data?.studioName ?? authContext.studioSession?.studioName ?? "";
+        loginRes.data?.studioName ??
+        authContext.studioSession?.studioName ??
+        "";
 
       if (nextStudioId) {
         setStudioSession({

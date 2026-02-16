@@ -3,13 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../lib/AuthContext";
 import { getGames, createGame } from "../lib/platform";
 import { ROUTES } from "../routes";
-import {
-  Page,
-  PageHeader,
-  Card,
-  Button,
-  Badge,
-} from "../components/ui/index";
+import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 
 interface Game {
   gameId: string;
@@ -86,7 +80,7 @@ export default function Games() {
 
     // Check for duplicate name or slug
     const duplicateName = games.find(
-      (g) => g.name.toLowerCase() === newGameName.trim().toLowerCase()
+      (g) => g.name.toLowerCase() === newGameName.trim().toLowerCase(),
     );
     const duplicateSlug = games.find((g) => g.slug === slug);
 
@@ -167,35 +161,35 @@ export default function Games() {
                   gap: "0.75rem",
                 }}>
                 {games.map((game) => (
-                    <div
-                      key={game.gameId}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "0.75rem",
-                        border: "1px solid var(--border, #ccc)",
-                        borderRadius: "4px",
-                        backgroundColor:
-                          activeGame?.gameId === game.gameId
-                            ? "var(--primary-light, #e3f2fd)"
-                            : "transparent",
-                      }}>
-                      <div>
-                        <strong>{game.name}</strong>
-                        <div style={{ fontSize: "0.875rem", color: "#666" }}>
-                          Slug: {game.slug} | ID: {game.gameId}
-                        </div>
+                  <div
+                    key={game.gameId}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "0.75rem",
+                      border: "1px solid var(--border, #ccc)",
+                      borderRadius: "4px",
+                      backgroundColor:
+                        activeGame?.gameId === game.gameId
+                          ? "var(--primary-light, #e3f2fd)"
+                          : "transparent",
+                    }}>
+                    <div>
+                      <strong>{game.name}</strong>
+                      <div style={{ fontSize: "0.875rem", color: "#666" }}>
+                        Slug: {game.slug} | ID: {game.gameId}
                       </div>
-                      <Button
-                        onClick={() => handleSetActive(game)}
-                        disabled={activeGame?.gameId === game.gameId}>
-                        {activeGame?.gameId === game.gameId
-                          ? "Aktivt"
-                          : "Set active"}
-                      </Button>
                     </div>
-                  ))}
+                    <Button
+                      onClick={() => handleSetActive(game)}
+                      disabled={activeGame?.gameId === game.gameId}>
+                      {activeGame?.gameId === game.gameId
+                        ? "Aktivt"
+                        : "Set active"}
+                    </Button>
+                  </div>
+                ))}
               </div>
             </Card>
           )}
@@ -257,7 +251,8 @@ export default function Games() {
                         fontSize: "0.875rem",
                         color: "#666",
                       }}>
-                      Auto-genererad slug: <strong>{generateSlug(newGameName)}</strong>
+                      Auto-genererad slug:{" "}
+                      <strong>{generateSlug(newGameName)}</strong>
                     </div>
                   )}
                 </div>

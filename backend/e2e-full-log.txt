@@ -1,0 +1,242 @@
+=== DATE ===
+Thu, Feb 12, 2026  3:45:27 PM
+
+=== NODE / NPM ===
+stdout is not a tty
+10.9.2
+
+=== ENV (test) ===
+TEST_DATABASE_HOST=localhost
+TEST_DATABASE_PORT=5432
+TEST_DATABASE_NAME=inner_wallet_test
+TEST_DATABASE_USER=postgres
+TEST_DATABASE_PASSWORD=LX7z8CGm^ZByd8KGsG48
+JWT_SECRET=test_jwt_secret_key
+PORT=3001
+
+# Encryption for custodial wallets (32 chars for key, 16 for IV)
+ENCRYPTION_KEY=12345678901234567890123456789012
+ENCRYPTION_IV=1234567890123456
+
+# Blockchain configuration
+RPC_URL=http://localhost:8545
+FACTORY_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+=== GREP sqlite/postgres/typeorm ===
+src\app.module.ts:3:import { TypeOrmModule } from "@nestjs/typeorm";
+src\app.module.ts:20:    TypeOrmModule.forRoot({
+src\app.module.ts:21:      type: "postgres",
+src\admin\admin.module.ts:4:import { TypeOrmModule } from '@nestjs/typeorm';
+src\admin\admin.module.ts:10:  imports: [TypeOrmModule.forFeature([TaxEvent, User]), TaxModule],
+src\wallets\wallets.module.ts:2:import { TypeOrmModule } from '@nestjs/typeorm';
+src\wallets\wallets.module.ts:8:  imports: [TypeOrmModule.forFeature([Wallet])],
+src\tax\tax.module.ts:2:import { TypeOrmModule } from '@nestjs/typeorm';
+src\tax\tax.module.ts:7:  imports: [TypeOrmModule.forFeature([TaxEvent])],
+src\platform\platform.module.ts:2:import { TypeOrmModule } from "@nestjs/typeorm";
+src\platform\platform.module.ts:21:    TypeOrmModule.forFeature([
+src\platform\platform.module.ts:37:    TypeOrmModule,
+src\users\users.module.ts:2:import { TypeOrmModule } from "@nestjs/typeorm";
+src\users\users.module.ts:13:    TypeOrmModule.forFeature([User, Studio, StudioMember]),
+
+=== RUN E2E ===
+
+> backend@0.0.1 test:e2e:env
+> bash scripts/test-e2e-env.sh
+
+
+> backend@0.0.1 test:e2e
+> cross-env NODE_ENV=test jest --config ./test/jest-e2e.json
+
+  console.log
+    JWT_SECRET in JwtStrategy: test_jwt_secret_key
+
+      at new JwtStrategy (../src/auth/jwt.strategy.ts:16:13)
+          at async Promise.all (index 4)
+          at async Promise.all (index 1)
+
+[31m[Nest] 28040  - [39m2026-02-12 15:45:32 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (1)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:35 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (2)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:38 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (3)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:41 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (4)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:44 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (5)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:47 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (6)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:50 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (7)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:53 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (8)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+[31m[Nest] 28040  - [39m2026-02-12 15:45:56 [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (9)...[39m
+TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+    at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+    at Array.forEach (<anonymous>)
+    at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+    at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+    at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+  console.error
+    E2E beforeAll failed: TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+        at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1128:23
+        at Array.forEach (<anonymous>)
+        at EntityMetadataBuilder.computeInverseProperties (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:1118:34)
+        at D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:160:18
+        at Array.forEach (<anonymous>)
+        at EntityMetadataBuilder.build (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\metadata-builder\EntityMetadataBuilder.ts:159:25)
+        at ConnectionMetadataBuilder.buildEntityMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\connection\ConnectionMetadataBuilder.ts:106:11)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at DataSource.buildMetadatas (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:712:13)
+        at DataSource.initialize (D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\backend\src\data-source\DataSource.ts:263:13)
+
+    [0m [90m 180 |[39m       })[33m;[39m
+     [90m 181 |[39m     } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 182 |[39m       console[33m.[39merror([32m"E2E beforeAll failed:"[39m[33m,[39m err)[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 183 |[39m       [36mthrow[39m err[33m;[39m
+     [90m 184 |[39m     }
+     [90m 185 |[39m   })[33m;[39m[0m
+
+      at Object.<anonymous> (platform-wallet-ledger.e2e-spec.ts:182:15)
+
+FAIL test/platform-wallet-ledger.e2e-spec.ts (26.177 s)
+  Game Wallet & Ledger E2E Smoke Tests
+    Smoke Tests
+      × A) GET /platform/games/:gameId/wallet should return wallet with balance, totalDeposited, totalWithdrawn (1 ms)
+      × B) GET /platform/games/:gameId/wallet/ledger should return array of ledger entries
+      × C) POST /platform/games/:gameId/wallet/deposit should record entry in ledger
+
+  ● Game Wallet & Ledger E2E Smoke Tests › Smoke Tests › A) GET /platform/games/:gameId/wallet should return wallet with balance, totalDeposited, totalWithdrawn
+
+    TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:1128:23
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.computeInverseProperties (../src/metadata-builder/EntityMetadataBuilder.ts:1118:34)
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:160:18
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.build (../src/metadata-builder/EntityMetadataBuilder.ts:159:25)
+      at ConnectionMetadataBuilder.buildEntityMetadatas (../src/connection/ConnectionMetadataBuilder.ts:106:11)
+      at DataSource.buildMetadatas (../src/data-source/DataSource.ts:712:13)
+      at DataSource.initialize (../src/data-source/DataSource.ts:263:13)
+
+  ● Game Wallet & Ledger E2E Smoke Tests › Smoke Tests › B) GET /platform/games/:gameId/wallet/ledger should return array of ledger entries
+
+    TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:1128:23
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.computeInverseProperties (../src/metadata-builder/EntityMetadataBuilder.ts:1118:34)
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:160:18
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.build (../src/metadata-builder/EntityMetadataBuilder.ts:159:25)
+      at ConnectionMetadataBuilder.buildEntityMetadatas (../src/connection/ConnectionMetadataBuilder.ts:106:11)
+      at DataSource.buildMetadatas (../src/data-source/DataSource.ts:712:13)
+      at DataSource.initialize (../src/data-source/DataSource.ts:263:13)
+
+  ● Game Wallet & Ledger E2E Smoke Tests › Smoke Tests › C) POST /platform/games/:gameId/wallet/deposit should record entry in ledger
+
+    TypeORMError: Entity metadata for GamePlayer#studioUser was not found. Check if you specified a correct entity object and if it's connected in the connection options.
+
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:1128:23
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.computeInverseProperties (../src/metadata-builder/EntityMetadataBuilder.ts:1118:34)
+      at ../src/metadata-builder/EntityMetadataBuilder.ts:160:18
+          at Array.forEach (<anonymous>)
+      at EntityMetadataBuilder.build (../src/metadata-builder/EntityMetadataBuilder.ts:159:25)
+      at ConnectionMetadataBuilder.buildEntityMetadatas (../src/connection/ConnectionMetadataBuilder.ts:106:11)
+      at DataSource.buildMetadatas (../src/data-source/DataSource.ts:712:13)
+      at DataSource.initialize (../src/data-source/DataSource.ts:263:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        26.335 s, estimated 28 s
+Ran all test suites.

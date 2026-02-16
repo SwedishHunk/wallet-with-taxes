@@ -5,10 +5,14 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  Check,
 } from "typeorm";
 import { GamePlayer } from "./game-player.entity";
 
 @Entity({ name: "game_wallets" })
+@Check(`balance >= 0`)
+@Check(`"totalDeposited" >= 0`)
+@Check(`"totalWithdrawn" >= 0`)
 export class GameWallet {
   @PrimaryGeneratedColumn("uuid")
   id: string;
