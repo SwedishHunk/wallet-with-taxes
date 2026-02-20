@@ -2,10 +2,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../routes";
-import { login, getStudios, getMemberSession } from "../lib/users";
+import { login, getStudios } from "../lib/users";
 import { setAuthToken } from "../lib/api";
 import { useAuthState } from "../lib/AuthContext";
-import { useLoginMember, useLoginStudio } from "../lib/useAuth";
+import { useLoginStudio } from "../lib/useAuth";
 import "../style/Login.css";
 import "../style/Bright.css";
 
@@ -15,14 +15,11 @@ export default function Login() {
   const navigate = useNavigate();
   const { authContext } = useAuthState();
   const { loginStudio } = useLoginStudio();
-  const { loginMember } = useLoginMember();
 
   const [studioEmail, setStudioEmail] = useState("");
   const [studioPassword, setStudioPassword] = useState("");
   const [studioError, setStudioError] = useState<string | null>(null);
-  const [memberError, setMemberError] = useState<string | null>(null);
   const [studioLoading, setStudioLoading] = useState(false);
-  const [memberLoading, setMemberLoading] = useState(false);
 
   // Keep errors until next interaction; no auto-clear so user can read them
 

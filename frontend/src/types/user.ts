@@ -9,3 +9,11 @@ export interface User {
   studioId?: string | null;
   createdAt: string;
 }
+
+/** Personal account user (logged into a personal account within a game/studio context) */
+export interface PersonalUser {
+  id: string;
+  email: string;
+  role: string;
+  accessPoints: Record<string, boolean>;
+}

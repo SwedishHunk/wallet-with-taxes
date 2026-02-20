@@ -8,16 +8,12 @@ import * as crypto from "crypto";
 import GenesisWalletFactoryAbiJson from "../shared/constants/abis/GenesisWalletFactory.json";
 import { JwtService } from "@nestjs/jwt";
 import type { InterfaceAbi } from "ethers";
-import {
-  ContractTransactionResponse,
-  ContractTransactionReceipt,
-} from "ethers";
+import { ContractTransactionResponse } from "ethers";
 import console from "console";
 import { Studio } from "../platform/entities/studio.entity";
 import {
   StudioMember,
   StudioRole,
-  PermissionBitMask,
 } from "../platform/entities/studio-member.entity";
 import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";

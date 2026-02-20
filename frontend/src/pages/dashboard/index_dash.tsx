@@ -9,6 +9,7 @@ import {
   Button,
   Badge,
 } from "../../components/ui/index";
+import WalletInfo from "./WalletInfo";
 import "../../style/Dashboard.css";
 
 export default function Dashboard() {
@@ -101,6 +102,11 @@ export default function Dashboard() {
           </div>
         </Card>
       )}
+
+      {/* Game Wallet UI */}
+      <Card>
+        <WalletInfo />
+      </Card>
     </Page>
   );
 }

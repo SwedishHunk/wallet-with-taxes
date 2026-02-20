@@ -27,7 +27,6 @@ import Dashboard from "./pages/dashboard/index_dash";
 import MemberLogin from "./pages/MemberLogin";
 import Members from "./pages/Members";
 import PersonalAccounts from "./pages/PersonalAccounts";
-import HomePage from "./pages/HomePage";
 import CreateFirstPersonalAccount from "./pages/CreateFirstPersonalAccount";
 import PersonalAccountLogin from "./pages/PersonalAccountLogin";
 import { GameControl } from "./pages/GameControl";

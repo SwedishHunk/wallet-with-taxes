@@ -20,7 +20,9 @@ export class GamePlayer {
   @ManyToOne(() => User, { nullable: true })
   user?: User;
 
-  @ManyToOne(() => StudioUser, (studioUser) => studioUser.gamePlayers, { nullable: true })
+  @ManyToOne(() => StudioUser, (studioUser) => studioUser.gamePlayers, {
+    nullable: true,
+  })
   studioUser?: StudioUser;
 
   @ManyToOne(() => Game, { nullable: false })

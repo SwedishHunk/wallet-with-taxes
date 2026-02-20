@@ -7,22 +7,24 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Unique,
-} from 'typeorm';
-import { Studio } from './studio.entity';
-import { GamePlayer } from './game-player.entity';
+} from "typeorm";
+import { Studio } from "./studio.entity";
+import { GamePlayer } from "./game-player.entity";
 
 export enum StudioUserRole {
-  ADMIN = 'admin',
-  MEMBER = 'member',
+  ADMIN = "admin",
+  MEMBER = "member",
 }
 
 @Entity()
-@Unique(['studio', 'email'])
+@Unique(["studio", "email"])
 export class StudioUser {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @ManyToOne(() => Studio, (studio) => studio.studioUsers, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Studio, (studio) => studio.studioUsers, {
+    onDelete: "CASCADE",
+  })
   studio: Studio;
 
   @Column()
@@ -31,10 +33,14 @@ export class StudioUser {
   @Column()
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: StudioUserRole, default: StudioUserRole.MEMBER })
+  @Column({
+    type: "enum",
+    enum: StudioUserRole,
+    default: StudioUserRole.MEMBER,
+  })
   role: StudioUserRole;
 
-  @Column({ type: 'json', default: {} })
+  @Column({ type: "json", default: {} })
   accessPoints: Record<string, boolean>;
 
   @OneToMany(() => GamePlayer, (gamePlayer) => gamePlayer.studioUser)

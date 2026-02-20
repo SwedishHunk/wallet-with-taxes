@@ -24,9 +24,12 @@ export default function HomePage() {
       try {
         const response = await getPersonalAccounts();
         setPersonalAccounts(response.data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching accounts:", err);
-        setError(err.response?.data?.message || "Failed to load accounts");
+        setError(
+          (err as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message || "Failed to load accounts"
+        );
       } finally {
         setLoading(false);
       }

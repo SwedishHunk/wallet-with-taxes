@@ -50,8 +50,11 @@ export default function Members() {
       );
       setMembers(data);
       setError("");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load members");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load members"
+      );
     } finally {
       setLoading(false);
     }
@@ -67,10 +70,14 @@ export default function Members() {
 
     try {
       const permissionsList = Object.entries(formData.permissions)
-        .filter(([_, v]) => v)
-        .map(([k, _]) => k);
+        .filter(([, v]) => v)
+        .map(([k]) => k);
 
-      const payload: any = {
+      const payload: {
+        email: string;
+        permissions: string[];
+        password?: string;
+      } = {
         email: formData.email,
         permissions: permissionsList,
       };
@@ -98,8 +105,11 @@ export default function Members() {
       setShowForm(false);
       setError("");
       await fetchMembers();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to create member");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to create member"
+      );
     }
   };
 

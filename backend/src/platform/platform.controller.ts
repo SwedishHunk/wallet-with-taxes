@@ -12,6 +12,16 @@ import { PlatformService } from "./platform.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Request } from "express";
 import { JwtUser } from "../auth/jwt-user.interface";
+import {
+  CreateGameDto,
+  CreateNftTemplateDto,
+  CreatePersonalAccountDto,
+  LoginPersonalAccountDto,
+  TransferBetweenPlayersDto,
+  UpdateNftDto,
+  UpdatePersonalAccountPermissionsDto,
+  WalletAmountDto,
+} from "./dto/platform-request.dto";
 
 @Controller("platform")
 export class PlatformController {
@@ -19,10 +29,7 @@ export class PlatformController {
 
   @UseGuards(JwtAuthGuard)
   @Post("games")
-  createGame(
-    @Req() req: Request,
-    @Body() data: { name: string; slug: string },
-  ) {
+  createGame(@Req() req: Request, @Body() data: CreateGameDto) {
     const jwtUser = req.user as JwtUser;
     // Only owner/admin can create games
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
@@ -80,7 +87,7 @@ export class PlatformController {
   depositToWallet(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body() data: { amount: string },
+    @Body() data: WalletAmountDto,
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.depositToGameWallet(
@@ -92,12 +99,11 @@ export class PlatformController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @UseGuards(JwtAuthGuard)
   @Post("games/:gameId/wallet/withdraw")
   withdrawFromWallet(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body() data: { amount: string },
+    @Body() data: WalletAmountDto,
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.withdrawFromGameWallet(
@@ -113,7 +119,7 @@ export class PlatformController {
   transferToPlayer(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body() data: { toUserId: string; amount: string; description?: string },
+    @Body() data: TransferBetweenPlayersDto,
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.transferBetweenPlayersInGame(
@@ -143,15 +149,7 @@ export class PlatformController {
   createNFTTemplate(
     @Req() req: Request,
     @Param("gameId") gameId: string,
-    @Body()
-    data: {
-      name: string;
-      tier?: number;
-      attributes?: Record<string, any>;
-      upkeepCostPerDay?: string;
-      mintingCost?: string;
-      maxMintCount?: number;
-    },
+    @Body() data: CreateNftTemplateDto,
   ) {
     const jwtUser = req.user as JwtUser;
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
@@ -181,7 +179,6 @@ export class PlatformController {
     @Req() req: Request,
     @Param("gameId") gameId: string,
     @Param("templateId") templateId: string,
-    @Body() data?: { targetUserId?: string },
   ) {
     const jwtUser = req.user as JwtUser;
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
@@ -191,7 +188,6 @@ export class PlatformController {
       gameId,
       jwtUser.studioId,
       templateId,
-      data?.targetUserId,
     );
   }
 
@@ -201,12 +197,7 @@ export class PlatformController {
     @Req() req: Request,
     @Param("gameId") gameId: string,
     @Param("nftId") nftId: string,
-    @Body()
-    data: {
-      equipped?: boolean;
-      condition?: number;
-      customAttributes?: Record<string, any>;
-    },
+    @Body() data: UpdateNftDto,
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.updateNFTInstance(
@@ -224,12 +215,7 @@ export class PlatformController {
   @Post("personal-accounts")
   createPersonalAccount(
     @Req() req: Request,
-    @Body()
-    data: {
-      email: string;
-      password: string;
-      accessPoints?: Record<string, boolean>;
-    },
+    @Body() data: CreatePersonalAccountDto,
   ) {
     const jwtUser = req.user as JwtUser;
     // Only studio owners can create personal accounts
@@ -257,7 +243,7 @@ export class PlatformController {
   @Post("personal-accounts/login")
   loginPersonalAccount(
     @Req() req: Request,
-    @Body() data: { email: string; password: string },
+    @Body() data: LoginPersonalAccountDto,
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.loginStudioUser(
@@ -272,7 +258,7 @@ export class PlatformController {
   updatePersonalAccountPermissions(
     @Req() req: Request,
     @Param("userId") userId: string,
-    @Body() data: { accessPoints: Record<string, boolean> },
+    @Body() data: UpdatePersonalAccountPermissionsDto,
   ) {
     const jwtUser = req.user as JwtUser;
     // Only studio owners can update permissions

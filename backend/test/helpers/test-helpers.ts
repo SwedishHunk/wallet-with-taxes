@@ -6,7 +6,9 @@
  */
 
 import request from "supertest";
+import type { INestApplication } from "@nestjs/common";
 import type { Test } from "supertest";
+import type { Server } from "http";
 
 export interface TestUser {
   id: string;
@@ -47,46 +49,51 @@ export function authHeader(token: string) {
  * Validates game wallet response shape
  * Throws if shape is invalid
  */
-export function validateGameWalletShape(data: any): TestGameWalletResponse {
+export function validateGameWalletShape(data: unknown): TestGameWalletResponse {
+  const record = data as Record<string, unknown>;
   if (
-    !data.id ||
-    !data.balance ||
-    data.totalDeposited === undefined ||
-    data.totalWithdrawn === undefined
+    !record.id ||
+    !record.balance ||
+    record.totalDeposited === undefined ||
+    record.totalWithdrawn === undefined
   ) {
     throw new Error(
       `Invalid wallet shape. Expected {id, balance, totalDeposited, totalWithdrawn}, got: ${JSON.stringify(data)}`,
     );
   }
-  return data;
+  return data as TestGameWalletResponse;
 }
 
 /**
  * Validates ledger entry response shape
  * Throws if shape is invalid
  */
-export function validateLedgerEntryShape(data: any): TestLedgerEntry {
+export function validateLedgerEntryShape(data: unknown): TestLedgerEntry {
+  const record = data as Record<string, unknown>;
   if (
-    !data.id ||
-    !data.type ||
-    !data.amount ||
-    !data.txGroupId ||
-    !data.description
+    !record.id ||
+    !record.type ||
+    !record.amount ||
+    !record.txGroupId ||
+    !record.description
   ) {
     throw new Error(
       `Invalid ledger entry shape. Expected {id, type, amount, txGroupId, description}, got: ${JSON.stringify(data)}`,
     );
   }
-  if (!["deposit", "withdraw", "transfer"].includes(data.type)) {
-    throw new Error(`Invalid ledger type: ${data.type}`);
+  const typeVal = record.type;
+  const typeStr =
+    typeof typeVal === "string" ? typeVal : JSON.stringify(typeVal);
+  if (!["deposit", "withdraw", "transfer"].includes(typeStr)) {
+    throw new Error(`Invalid ledger type: ${typeStr}`);
   }
-  return data;
+  return data as TestLedgerEntry;
 }
 
 /**
  * Validates that response is an array of ledger entries
  */
-export function validateLedgerArrayShape(data: any[]): TestLedgerEntry[] {
+export function validateLedgerArrayShape(data: unknown): TestLedgerEntry[] {
   if (!Array.isArray(data)) {
     throw new Error(`Expected array of ledger entries, got: ${typeof data}`);
   }
@@ -97,11 +104,11 @@ export function validateLedgerArrayShape(data: any[]): TestLedgerEntry[] {
  * Helper to make authenticated request to game wallet endpoint
  */
 export async function getGameWallet(
-  app: any,
+  app: INestApplication,
   gameId: string,
   token: string,
 ): Promise<Test> {
-  return request(app)
+  return request(app.getHttpServer() as Server)
     .get(`/platform/games/${gameId}/wallet`)
     .set(authHeader(token))
     .expect(200);
@@ -111,11 +118,11 @@ export async function getGameWallet(
  * Helper to make authenticated request to game wallet ledger endpoint
  */
 export async function getGameWalletLedger(
-  app: any,
+  app: INestApplication,
   gameId: string,
   token: string,
 ) {
-  return request(app)
+  return request(app.getHttpServer() as Server)
     .get(`/platform/games/${gameId}/wallet/ledger`)
     .set(authHeader(token))
     .expect(200);

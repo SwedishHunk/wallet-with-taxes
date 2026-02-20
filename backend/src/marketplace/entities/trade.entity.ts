@@ -6,7 +6,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 @Entity()
 export class Trade {
   @PrimaryGeneratedColumn()
@@ -21,17 +21,17 @@ export class Trade {
   @Column()
   listingId: number;
 
-  @Column('decimal')
+  @Column("decimal")
   amount: number;
 
-  @Column('decimal')
+  @Column("decimal")
   totalPrice: number;
 
-  @Column('decimal')
+  @Column("decimal")
   feeUSD: number;
 
-  @Column({ default: 'pending' })
-  status: 'pending' | 'confirmed' | 'failed';
+  @Column({ default: "pending" })
+  status: "pending" | "confirmed" | "failed";
 
   @CreateDateColumn()
   createdAt: Date;

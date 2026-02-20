@@ -67,7 +67,7 @@ export default function PersonalAccounts() {
         navigate(ROUTES.dashboard);
         return;
       }
-    } catch (err) {
+    } catch {
       navigate(ROUTES.home);
       return;
     }

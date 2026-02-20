@@ -11,11 +11,26 @@ export const getGameDetails = (gameId: string) =>
 export const getGameWallet = (gameId: string) =>
   api.get(`/platform/games/${gameId}/wallet`);
 
-export const depositToWallet = (gameId: string, amount: string) =>
-  api.post(`/platform/games/${gameId}/wallet/deposit`, { amount });
+export const getGameWalletLedger = (gameId: string) =>
+  api.get(`/platform/games/${gameId}/wallet/ledger`);
 
-export const withdrawFromWallet = (gameId: string, amount: string) =>
-  api.post(`/platform/games/${gameId}/wallet/withdraw`, { amount });
+export const depositToWallet = (gameId: string, amount: string, description?: string) =>
+  api.post(`/platform/games/${gameId}/wallet/deposit`, { amount, description });
+
+export const withdrawFromWallet = (gameId: string, amount: string, description?: string) =>
+  api.post(`/platform/games/${gameId}/wallet/withdraw`, { amount, description });
+
+export const transferBetweenPlayers = (
+  gameId: string,
+  toUserId: string,
+  amount: string,
+  description?: string,
+) =>
+  api.post(`/platform/games/${gameId}/wallet/transfer`, {
+    toUserId,
+    amount,
+    description,
+  });
 
 // NFT Functions
 
@@ -27,7 +42,7 @@ export const createNFTTemplate = (
   data: {
     name: string;
     tier?: number;
-    attributes?: Record<string, any>;
+    attributes?: Record<string, unknown>;
     upkeepCostPerDay?: string;
     mintingCost?: string;
     maxMintCount?: number;
@@ -52,7 +67,7 @@ export const updateNFT = (
   data: {
     equipped?: boolean;
     condition?: number;
-    customAttributes?: Record<string, any>;
+    customAttributes?: Record<string, unknown>;
   },
 ) => api.post(`/platform/games/${gameId}/nfts/${nftId}/update`, data);
 // Personal Account Management

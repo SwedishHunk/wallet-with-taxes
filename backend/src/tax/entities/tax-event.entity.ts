@@ -3,15 +3,15 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
 @Entity()
 export class TaxEvent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar' })
-  type: 'trade' | 'mint' | 'withdraw' | 'reward' | 'acquisition' | 'disposal';
+  @Column({ type: "varchar" })
+  type: "trade" | "mint" | "withdraw" | "reward" | "acquisition" | "disposal";
 
   @Column()
   userAddress: string;
@@ -22,15 +22,15 @@ export class TaxEvent {
   @Column()
   tokenId: number;
 
-  @Column('decimal')
+  @Column("decimal")
   amount: number;
 
-  @Column('decimal')
+  @Column("decimal")
   feeUSD: number;
 
   @CreateDateColumn()
   timestamp: Date;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ type: "float", nullable: true })
   priceUSD?: number;
 }

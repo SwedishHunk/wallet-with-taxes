@@ -13,15 +13,19 @@ type JwtPayload = {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error("JWT_SECRET environment variable is required");
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET ?? "default_jwt_secret", // fallback for safety
+      secretOrKey: jwtSecret,
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async validate(payload: JwtPayload) {
+  validate(payload: JwtPayload) {
     return {
       id: payload.id,
       email: payload.email,

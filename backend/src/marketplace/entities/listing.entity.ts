@@ -4,7 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
 @Entity()
 export class Listing {
@@ -15,8 +15,8 @@ export class Listing {
   @Column() tokenAddress: string;
   @Column() tokenId: number;
   @Column() amount: number;
-  @Column('decimal') pricePerUnit: number;
-  @Column({ default: 'active' }) status: 'active' | 'sold' | 'cancelled';
+  @Column("decimal") pricePerUnit: number;
+  @Column({ default: "active" }) status: "active" | "sold" | "cancelled";
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

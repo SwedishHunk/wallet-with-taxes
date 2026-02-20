@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsNumber } from 'class-validator';
+import { IsString, IsInt, IsNumber } from "class-validator";
 
 export class ListItemDto {
   @IsString()

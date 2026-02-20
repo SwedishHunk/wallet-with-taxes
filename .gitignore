@@ -50,3 +50,11 @@ nul
 POINT_*.md
 STEG_*.md
 VERIFICATION_*.md
+
+# legacy/dubletter i frontend
+frontend/src/_legacy_js/
+frontend/src/**/*.js
+frontend/src/**/*.jsx
+
+# om de här bara är anteckningar
+WALLET_UI_*.md

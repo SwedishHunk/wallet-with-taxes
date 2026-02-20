@@ -10,28 +10,25 @@ import {
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Request } from "express";
+import { LinkWalletDto, LoginDto, SignupDto } from "./dto/users-request.dto";
 
 @Controller("users")
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post("signup")
-  async signup(
-    @Body() body: { email: string; password: string; studioName?: string },
-  ) {
+  async signup(@Body() body: SignupDto) {
     const { email, password, studioName } = body;
     return this.usersService.signup(email, password, studioName);
   }
 
   @Post("login")
-  async login(
-    @Body() body: { email: string; password: string; studioId?: string },
-  ) {
+  async login(@Body() body: LoginDto) {
     return this.usersService.login(body.email, body.password, body.studioId);
   }
 
   @Post("link-wallet")
-  async linkWallet(@Body() body: { email: string; walletAddress: string }) {
+  async linkWallet(@Body() body: LinkWalletDto) {
     return this.usersService.linkWallet(body.email, body.walletAddress);
   }
 

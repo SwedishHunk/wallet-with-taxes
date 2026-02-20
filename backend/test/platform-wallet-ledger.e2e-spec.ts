@@ -5,6 +5,7 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import request from "supertest";
 import { DataSource, Repository } from "typeorm";
+import type { Server } from "http";
 import { PlatformService } from "src/platform/platform.service";
 import { PlatformController } from "src/platform/platform.controller";
 import { JwtStrategy } from "src/auth/jwt.strategy";
@@ -30,8 +31,7 @@ import { TestLogger } from "./helpers/test-logger";
 
 describe("Game Wallet & Ledger E2E Smoke Tests", () => {
   let app: INestApplication | null = null;
-  let server: any = null;
-  let platformService: PlatformService;
+  let server: Server;
   let jwtService: JwtService;
   let dataSource: DataSource | null = null;
 
@@ -40,9 +40,6 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
   let studioRepo: Repository<Studio>;
   let studioMemberRepo: Repository<StudioMember>;
   let gameRepo: Repository<Game>;
-  let gamePlayerRepo: Repository<GamePlayer>;
-  let walletRepo: Repository<GameWallet>;
-  let ledgerRepo: Repository<LedgerEntry>;
 
   // Test data
   let user1: User;
@@ -54,7 +51,6 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
   let game3: Game;
   let user1Token: string;
   let user2Token: string;
-  let studio2Token: string;
 
   beforeAll(async () => {
     try {
@@ -121,9 +117,8 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
       app.useLogger(new TestLogger()); // Silence Nest logs for cleaner test output
       app.useGlobalPipes(new ValidationPipe());
       await app.init();
-      server = app.getHttpServer();
+      server = app.getHttpServer() as Server;
 
-      platformService = moduleFixture.get(PlatformService);
       jwtService = moduleFixture.get(JwtService);
       dataSource = moduleFixture.get(DataSource);
 
@@ -137,9 +132,6 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
       studioRepo = ds.getRepository(Studio);
       studioMemberRepo = ds.getRepository(StudioMember);
       gameRepo = ds.getRepository(Game);
-      gamePlayerRepo = ds.getRepository(GamePlayer);
-      walletRepo = ds.getRepository(GameWallet);
-      ledgerRepo = ds.getRepository(LedgerEntry);
 
       // Seed test data
       user1 = await userRepo.save({
@@ -213,11 +205,17 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
       });
 
       // JWT token helper
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
+      const jwtSecretRaw = process.env.JWT_SECRET;
+      if (!jwtSecretRaw || typeof jwtSecretRaw !== "string") {
         throw new Error("JWT_SECRET not set for e2e");
       }
-      const signTestToken = (payload: any) => {
+      const jwtSecret = jwtSecretRaw;
+      const signTestToken = (payload: unknown) => {
+        if (typeof payload !== "object" || payload === null) {
+          throw new Error(
+            `Expected payload to be object, got: ${JSON.stringify(payload)}`,
+          );
+        }
         return jwtService.sign(payload, { secret: jwtSecret });
       };
 
@@ -232,12 +230,6 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
         id: user2.id,
         studioId: studio.id,
         role: "member",
-      });
-
-      studio2Token = signTestToken({
-        id: user2.id,
-        studioId: studio2.id,
-        role: "owner",
       });
     } catch (err) {
       console.error("E2E beforeAll failed:", err);
@@ -282,7 +274,7 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
 
     it("C) POST /platform/games/:gameId/wallet/deposit should record entry in ledger", async () => {
       // Deposit
-      const depositRes = await request(server)
+      await request(server)
         .post(`/platform/games/${game.id}/wallet/deposit`)
         .set(authHeader(user1Token))
         .send({ amount: "10" })
@@ -566,6 +558,15 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
       const finalLedger = validateLedgerArrayShape(finalLedgerRes.body);
 
       expect(finalLedger.length).toBe(initialLedgerLen);
+    });
+
+    it("G2) Deposit with non-numeric amount should return 400", async () => {
+      const response = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit`)
+        .set(authHeader(user1Token))
+        .send({ amount: "abc" });
+
+      expect(response.status).toBe(400);
     });
 
     it("H) Withdraw with zero/negative amount should return 400 and not modify DB", async () => {

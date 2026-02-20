@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Wallet } from './wallet.entity';
-import { ethers } from 'ethers';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Wallet } from "./wallet.entity";
+import { ethers } from "ethers";
 
 @Injectable()
 export class WalletsService {
@@ -24,7 +24,7 @@ export class WalletsService {
       if (!process.env.RPC_URL) {
         return {
           address,
-          balance: '0 ETH',
+          balance: "0 ETH",
         };
       }
 
@@ -37,10 +37,10 @@ export class WalletsService {
         balance: `${balanceEth} ETH`,
       };
     } catch (err) {
-      console.warn('Error fetching balance:', err);
+      console.warn("Error fetching balance:", err);
       return {
         address,
-        balance: '0 ETH (unavailable)',
+        balance: "0 ETH (unavailable)",
       };
     }
   }
@@ -49,8 +49,8 @@ export class WalletsService {
     return {
       address,
       assets: [
-        { name: 'TIX_HARDKODED!!!', symbol: 'TIX', balance: 500 },
-        { name: 'USDC_HARDKODED!!!', symbol: 'USDC', balance: 1250 },
+        { name: "TIX_HARDKODED!!!", symbol: "TIX", balance: 500 },
+        { name: "USDC_HARDKODED!!!", symbol: "USDC", balance: 1250 },
       ],
     };
   }
@@ -60,10 +60,10 @@ export class WalletsService {
     return {
       tokenId,
       owner: address,
-      type: 'ERC721',
-      name: 'Genesis NFT #' + tokenId,
+      type: "ERC721",
+      name: "Genesis NFT #" + tokenId,
       image: `https://example.com/images/${tokenId}.png`,
-      description: 'A unique Genesis NFT',
+      description: "A unique Genesis NFT",
     };
   }
 }

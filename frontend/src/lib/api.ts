@@ -32,7 +32,7 @@ api.interceptors.response.use(
         localStorage.removeItem("studio_session");
         localStorage.removeItem("member_session");
         setAuthToken(null);
-      } catch (e) {
+      } catch {
         // ignore
       }
       return Promise.reject(error);

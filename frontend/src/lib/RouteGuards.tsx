@@ -140,13 +140,13 @@ export function ProtectedMemberAuth({ children }: GuardProps) {
  * <Route path="/members" element={<ProtectedPage />} />
  */
 export function WithAuth(
-  Component: React.ComponentType<any>,
+  Component: React.ComponentType<Record<string, unknown>>,
   requiredState:
     | "Unauthenticated"
     | "StudioAuthenticated"
     | "Studio+MemberActive",
 ) {
-  return function ProtectedComponent(props: any) {
+  return function ProtectedComponent(props: Record<string, unknown>) {
     const { authContext, isLoading } = useAuthState();
 
     if (isLoading) {

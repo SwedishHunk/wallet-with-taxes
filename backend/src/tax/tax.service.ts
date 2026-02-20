@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { TaxEvent } from './entities/tax-event.entity';
-import { Response } from 'express';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { TaxEvent } from "./entities/tax-event.entity";
+import { Response } from "express";
 
 interface TaxCsvRow {
   Date: string;
@@ -28,7 +28,7 @@ export class TaxService {
   async getEventsForUser(userAddress: string): Promise<TaxEvent[]> {
     return this.repo.find({
       where: { userAddress },
-      order: { timestamp: 'ASC' },
+      order: { timestamp: "ASC" },
     });
   }
 
@@ -46,7 +46,7 @@ export class TaxService {
       const key = `${e.assetAddress}:${e.tokenId}`;
 
       if (
-        e.type === 'acquisition' &&
+        e.type === "acquisition" &&
         e.priceUSD !== null &&
         e.priceUSD !== undefined
       ) {
@@ -59,7 +59,7 @@ export class TaxService {
       }
 
       if (
-        e.type === 'disposal' &&
+        e.type === "disposal" &&
         e.priceUSD !== null &&
         e.priceUSD !== undefined
       ) {
@@ -106,19 +106,19 @@ export class TaxService {
       Asset: e.assetAddress,
       TokenID: e.tokenId,
       Amount: Number(e.amount),
-      PriceUSD: e.priceUSD ?? '',
+      PriceUSD: e.priceUSD ?? "",
       FeeUSD: Number(e.feeUSD),
     }));
 
-    const header = Object.keys(formatted[0]).join(',');
+    const header = Object.keys(formatted[0]).join(",");
     const rows = formatted.map(
       (row) =>
         `${row.Date},${row.Type},${row.Asset},${row.TokenID},${row.Amount},${row.PriceUSD},${row.FeeUSD}`,
     );
-    const csv = [header, ...rows].join('\n');
+    const csv = [header, ...rows].join("\n");
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=tax-report.csv');
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=tax-report.csv");
     res.send(csv);
   }
 }

@@ -20,9 +20,10 @@ export default function PersonalAccountLogin() {
   const [accounts, setAccounts] = useState<
     Array<{ id: string; email: string; role: string }>
   >([]);
-  const [mode, setMode] = useState<"login" | "create">(
-    (location.state?.mode as any) || "login",
-  );
+  const [mode, setMode] = useState<"login" | "create">(() => {
+    const stateMode = location.state?.mode;
+    return stateMode === "create" || stateMode === "login" ? stateMode : "login";
+  });
   const [createEmail, setCreateEmail] = useState(
     (location.state?.email as string) || "",
   );
@@ -82,10 +83,11 @@ export default function PersonalAccountLogin() {
 
       // Redirect to dashboard
       navigate(ROUTES.dashboard);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error logging in:", err);
       setError(
-        err.response?.data?.message || "Invalid credentials. Please try again.",
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Invalid credentials. Please try again."
       );
     } finally {
       setLoading(false);
@@ -125,10 +127,10 @@ export default function PersonalAccountLogin() {
       // Refresh account list
       const res = await getPersonalAccounts();
       setAccounts(res.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(
-        err.response?.data?.message ||
-          "Failed to create account. Please try again.",
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to create account. Please try again."
       );
     } finally {
       setCreateLoading(false);

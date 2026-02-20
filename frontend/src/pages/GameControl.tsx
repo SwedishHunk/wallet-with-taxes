@@ -38,7 +38,7 @@ interface NFT {
   condition: number;
   power: number;
   equipped: boolean;
-  customAttributes: Record<string, any>;
+  customAttributes: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -92,8 +92,11 @@ export function GameControl() {
 
       const nftRes = await getPlayerNFTs(gameId!);
       setNfts(nftRes.data || []);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load game data");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load game data"
+      );
     } finally {
       setLoading(false);
     }
@@ -111,8 +114,11 @@ export function GameControl() {
       setDepositAmount("");
       loadGameData();
       setTimeout(() => setSuccess(""), 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Deposit failed. Try again?");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Deposit failed. Try again?"
+      );
     }
   };
 
@@ -139,9 +145,10 @@ export function GameControl() {
       setWithdrawAmount("");
       loadGameData();
       setTimeout(() => setSuccess(""), 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message =
-        err.response?.data?.message || "Withdrawal failed. Try again?";
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Withdrawal failed. Try again?";
       if (message.includes("Insufficient")) {
         setError(`Not enough credits! Check your balance and try again.`);
       } else {

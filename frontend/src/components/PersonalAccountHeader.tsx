@@ -2,6 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getStudios } from "../lib/users";
 import { ROUTES } from "../routes";
+import type { Studio } from "../types/studio";
+import type { PersonalUser } from "../types/user";
 
 interface PersonalAccountHeaderProps {
   studioName?: string;
@@ -12,7 +14,7 @@ export default function PersonalAccountHeader({
   studioName,
   onLogoutPersonal,
 }: PersonalAccountHeaderProps) {
-  const [personalUser, setPersonalUser] = useState<any>(null);
+  const [personalUser, setPersonalUser] = useState<PersonalUser | null>(null);
   const [resolvedStudioName, setResolvedStudioName] = useState<
     string | undefined
   >(studioName);
@@ -37,10 +39,10 @@ export default function PersonalAccountHeader({
         const studioId = localStorage.getItem("studioId");
         if (!studioId) return;
         const res = await getStudios();
-        const studios: any[] = res.data || [];
+        const studios: Studio[] = res.data || [];
         const match = studios.find((s) => String(s.id) === String(studioId));
         if (match) setResolvedStudioName(match.name || match.email || "Studio");
-      } catch (err) {
+      } catch {
         // Fallback to generic label
         setResolvedStudioName(studioName || "Studio");
       }

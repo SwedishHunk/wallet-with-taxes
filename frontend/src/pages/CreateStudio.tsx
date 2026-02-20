@@ -70,8 +70,10 @@ export default function CreateStudio() {
 
       // Navigate to dashboard
       navigate(ROUTES.dashboard, { replace: true });
-    } catch (err: any) {
-      const message = err.response?.data?.message || "Failed to create studio";
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to create studio";
       setError(message);
     } finally {
       setLoading(false);

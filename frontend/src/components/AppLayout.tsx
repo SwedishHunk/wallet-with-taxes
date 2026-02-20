@@ -15,11 +15,7 @@
 import React from "react";
 import { Link, useNavigate, Outlet } from "react-router-dom";
 import { useAuthState } from "../lib/AuthContext";
-import {
-  useLogout,
-  useCanManageMembers,
-  useCanPromoteToOwner,
-} from "../lib/useAuth";
+import { useLogout, useCanManageMembers } from "../lib/useAuth";
 import { ROUTES } from "../routes";
 import { APP_NAME, APP_SHORT_NAME, APP_YEAR } from "../config/app";
 import "./AppLayout.css";

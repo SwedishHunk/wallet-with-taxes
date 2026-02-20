@@ -98,10 +98,12 @@ export default function MemberLogin() {
       const membersData = await getMembersCount(studioId);
       const raw = membersData.data || [];
 
-      const normalized = raw.map((m: any) => ({
-        ...m,
-        memberId: m.memberId ?? m.id,
-      }));
+      const normalized = raw.map(
+        (m: { memberId?: string; id?: string; email: string; isOwner: boolean }) => ({
+          ...m,
+          memberId: m.memberId ?? m.id,
+        })
+      );
 
       setMembers(normalized);
     } catch (err) {

@@ -48,8 +48,11 @@ export default function StudioSelector() {
       if (res.data && res.data.length === 1) {
         selectStudio(res.data[0].id);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load studios");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load studios"
+      );
       console.error(err);
     } finally {
       setLoading(false);

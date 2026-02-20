@@ -23,7 +23,9 @@ export class Studio {
   @OneToMany(() => StudioMember, (member) => member.studio, { cascade: true })
   members: StudioMember[];
 
-  @OneToMany(() => StudioUser, (studioUser) => studioUser.studio, { cascade: true })
+  @OneToMany(() => StudioUser, (studioUser) => studioUser.studio, {
+    cascade: true,
+  })
   studioUsers: StudioUser[];
 
   @Column({ nullable: true })

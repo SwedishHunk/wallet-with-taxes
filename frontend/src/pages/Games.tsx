@@ -42,15 +42,20 @@ export default function Games() {
       setError(null);
       const response = await getGames();
       // Map backend format (id) to frontend format (gameId)
-      const mappedGames = (response.data || []).map((game: any) => ({
-        gameId: game.id,
-        name: game.name,
-        slug: game.slug,
-      }));
+      const mappedGames = (response.data || []).map(
+        (game: { id: string; name: string; slug: string }) => ({
+          gameId: game.id,
+          name: game.name,
+          slug: game.slug,
+        })
+      );
       setGames(mappedGames);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load games:", err);
-      setError(err?.response?.data?.message || "Failed to load games");
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load games"
+      );
     } finally {
       setLoading(false);
     }
@@ -105,9 +110,12 @@ export default function Games() {
       setNewGameSlug("");
       setShowCreateForm(false);
       await loadGames();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to create game:", err);
-      setError(err?.response?.data?.message || "Failed to create game");
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to create game"
+      );
     } finally {
       setCreating(false);
     }

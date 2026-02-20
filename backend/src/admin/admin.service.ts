@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { TaxEvent } from '../tax/entities/tax-event.entity';
-import { User } from '../users/user.entity';
-import { Repository } from 'typeorm';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { TaxEvent } from "../tax/entities/tax-event.entity";
+import { User } from "../users/user.entity";
+import { Repository } from "typeorm";
 
 interface FeeStatsRaw {
   totalFeesUSD: string;
@@ -21,15 +21,15 @@ export class AdminService {
 
   async getFeeStats(from?: string, to?: string) {
     const query = this.taxRepo
-      .createQueryBuilder('tax')
-      .where('tax.feeUSD IS NOT NULL');
+      .createQueryBuilder("tax")
+      .where("tax.feeUSD IS NOT NULL");
 
     if (from) {
-      query.andWhere('tax.timestamp >= :from', { from });
+      query.andWhere("tax.timestamp >= :from", { from });
     }
 
     if (to) {
-      query.andWhere('tax.timestamp <= :to', { to });
+      query.andWhere("tax.timestamp <= :to", { to });
     }
 
     const raw = await query
@@ -40,8 +40,8 @@ export class AdminService {
       .getRawOne<FeeStatsRaw>();
 
     const safeRaw: FeeStatsRaw = raw ?? {
-      totalFeesUSD: '0',
-      totalTrades: '0',
+      totalFeesUSD: "0",
+      totalTrades: "0",
     };
 
     return {
@@ -54,17 +54,17 @@ export class AdminService {
 
   async getRevenueSplit(from?: string, to?: string) {
     const query = this.taxRepo
-      .createQueryBuilder('tax')
-      .where('tax.feeUSD IS NOT NULL');
+      .createQueryBuilder("tax")
+      .where("tax.feeUSD IS NOT NULL");
 
-    if (from) query.andWhere('tax.timestamp >= :from', { from });
-    if (to) query.andWhere('tax.timestamp <= :to', { to });
+    if (from) query.andWhere("tax.timestamp >= :from", { from });
+    if (to) query.andWhere("tax.timestamp <= :to", { to });
 
     const raw = await query
       .select(['COALESCE(SUM(tax.feeUSD), 0)::text AS "totalFeesUSD"'])
       .getRawOne<{ totalFeesUSD: string }>();
 
-    const totalFees = Number(raw?.totalFeesUSD ?? '0');
+    const totalFees = Number(raw?.totalFeesUSD ?? "0");
     const devShare = totalFees * 0.6;
     const triolithGross = totalFees * 0.3;
     const safuCut = triolithGross * 0.05;
@@ -85,15 +85,15 @@ export class AdminService {
   async getUserList() {
     const users = await this.userRepo.find({
       select: [
-        'id',
-        'email',
-        'walletAddress',
-        'custodyMode',
-        'kycStatus',
-        'isAdmin',
-        'createdAt',
+        "id",
+        "email",
+        "walletAddress",
+        "custodyMode",
+        "kycStatus",
+        "isAdmin",
+        "createdAt",
       ],
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     return users;

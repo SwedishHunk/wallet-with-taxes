@@ -1,9 +1,9 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from "class-validator";
 
 export class GetListingsQueryDto {
   @IsOptional()
   @IsString()
-  status?: 'active' | 'sold' | 'cancelled';
+  status?: "active" | "sold" | "cancelled";
 
   @IsOptional()
   @IsString()

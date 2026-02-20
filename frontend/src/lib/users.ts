@@ -15,6 +15,9 @@ export const getMemberSession = (studioId: string) =>
 export const getMembersCount = (studioId: string) =>
   api.get(`/studios/${studioId}/members`);
 
+export const getStudioMembers = (studioId: string) =>
+  api.get(`/studios/${studioId}/members`);
+
 export const linkWallet = (email: string, walletAddress: string) =>
   api.post("/users/link-wallet", { email, walletAddress });
 

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { signup } from "../lib/users";
-import { setAuthToken } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import "../style/Login.css";
 import "../style/Bright.css";
@@ -27,9 +26,10 @@ export default function Signup() {
       await signup(email, password);
       // Signup successful - redirect to login
       navigate(ROUTES.root);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage =
-        err.response?.data?.message || "Signup failed. Please try again.";
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Signup failed. Please try again.";
       setMessage({ type: "error", text: errorMessage });
       console.error(err);
       setLoading(false);
