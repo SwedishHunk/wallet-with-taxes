@@ -9,6 +9,7 @@ import { GameWallet } from "./entities/game-wallet.entity";
 import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
+import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { PlatformService } from "./platform.service";
 import { PlatformController } from "./platform.controller";
 import { StudiosController } from "./studios.controller";
@@ -28,6 +29,7 @@ import { User } from "../users/user.entity";
       LedgerEntry,
       NFTTemplate,
       NFTInstance,
+      WalletDepositIntent,
       User,
     ]),
   ],

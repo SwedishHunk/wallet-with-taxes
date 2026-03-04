@@ -22,6 +22,10 @@ import {
   UpdatePersonalAccountPermissionsDto,
   WalletAmountDto,
 } from "./dto/platform-request.dto";
+import {
+  WalletDepositConfirmDto,
+  WalletDepositIntentDto,
+} from "./dto/wallet-deposit.dto";
 
 @Controller("platform")
 export class PlatformController {
@@ -95,6 +99,39 @@ export class PlatformController {
       jwtUser.id,
       jwtUser.studioId,
       data.amount,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("games/:gameId/wallet/deposit-intent")
+  createDepositIntent(
+    @Req() req: Request,
+    @Param("gameId") gameId: string,
+    @Body() data: WalletDepositIntentDto,
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.platformService.createWalletDepositIntent(
+      gameId,
+      jwtUser.id,
+      jwtUser.studioId,
+      data.amount,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("games/:gameId/wallet/deposit-confirm")
+  confirmDepositIntent(
+    @Req() req: Request,
+    @Param("gameId") gameId: string,
+    @Body() data: WalletDepositConfirmDto,
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.platformService.confirmWalletDepositIntent(
+      gameId,
+      jwtUser.id,
+      jwtUser.studioId,
+      data.intentId,
+      data.txHash,
     );
   }
 

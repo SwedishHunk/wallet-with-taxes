@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
-import { randomUUID } from "crypto";
+import { DataSource, QueryFailedError, Repository } from "typeorm";
+import { createHash, randomUUID } from "crypto";
 import { Studio } from "./entities/studio.entity";
 import { StudioMember, StudioRole } from "./entities/studio-member.entity";
 import { Game } from "./entities/game.entity";
@@ -10,6 +10,10 @@ import { GameWallet } from "./entities/game-wallet.entity";
 import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
+import {
+  WalletDepositIntent,
+  WalletDepositIntentStatus,
+} from "./entities/wallet-deposit-intent.entity";
 import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
@@ -17,6 +21,8 @@ import { parseAmount } from "./parse-amount";
 
 @Injectable()
 export class PlatformService {
+  private static readonly DEPOSIT_INTENT_TTL_MS = 15 * 60 * 1000;
+
   constructor(
     private dataSource: DataSource,
     @InjectRepository(Studio)
@@ -35,9 +41,27 @@ export class PlatformService {
     private nftTemplateRepo: Repository<NFTTemplate>,
     @InjectRepository(NFTInstance)
     private nftInstanceRepo: Repository<NFTInstance>,
+    @InjectRepository(WalletDepositIntent)
+    private walletDepositIntentRepo: Repository<WalletDepositIntent>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
   ) {}
+
+  private generateFakeDepositAddress(
+    gameId: string,
+    userId: string,
+    intentId: string,
+  ): string {
+    const hash = createHash("sha256")
+      .update(`${gameId}:${userId}:${intentId}`)
+      .digest("hex");
+    return `0x${hash.slice(0, 40)}`;
+  }
+
+  private isValidFakeTxHash(txHash: string): boolean {
+    const value = txHash.trim();
+    return value.length >= 10 && value.startsWith("0x");
+  }
 
   /**
    * Asserts that a game belongs to the given studio.
@@ -241,6 +265,161 @@ export class PlatformService {
 
       return savedWallet;
     });
+  }
+
+  async createWalletDepositIntent(
+    gameId: string,
+    userId: string,
+    studioId: string,
+    amount: unknown,
+  ) {
+    const amountNum = parseAmount(amount);
+
+    const game = await this.assertGameBelongsToStudio(gameId, studioId);
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
+    }
+
+    const intentId = randomUUID();
+    const expiresAt = new Date(
+      Date.now() + PlatformService.DEPOSIT_INTENT_TTL_MS,
+    );
+    const depositAddress = this.generateFakeDepositAddress(
+      gameId,
+      userId,
+      intentId,
+    );
+
+    const intent = this.walletDepositIntentRepo.create({
+      id: intentId,
+      game,
+      user,
+      amount: amountNum.toString(),
+      depositAddress,
+      status: WalletDepositIntentStatus.PENDING,
+      expiresAt,
+    });
+    await this.walletDepositIntentRepo.save(intent);
+
+    return {
+      intentId: intent.id,
+      depositAddress: intent.depositAddress,
+      amount: intent.amount,
+      expiresAt: intent.expiresAt.toISOString(),
+    };
+  }
+
+  async confirmWalletDepositIntent(
+    gameId: string,
+    userId: string,
+    studioId: string,
+    intentId: string,
+    txHash: string,
+  ) {
+    if (!this.isValidFakeTxHash(txHash)) {
+      throw new AppException("Invalid txHash", 400);
+    }
+
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    const { wallet } = await this.ensureGameWalletForPlayer(
+      gameId,
+      userId,
+      studioId,
+    );
+
+    const txGroupId = randomUUID();
+    const normalizedTxHash = txHash.trim();
+
+    let result: { expired: true } | { expired: false; wallet: GameWallet };
+    try {
+      result = await this.dataSource.transaction(async (manager) => {
+        const intentRepo = manager.getRepository(WalletDepositIntent);
+        const walletRepo = manager.getRepository(GameWallet);
+        const ledgerRepo = manager.getRepository(LedgerEntry);
+
+        const intent = await intentRepo.findOne({
+          where: {
+            id: intentId,
+            game: { id: gameId },
+            user: { id: userId },
+          },
+          lock: { mode: "pessimistic_write" },
+        });
+
+        if (!intent) {
+          throw new AppException("Deposit intent not found", 404);
+        }
+
+        if (intent.status !== WalletDepositIntentStatus.PENDING) {
+          throw new AppException("Deposit intent is not pending", 400);
+        }
+
+        const now = new Date();
+        if (intent.expiresAt.getTime() <= now.getTime()) {
+          intent.status = WalletDepositIntentStatus.EXPIRED;
+          await intentRepo.save(intent);
+          return { expired: true as const };
+        }
+
+        const lockedWallet = await walletRepo.findOne({
+          where: { id: wallet.id },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!lockedWallet) {
+          throw new AppException("Game wallet not found", 404);
+        }
+
+        const amountNum = parseFloat(intent.amount);
+        lockedWallet.balance = (
+          parseFloat(lockedWallet.balance) + amountNum
+        ).toString();
+        lockedWallet.totalDeposited = (
+          parseFloat(lockedWallet.totalDeposited) + amountNum
+        ).toString();
+        const savedWallet = await walletRepo.save(lockedWallet);
+
+        intent.status = WalletDepositIntentStatus.CONFIRMED;
+        intent.txHash = normalizedTxHash;
+        intent.confirmedAt = now;
+        await intentRepo.save(intent);
+
+        const ledgerEntry = ledgerRepo.create({
+          wallet: savedWallet,
+          txGroupId,
+          type: "deposit",
+          amount: intent.amount,
+          intentId: intent.id,
+          description: `External deposit txHash=${normalizedTxHash} intentId=${intent.id}`,
+          txHash: normalizedTxHash,
+        });
+        await ledgerRepo.save(ledgerEntry);
+
+        return { expired: false as const, wallet: savedWallet };
+      });
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint ===
+            "uq_wallet_deposit_intents_tx_hash_not_null"
+        ) {
+          throw new AppException("txHash already used", 400);
+        }
+      }
+      throw error;
+    }
+
+    if (result.expired) {
+      throw new AppException("Deposit intent has expired", 400);
+    }
+
+    return result.wallet;
   }
 
   async withdrawFromGameWallet(

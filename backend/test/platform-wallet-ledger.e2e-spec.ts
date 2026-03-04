@@ -21,6 +21,7 @@ import { GameWallet } from "src/platform/entities/game-wallet.entity";
 import { LedgerEntry } from "src/platform/entities/ledger-entry.entity";
 import { NFTTemplate } from "src/platform/entities/nft-template.entity";
 import { NFTInstance } from "src/platform/entities/nft-instance.entity";
+import { WalletDepositIntent } from "src/platform/entities/wallet-deposit-intent.entity";
 import { User } from "src/users/user.entity";
 import {
   authHeader,
@@ -40,6 +41,7 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
   let studioRepo: Repository<Studio>;
   let studioMemberRepo: Repository<StudioMember>;
   let gameRepo: Repository<Game>;
+  let depositIntentRepo: Repository<WalletDepositIntent>;
 
   // Test data
   let user1: User;
@@ -88,6 +90,7 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
               LedgerEntry,
               NFTTemplate,
               NFTInstance,
+              WalletDepositIntent,
             ],
             synchronize: true,
             dropSchema: true,
@@ -102,6 +105,7 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
             LedgerEntry,
             NFTTemplate,
             NFTInstance,
+            WalletDepositIntent,
           ]),
           PassportModule,
           JwtModule.register({
@@ -132,6 +136,7 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
       studioRepo = ds.getRepository(Studio);
       studioMemberRepo = ds.getRepository(StudioMember);
       gameRepo = ds.getRepository(Game);
+      depositIntentRepo = ds.getRepository(WalletDepositIntent);
 
       // Seed test data
       user1 = await userRepo.save({
@@ -567,6 +572,222 @@ describe("Game Wallet & Ledger E2E Smoke Tests", () => {
         .send({ amount: "abc" });
 
       expect(response.status).toBe(400);
+    });
+
+    it("G3) Deposit intent + confirm credits wallet and ledger atomically", async () => {
+      const initialWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const initialWallet = validateGameWalletShape(initialWalletRes.body);
+      const initialBalance = parseFloat(initialWallet.balance);
+
+      const initialLedgerRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet/ledger`)
+        .set(authHeader(user1Token));
+      const initialLedger = validateLedgerArrayShape(initialLedgerRes.body);
+      const initialLedgerLen = initialLedger.length;
+
+      const amount = "12.5";
+      const intentRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-intent`)
+        .set(authHeader(user1Token))
+        .send({ amount });
+      expect(intentRes.status).toBe(201);
+      const intentBody = intentRes.body as {
+        intentId: string;
+        depositAddress: string;
+        amount: string;
+        expiresAt: string;
+      };
+      expect(typeof intentBody.intentId).toBe("string");
+      expect(intentBody.depositAddress).toMatch(/^0x[a-f0-9]{40}$/);
+      expect(intentBody.amount).toBe(amount);
+      expect(typeof intentBody.expiresAt).toBe("string");
+
+      const intentId = intentBody.intentId;
+      const txHash = "0xabcdef1234567890";
+      const confirmRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-confirm`)
+        .set(authHeader(user1Token))
+        .send({ intentId, txHash });
+      expect(confirmRes.status).toBe(201);
+
+      const finalWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const finalWallet = validateGameWalletShape(finalWalletRes.body);
+      expect(
+        Math.abs(parseFloat(finalWallet.balance) - (initialBalance + 12.5)),
+      ).toBeLessThan(1e-9);
+
+      const finalLedgerRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet/ledger`)
+        .set(authHeader(user1Token));
+      const finalLedger = validateLedgerArrayShape(finalLedgerRes.body);
+      expect(finalLedger.length).toBe(initialLedgerLen + 1);
+
+      const matchingIntentEntries = finalLedger.filter(
+        (entry) => entry.intentId === intentId,
+      );
+      expect(matchingIntentEntries).toHaveLength(1);
+      expect(matchingIntentEntries[0].type).toBe("deposit");
+      expect(
+        Math.abs(parseFloat(matchingIntentEntries[0].amount) - 12.5),
+      ).toBeLessThan(1e-9);
+      expect(matchingIntentEntries[0].txHash).toBe(txHash);
+      expect(matchingIntentEntries[0].txGroupId).toBeTruthy();
+
+      const intent = await depositIntentRepo.findOne({
+        where: { id: intentId },
+      });
+      expect(intent).toBeTruthy();
+      expect(intent?.status).toBe("CONFIRMED");
+      expect(intent?.txHash).toBe(txHash);
+    });
+
+    it("G4) Confirm with invalid txHash returns 400 and does not modify DB", async () => {
+      const amount = "9";
+      const intentRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-intent`)
+        .set(authHeader(user1Token))
+        .send({ amount });
+      expect(intentRes.status).toBe(201);
+      const intentBody = intentRes.body as { intentId: string };
+      const intentId = intentBody.intentId;
+
+      const initialWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const initialWallet = validateGameWalletShape(initialWalletRes.body);
+      const initialBalance = parseFloat(initialWallet.balance);
+
+      const initialLedgerRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet/ledger`)
+        .set(authHeader(user1Token));
+      const initialLedger = validateLedgerArrayShape(initialLedgerRes.body);
+      const initialLedgerLen = initialLedger.length;
+
+      const confirmRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-confirm`)
+        .set(authHeader(user1Token))
+        .send({ intentId, txHash: "bad-hash" });
+      expect(confirmRes.status).toBe(400);
+
+      const finalWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const finalWallet = validateGameWalletShape(finalWalletRes.body);
+      expect(
+        Math.abs(parseFloat(finalWallet.balance) - initialBalance),
+      ).toBeLessThan(1e-9);
+
+      const finalLedgerRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet/ledger`)
+        .set(authHeader(user1Token));
+      const finalLedger = validateLedgerArrayShape(finalLedgerRes.body);
+      expect(finalLedger.length).toBe(initialLedgerLen);
+
+      const intent = await depositIntentRepo.findOne({
+        where: { id: intentId },
+      });
+      expect(intent).toBeTruthy();
+      expect(intent?.status).toBe("PENDING");
+      expect(intent?.txHash).toBeNull();
+    });
+
+    it("G5) Confirm on expired intent returns 400", async () => {
+      const intentRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-intent`)
+        .set(authHeader(user1Token))
+        .send({ amount: "3" });
+      expect(intentRes.status).toBe(201);
+      const intentBody = intentRes.body as { intentId: string };
+      const intentId = intentBody.intentId;
+
+      const intent = await depositIntentRepo.findOne({
+        where: { id: intentId },
+      });
+      if (!intent) {
+        throw new Error("Expected deposit intent to exist");
+      }
+      intent.expiresAt = new Date(Date.now() - 60_000);
+      await depositIntentRepo.save(intent);
+
+      const confirmRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-confirm`)
+        .set(authHeader(user1Token))
+        .send({ intentId, txHash: "0x1234567890abcdef" });
+      expect(confirmRes.status).toBe(400);
+
+      const expiredIntent = await depositIntentRepo.findOne({
+        where: { id: intentId },
+      });
+      expect(expiredIntent?.status).toBe("EXPIRED");
+    });
+
+    it("G6) Duplicate txHash across different intents is rejected", async () => {
+      const txHash = "0xfeedfacecafebeef";
+
+      const initialWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const initialWallet = validateGameWalletShape(initialWalletRes.body);
+      const initialBalance = parseFloat(initialWallet.balance);
+
+      const intentARes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-intent`)
+        .set(authHeader(user1Token))
+        .send({ amount: "4" });
+      expect(intentARes.status).toBe(201);
+      const intentA = intentARes.body as { intentId: string };
+
+      const confirmARes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-confirm`)
+        .set(authHeader(user1Token))
+        .send({ intentId: intentA.intentId, txHash });
+      expect(confirmARes.status).toBe(201);
+
+      const afterFirstConfirmWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const afterFirstConfirmWallet = validateGameWalletShape(
+        afterFirstConfirmWalletRes.body,
+      );
+      expect(
+        Math.abs(
+          parseFloat(afterFirstConfirmWallet.balance) - (initialBalance + 4),
+        ),
+      ).toBeLessThan(1e-9);
+
+      const intentBRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-intent`)
+        .set(authHeader(user1Token))
+        .send({ amount: "6" });
+      expect(intentBRes.status).toBe(201);
+      const intentB = intentBRes.body as { intentId: string };
+
+      const confirmBRes = await request(server)
+        .post(`/platform/games/${game.id}/wallet/deposit-confirm`)
+        .set(authHeader(user1Token))
+        .send({ intentId: intentB.intentId, txHash });
+      expect(confirmBRes.status).toBe(400);
+
+      const finalWalletRes = await request(server)
+        .get(`/platform/games/${game.id}/wallet`)
+        .set(authHeader(user1Token));
+      const finalWallet = validateGameWalletShape(finalWalletRes.body);
+      expect(
+        Math.abs(
+          parseFloat(finalWallet.balance) -
+            parseFloat(afterFirstConfirmWallet.balance),
+        ),
+      ).toBeLessThan(1e-9);
+
+      const intentBAfter = await depositIntentRepo.findOne({
+        where: { id: intentB.intentId },
+      });
+      expect(intentBAfter?.status).toBe("PENDING");
+      expect(intentBAfter?.txHash).toBeNull();
     });
 
     it("H) Withdraw with zero/negative amount should return 400 and not modify DB", async () => {

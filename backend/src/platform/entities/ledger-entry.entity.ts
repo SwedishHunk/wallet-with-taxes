@@ -41,6 +41,10 @@ export class LedgerEntry {
   @Column({ type: "uuid", nullable: true })
   counterpartyUserId?: string;
 
+  @Index("idx_ledger_intent_id")
+  @Column({ type: "uuid", nullable: true })
+  intentId?: string | null;
+
   @Column({ nullable: true })
   description?: string;
 

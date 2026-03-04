@@ -30,7 +30,9 @@ export interface TestLedgerEntry {
   amount: string;
   txGroupId: string;
   counterpartyUserId?: string;
-  description: string;
+  intentId?: string | null;
+  txHash?: string | null;
+  description?: string;
   createdAt: string;
 }
 
@@ -70,15 +72,9 @@ export function validateGameWalletShape(data: unknown): TestGameWalletResponse {
  */
 export function validateLedgerEntryShape(data: unknown): TestLedgerEntry {
   const record = data as Record<string, unknown>;
-  if (
-    !record.id ||
-    !record.type ||
-    !record.amount ||
-    !record.txGroupId ||
-    !record.description
-  ) {
+  if (!record.id || !record.type || !record.amount || !record.txGroupId) {
     throw new Error(
-      `Invalid ledger entry shape. Expected {id, type, amount, txGroupId, description}, got: ${JSON.stringify(data)}`,
+      `Invalid ledger entry shape. Expected {id, type, amount, txGroupId}, got: ${JSON.stringify(data)}`,
     );
   }
   const typeVal = record.type;
