@@ -13,9 +13,13 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:ci": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings=0",
     "test": "jest",
+    "test:unit": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:unit:cov": "jest --coverage --runInBand --ci",
+    "test:ci": "npm run lint:ci && npm run build && npm run test:unit:cov",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json",
     "test:e2e:env": "bash scripts/test-e2e-env.sh",
@@ -86,9 +90,57 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.module.ts",
+      "!main.ts",
+      "!migrations/**",
+      "!__assets/**",
+      "!__events/**"
     ],
     "coverageDirectory": "../coverage",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "migrations"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 65,
+        "lines": 85,
+        "statements": 85
+      },
+      "./src/tax/": {
+        "branches": 85,
+        "functions": 90,
+        "lines": 90,
+        "statements": 90
+      },
+      "./src/wallets/": {
+        "branches": 85,
+        "functions": 90,
+        "lines": 90,
+        "statements": 90
+      },
+      "./src/platform/platform.service.ts": {
+        "branches": 85,
+        "functions": 100,
+        "lines": 95,
+        "statements": 95
+      },
+      "./src/platform/studio-member.service.ts": {
+        "branches": 85,
+        "functions": 100,
+        "lines": 95,
+        "statements": 95
+      },
+      "./src/platform/studios.service.ts": {
+        "branches": 75,
+        "functions": 100,
+        "lines": 95,
+        "statements": 95
+      }
+    },
     "testEnvironment": "node"
   }
 }
+

@@ -17,6 +17,7 @@ frontend/tsconfig.app.tsbuildinfo
 # =========================
 backend/node_modules/
 backend/dist/
+backend/coverage/
 
 # =========================
 # Environment files
