@@ -15,6 +15,10 @@ import { GameWallet } from "./game-wallet.entity";
   `type IN ('deposit', 'withdraw', 'spend', 'earn', 'transfer', 'upkeep', 'mint')`,
 )
 @Index("idx_ledger_tx_group_id", ["txGroupId"])
+@Index("uq_ledger_intent_id_not_null", ["intentId"], {
+  unique: true,
+  where: `"intentId" IS NOT NULL`,
+})
 export class LedgerEntry {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -41,7 +45,6 @@ export class LedgerEntry {
   @Column({ type: "uuid", nullable: true })
   counterpartyUserId?: string;
 
-  @Index("idx_ledger_intent_id")
   @Column({ type: "uuid", nullable: true })
   intentId?: string | null;
 

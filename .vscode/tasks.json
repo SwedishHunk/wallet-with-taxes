@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Backend Dev",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd backend && set -a && source .env && set +a && npm run start:dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Frontend Dev",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && npm run dev"
+			],
+			"isBackground": true
+		}
+	]
+}

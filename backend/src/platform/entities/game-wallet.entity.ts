@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -17,6 +18,7 @@ export class GameWallet {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
+  @Index("uq_game_wallets_game_player_id", { unique: true })
   @ManyToOne(() => GamePlayer, { nullable: false })
   gamePlayer: GamePlayer;
 
