@@ -63,6 +63,67 @@ export class PlatformService {
     return value.length >= 10 && value.startsWith("0x");
   }
 
+  private async findUserOrThrow(
+    userRepo: Repository<User>,
+    userId: string,
+  ): Promise<User> {
+    const user = await userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
+    }
+    return user;
+  }
+
+  private async ensureGamePlayer(
+    gamePlayerRepo: Repository<GamePlayer>,
+    game: Game,
+    user: User,
+  ): Promise<GamePlayer> {
+    let player = await gamePlayerRepo.findOne({
+      where: { user: { id: user.id }, game: { id: game.id } },
+      relations: ["game", "user"],
+    });
+    if (!player) {
+      player = gamePlayerRepo.create({ user, game });
+      player = await gamePlayerRepo.save(player);
+    }
+    return player;
+  }
+
+  private async ensureWalletForGamePlayer(
+    walletRepo: Repository<GameWallet>,
+    gamePlayer: GamePlayer,
+  ): Promise<GameWallet> {
+    let wallet = await walletRepo.findOne({
+      where: { gamePlayer: { id: gamePlayer.id } },
+    });
+    if (!wallet) {
+      wallet = walletRepo.create({
+        gamePlayer,
+        balance: "0",
+        totalDeposited: "0",
+        totalWithdrawn: "0",
+      });
+      wallet = await walletRepo.save(wallet);
+    }
+    return wallet;
+  }
+
+  private async lockWalletOrThrow(
+    walletRepo: Repository<GameWallet>,
+    walletId: string,
+    notFoundMessage: string,
+  ): Promise<GameWallet> {
+    const locked = await walletRepo.findOne({
+      where: { id: walletId },
+      lock: { mode: "pessimistic_write" },
+    });
+    if (!locked) {
+      throw new AppException(notFoundMessage, 404);
+    }
+    return locked;
+  }
+
   /**
    * Asserts that a game belongs to the given studio.
    * Throws 404 if game not found, 403 if studio mismatch.
@@ -492,84 +553,32 @@ export class PlatformService {
       const walletRepo = manager.getRepository(GameWallet);
       const ledgerRepo = manager.getRepository(LedgerEntry);
 
-      // Get users
-      const fromUser = await userRepo.findOne({ where: { id: fromUserId } });
-      if (!fromUser) {
-        throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
-      }
-      const toUser = await userRepo.findOne({ where: { id: toUserId } });
-      if (!toUser) {
-        throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
-      }
+      const fromUser = await this.findUserOrThrow(userRepo, fromUserId);
+      const toUser = await this.findUserOrThrow(userRepo, toUserId);
 
-      // Ensure from player exists and get wallet
-      let fromGamePlayer = await gamePlayerRepo.findOne({
-        where: { user: { id: fromUserId }, game: { id: gameId } },
-        relations: ["game", "user"],
-      });
-      if (!fromGamePlayer) {
-        fromGamePlayer = gamePlayerRepo.create({
-          user: fromUser,
-          game,
-        });
-        fromGamePlayer = await gamePlayerRepo.save(fromGamePlayer);
-      }
+      const fromGamePlayer = await this.ensureGamePlayer(
+        gamePlayerRepo,
+        game,
+        fromUser,
+      );
+      const toGamePlayer = await this.ensureGamePlayer(gamePlayerRepo, game, toUser);
 
-      let fromWallet = await walletRepo.findOne({
-        where: { gamePlayer: { id: fromGamePlayer.id } },
-      });
-      if (!fromWallet) {
-        fromWallet = walletRepo.create({
-          gamePlayer: fromGamePlayer,
-          balance: "0",
-          totalDeposited: "0",
-          totalWithdrawn: "0",
-        });
-        fromWallet = await walletRepo.save(fromWallet);
-      }
+      const fromWallet = await this.ensureWalletForGamePlayer(
+        walletRepo,
+        fromGamePlayer,
+      );
+      const toWallet = await this.ensureWalletForGamePlayer(walletRepo, toGamePlayer);
 
-      // Ensure to player exists and get wallet
-      let toGamePlayer = await gamePlayerRepo.findOne({
-        where: { user: { id: toUserId }, game: { id: gameId } },
-        relations: ["game", "user"],
-      });
-      if (!toGamePlayer) {
-        toGamePlayer = gamePlayerRepo.create({
-          user: toUser,
-          game,
-        });
-        toGamePlayer = await gamePlayerRepo.save(toGamePlayer);
-      }
-
-      let toWallet = await walletRepo.findOne({
-        where: { gamePlayer: { id: toGamePlayer.id } },
-      });
-      if (!toWallet) {
-        toWallet = walletRepo.create({
-          gamePlayer: toGamePlayer,
-          balance: "0",
-          totalDeposited: "0",
-          totalWithdrawn: "0",
-        });
-        toWallet = await walletRepo.save(toWallet);
-      }
-
-      // Lock both wallets pessimistically for write
-      const lockedFromWallet = await walletRepo.findOne({
-        where: { id: fromWallet.id },
-        lock: { mode: "pessimistic_write" },
-      });
-      if (!lockedFromWallet) {
-        throw new AppException("Sender wallet not found", 404);
-      }
-
-      const lockedToWallet = await walletRepo.findOne({
-        where: { id: toWallet.id },
-        lock: { mode: "pessimistic_write" },
-      });
-      if (!lockedToWallet) {
-        throw new AppException("Recipient wallet not found", 404);
-      }
+      const lockedFromWallet = await this.lockWalletOrThrow(
+        walletRepo,
+        fromWallet.id,
+        "Sender wallet not found",
+      );
+      const lockedToWallet = await this.lockWalletOrThrow(
+        walletRepo,
+        toWallet.id,
+        "Recipient wallet not found",
+      );
 
       // Validate sufficient balance
       const fromBalance = parseFloat(lockedFromWallet.balance);

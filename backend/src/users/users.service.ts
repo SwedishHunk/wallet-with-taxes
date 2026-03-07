@@ -38,19 +38,18 @@ export class UsersService {
     return emailRegex.test(email);
   }
 
-  async signup(email: string, password: string, studioName?: string) {
-    // Validate email format
+  private assertValidEmail(email: string): void {
     if (!this.isValidEmail(email)) {
       throw new AppException(ERROR_MESSAGES.INVALID_EMAIL_FORMAT, 400);
     }
+  }
 
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-    if (existingUser) {
-      throw new AppException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS, 409);
-    }
-
+  private async buildCustodialCredentials(password: string): Promise<{
+    passwordHash: string;
+    wallet: { address: string; privateKey: string };
+    encryptedPrivateKey: string;
+    onChainWallet?: string;
+  }> {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
@@ -72,44 +71,72 @@ export class UsersService {
     const encryptedPrivateKey =
       cipher.update(wallet.privateKey, "utf8", "hex") + cipher.final("hex");
 
-    // Optional on-chain wallet creation. Skip gracefully if RPC is unavailable.
-    let onChainWallet: string | null = null;
+    const onChainWallet = await this.tryCreateOnChainWallet(wallet.address);
+
+    return {
+      passwordHash,
+      wallet,
+      encryptedPrivateKey,
+      onChainWallet: onChainWallet ?? undefined,
+    };
+  }
+
+  private async tryCreateOnChainWallet(
+    walletAddress: string,
+  ): Promise<string | null> {
     const rpcUrl = process.env.RPC_URL;
     const factoryAddress = process.env.FACTORY_ADDRESS;
     const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
 
-    if (rpcUrl && factoryAddress && deployerKey) {
-      try {
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
-        const deployer = new ethers.Wallet(deployerKey, provider);
-        const factory = new ethers.Contract(
-          factoryAddress,
-          GenesisWalletFactoryAbiJson as InterfaceAbi,
-          deployer,
-        );
-
-        const tx = (await factory.createWallet(
-          wallet.address,
-        )) as ContractTransactionResponse;
-        const receipt = await tx.wait();
-        if (receipt && receipt.status === 1) {
-          onChainWallet = wallet.address;
-        } else {
-          console.warn(
-            "On-chain wallet creation returned non-success status; continuing without on-chain wallet",
-          );
-        }
-      } catch (err) {
-        console.warn(
-          "Skipping on-chain wallet creation (RPC unavailable?):",
-          err,
-        );
-      }
-    } else {
+    if (!rpcUrl || !factoryAddress || !deployerKey) {
       console.warn(
         "Blockchain env vars missing; skipping on-chain wallet creation",
       );
+      return null;
     }
+
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const deployer = new ethers.Wallet(deployerKey, provider);
+      const factory = new ethers.Contract(
+        factoryAddress,
+        GenesisWalletFactoryAbiJson as InterfaceAbi,
+        deployer,
+      );
+
+      const tx = (await factory.createWallet(
+        walletAddress,
+      )) as ContractTransactionResponse;
+      const receipt = await tx.wait();
+      if (receipt && receipt.status === 1) {
+        return walletAddress;
+      }
+      console.warn(
+        "On-chain wallet creation returned non-success status; continuing without on-chain wallet",
+      );
+      return null;
+    } catch (err) {
+      console.warn("Skipping on-chain wallet creation (RPC unavailable?):", err);
+      return null;
+    }
+  }
+
+  async signup(email: string, password: string, studioName?: string) {
+    this.assertValidEmail(email);
+
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
+    if (existingUser) {
+      throw new AppException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS, 409);
+    }
+
+    const {
+      passwordHash,
+      wallet,
+      encryptedPrivateKey,
+      onChainWallet,
+    } = await this.buildCustodialCredentials(password);
 
     const user = this.userRepository.create({
       email,
@@ -117,7 +144,7 @@ export class UsersService {
       custodyMode: "custodial",
       encryptedPrivateKey,
       walletAddress: wallet.address,
-      onChainWallet: onChainWallet ?? undefined,
+      onChainWallet,
       kycStatus: "pending",
     });
 
@@ -174,10 +201,7 @@ export class UsersService {
   }
 
   async login(email: string, password: string, studioId?: string) {
-    // Validate email format
-    if (!this.isValidEmail(email)) {
-      throw new AppException(ERROR_MESSAGES.INVALID_EMAIL_FORMAT, 400);
-    }
+    this.assertValidEmail(email);
 
     console.log("Login attempt with:", email, password, "studioId:", studioId);
 
