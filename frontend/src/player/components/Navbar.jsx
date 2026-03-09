@@ -23,7 +23,7 @@ export default function Navbar() {
               <span className="text-dark-900 font-bold text-sm">T</span>
             </div>
             <span className="font-bold text-lg tracking-tight">
-              <span className="glow-text-cyan">Trolith</span>
+              <span className="glow-text-cyan">Triolith</span>
               <span className="text-gray-400 ml-1 text-sm font-normal">Studio</span>
             </span>
           </div>

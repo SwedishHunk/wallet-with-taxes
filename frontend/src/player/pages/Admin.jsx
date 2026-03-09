@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
 import { useApiData } from "../hooks/useApi";
+import { formatTxError } from "../formatTxError";
 import {
   Shield,
   Pause,
@@ -122,6 +123,11 @@ export default function Admin() {
     setMsg("Confirm in wallet...");
     try {
       const shop = getShop();
+      if (!shop) {
+        throw new Error(
+          "TokenShop contract is not ready yet. Verify wallet connection and shop config."
+        );
+      }
       const tx = await fn(shop);
       setMsg("Waiting for confirmation...");
       await tx.wait();
@@ -130,7 +136,7 @@ export default function Admin() {
       refreshConfig();
     } catch (err) {
       setStatus("error");
-      const reason = err.reason || err.message || "Failed";
+      const reason = formatTxError(err, "Failed");
       setMsg(reason.length > 80 ? reason.slice(0, 80) + "..." : reason);
     }
   }
@@ -192,7 +198,7 @@ export default function Admin() {
                 execTx((shop) => shop.setPaused(true), setPauseStatus, setPauseMsg)
               }
               className="btn-danger flex-1 flex items-center justify-center gap-2"
-              disabled={pauseStatus === "pending"}
+              disabled={pauseStatus === "pending" || !ready}
             >
               <Pause size={14} /> Pause
             </button>
@@ -201,7 +207,7 @@ export default function Admin() {
                 execTx((shop) => shop.setPaused(false), setPauseStatus, setPauseMsg)
               }
               className="btn-success flex-1 flex items-center justify-center gap-2"
-              disabled={pauseStatus === "pending"}
+              disabled={pauseStatus === "pending" || !ready}
             >
               <Play size={14} /> Unpause
             </button>
@@ -230,7 +236,7 @@ export default function Admin() {
                 )
               }
               className="btn-primary"
-              disabled={feeStatus === "pending" || !feeBps}
+              disabled={feeStatus === "pending" || !feeBps || !ready}
             >
               Set
             </button>
@@ -238,6 +244,11 @@ export default function Admin() {
           <p className="text-xs text-gray-500 mt-1">
             {feeBps ? `${Number(feeBps) / 100}% fee` : "0-1000 bps (0%-10%)"}
           </p>
+          {!ready && (
+            <p className="text-xs text-neon-pink mt-1">
+              TokenShop contract not ready yet. Wait for wallet + config to load.
+            </p>
+          )}
           <TxResult status={feeStatus} message={feeMsg} />
         </AdminAction>
 
@@ -279,7 +290,7 @@ export default function Admin() {
                 )
               }
               className="btn-primary w-full"
-              disabled={rateStatus === "pending" || !buyRate || !sellRate}
+              disabled={rateStatus === "pending" || !buyRate || !sellRate || !ready}
             >
               Update Rates
             </button>
@@ -312,6 +323,11 @@ export default function Admin() {
                 setLimitMsg("Confirm in wallet...");
                 try {
                   const shop = getShop();
+                  if (!shop) {
+                    throw new Error(
+                      "TokenShop contract is not ready yet. Verify wallet connection and shop config."
+                    );
+                  }
                   if (maxEthIn) {
                     const tx = await shop.setMaxEthIn(ethers.parseEther(maxEthIn));
                     await tx.wait();
@@ -325,11 +341,11 @@ export default function Admin() {
                   refreshConfig();
                 } catch (err) {
                   setLimitStatus("error");
-                  setLimitMsg(err.reason || err.message || "Failed");
+                  setLimitMsg(formatTxError(err, "Failed"));
                 }
               }}
               className="btn-primary w-full"
-              disabled={limitStatus === "pending" || (!maxEthIn && !maxGenIn)}
+              disabled={limitStatus === "pending" || (!maxEthIn && !maxGenIn) || !ready}
             >
               Update Limits
             </button>
@@ -365,7 +381,9 @@ export default function Admin() {
                 )
               }
               className="btn-danger w-full"
-              disabled={withdrawStatus === "pending" || !withdrawTo || !withdrawAmount}
+              disabled={
+                withdrawStatus === "pending" || !withdrawTo || !withdrawAmount || !ready
+              }
             >
               Withdraw
             </button>

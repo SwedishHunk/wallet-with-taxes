@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
 import { useApiData, apiGet, triggerSync } from "../hooks/useApi";
+import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
 import { ArrowDownUp, Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
@@ -13,8 +14,9 @@ import { ArrowDownUp, Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-
 const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
-  const { isConnected, address } = useWallet();
-  const { getShop, getToken, getErc20, shopAddress, ready } = useContracts();
+  const { isConnected, address, provider } = useWallet();
+  const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
+    useContracts();
 
   // ---------------------------------------------------------------
   // STEP 1: Fetch supported assets from the backend
@@ -30,6 +32,9 @@ export default function Trade() {
     error: assetsError,
     refresh: refreshAssets,
   } = useApiData("/shop/supported-assets");
+  const { data: tokenBalance, refresh: refreshTokenBalance } = useApiData(
+    isConnected && address ? `/user/${address}/balance` : null
+  );
 
   // ---------------------------------------------------------------
   // STEP 2: Track which asset is selected
@@ -59,10 +64,74 @@ export default function Trade() {
 
   // Config (for fee display)
   const [config, setConfig] = useState(null);
+  const [ethBalance, setEthBalance] = useState(null);
+  const [selectedAssetBalance, setSelectedAssetBalance] = useState(null);
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!isConnected || !address || !provider) {
+      setEthBalance(null);
+      return;
+    }
+
+    let active = true;
+
+    provider
+      .getBalance(address)
+      .then((balance) => {
+        if (!active) return;
+        setEthBalance(Number(ethers.formatEther(balance)));
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load ETH balance:", error);
+        setEthBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, provider, txStatus]);
+
+  useEffect(() => {
+    if (!isConnected || !address || !selectedAsset) {
+      setSelectedAssetBalance(null);
+      return;
+    }
+
+    if (selectedAsset.address === ETH_ADDRESS) {
+      setSelectedAssetBalance(ethBalance);
+      return;
+    }
+
+    let active = true;
+    const erc20 = getErc20(selectedAsset.address);
+    if (!erc20) {
+      setSelectedAssetBalance(null);
+      return;
+    }
+
+    erc20
+      .balanceOf(address)
+      .then((balance) => {
+        if (!active) return;
+        setSelectedAssetBalance(
+          Number(ethers.formatUnits(balance, selectedAsset.decimals))
+        );
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load selected asset balance:", error);
+        setSelectedAssetBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, selectedAsset, ethBalance, getErc20, txStatus]);
 
   // ---------------------------------------------------------------
   // STEP 3: Fetch quotes using the selected asset
@@ -118,6 +187,30 @@ export default function Trade() {
     setQuote(null);
   }, [mode, selectedAsset]);
 
+  function getPreflightError() {
+    if (!isConnected || !selectedAsset || !amount || Number(amount) <= 0) {
+      return null;
+    }
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) {
+      return "Enter a valid amount.";
+    }
+
+    if (mode === "buy" && selectedAsset.address === ETH_ADDRESS) {
+      const maxEthIn = config?.maxEthIn ? Number(config.maxEthIn) : null;
+      if (maxEthIn !== null && Number.isFinite(maxEthIn) && numericAmount > maxEthIn) {
+        return "Amount exceeds the current maximum ETH buy limit.";
+      }
+
+      if (ethBalance !== null && numericAmount >= ethBalance) {
+        return "Wallet does not have enough ETH to cover this purchase and gas fees.";
+      }
+    }
+
+    return null;
+  }
+
   // ---------------------------------------------------------------
   // STEP 4: Execute trade using the selected asset
   // ---------------------------------------------------------------
@@ -133,6 +226,11 @@ export default function Trade() {
 
     try {
       const shop = getShop();
+      if (!shop) {
+        throw new Error(
+          "TokenShop contract is not ready yet. Verify wallet connection and shop config."
+        );
+      }
       const isEth = selectedAsset.address === ETH_ADDRESS;
       let tx;
 
@@ -148,6 +246,9 @@ export default function Trade() {
 
         // Approve: "Hey TRI token, let the shop take X TRI from me"
         const token = getToken();
+        if (!token) {
+          throw new Error("TRI token contract is not ready yet.");
+        }
         setTxMessage("Approving TRI transfer...");
         const approveTx = await token.approve(shopAddress, genIn);
         await approveTx.wait();
@@ -158,6 +259,9 @@ export default function Trade() {
       } else if (mode === "buy") {
         // --- Buy TRI with ERC-20 (e.g. USDT) ---
         const erc20 = getErc20(selectedAsset.address);
+        if (!erc20) {
+          throw new Error(`${selectedAsset.symbol} contract is not ready yet.`);
+        }
 
         // Use the asset's decimals (USDT = 6, not 18!)
         const amountIn = ethers.parseUnits(amount, selectedAsset.decimals);
@@ -174,6 +278,9 @@ export default function Trade() {
         // --- Sell TRI for ERC-20 ---
         const genIn = ethers.parseUnits(amount, 18);
         const token = getToken();
+        if (!token) {
+          throw new Error("TRI token contract is not ready yet.");
+        }
 
         setTxMessage("Approving TRI transfer...");
         const approveTx = await token.approve(shopAddress, genIn);
@@ -196,6 +303,7 @@ export default function Trade() {
       try {
         await triggerSync();
         refreshAssets();
+        refreshTokenBalance();
         // Re-fetch config too (supply may have changed)
         apiGet("/shop/config").then(setConfig).catch(console.error);
       } catch {
@@ -203,7 +311,7 @@ export default function Trade() {
       }
     } catch (err) {
       setTxStatus("error");
-      const reason = err.reason || err.message || "Transaction failed";
+      const reason = formatTxError(err, "Transaction failed");
       setTxMessage(reason.length > 100 ? reason.slice(0, 100) + "..." : reason);
       console.error("Trade error:", err);
     }
@@ -211,6 +319,14 @@ export default function Trade() {
 
   const isBuy = mode === "buy";
   const isEth = selectedAsset?.address === ETH_ADDRESS;
+  const preflightError = getPreflightError();
+
+  function formatBalance(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "—";
+    }
+    return value >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value.toFixed(4);
+  }
 
   return (
     <div className="max-w-lg mx-auto">
@@ -227,6 +343,41 @@ export default function Trade() {
 
       {/* Trade Card */}
       <div className="card border-dark-500">
+        {isConnected && (
+          <div
+            className={`mb-6 grid grid-cols-1 gap-3 ${
+              isEth ? "sm:grid-cols-2" : "sm:grid-cols-3"
+            }`}
+          >
+            <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                ETH Balance
+              </p>
+              <p className="mt-1 font-mono text-sm text-gray-100">
+                {formatBalance(ethBalance)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                TRI Balance
+              </p>
+              <p className="mt-1 font-mono text-sm text-gray-100">
+                {tokenBalance?.genBalance ?? "—"}
+              </p>
+            </div>
+            {!isEth && (
+              <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                  {selectedAsset ? `${selectedAsset.symbol} Balance` : "Asset Balance"}
+                </p>
+                <p className="mt-1 font-mono text-sm text-gray-100">
+                  {selectedAsset ? formatBalance(selectedAssetBalance) : "—"}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <div className="flex rounded-lg bg-dark-700 p-1 mb-6">
           <button
@@ -364,22 +515,41 @@ export default function Trade() {
             Connect your wallet to trade
           </p>
         ) : (
-          <button
-            onClick={handleTrade}
-            disabled={!amount || !quote || txStatus === "pending" || !selectedAsset}
-            className={`w-full py-3.5 rounded-lg font-bold text-sm transition-all duration-200 ${
-              isBuy
-                ? "bg-gradient-to-r from-neon-green/80 to-neon-cyan/80 text-dark-900 hover:opacity-90 shadow-neon-green disabled:opacity-30"
-                : "bg-gradient-to-r from-neon-pink/80 to-neon-purple/80 text-white hover:opacity-90 shadow-neon-pink disabled:opacity-30"
-            }`}
-          >
-            <Zap size={14} className="inline mr-1" />
-            {txStatus === "pending"
-              ? "Processing..."
-              : isBuy
-              ? `Buy TRI with ${selectedAsset?.symbol || "..."}`
-              : `Sell TRI for ${selectedAsset?.symbol || "..."}`}
-          </button>
+          <>
+            <button
+              onClick={handleTrade}
+              disabled={
+                !amount ||
+                !quote ||
+                txStatus === "pending" ||
+                !selectedAsset ||
+                !ready ||
+                !!preflightError
+              }
+              className={`w-full py-3.5 rounded-lg font-bold text-sm transition-all duration-200 ${
+                isBuy
+                  ? "bg-gradient-to-r from-neon-green/80 to-neon-cyan/80 text-dark-900 hover:opacity-90 shadow-neon-green disabled:opacity-30"
+                  : "bg-gradient-to-r from-neon-pink/80 to-neon-purple/80 text-white hover:opacity-90 shadow-neon-pink disabled:opacity-30"
+              }`}
+            >
+              <Zap size={14} className="inline mr-1" />
+              {txStatus === "pending"
+                ? "Processing..."
+                : isBuy
+                ? `Buy TRI with ${selectedAsset?.symbol || "..."}`
+                : `Sell TRI for ${selectedAsset?.symbol || "..."}`}
+            </button>
+            {!ready && configLoaded && (
+              <p className="text-xs text-neon-pink mt-2 text-center">
+                TokenShop contract not ready yet. Verify wallet connection and config.
+              </p>
+            )}
+            {preflightError && (
+              <p className="text-xs text-neon-pink mt-2 text-center">
+                {preflightError}
+              </p>
+            )}
+          </>
         )}
 
         {/* TX Status */}
