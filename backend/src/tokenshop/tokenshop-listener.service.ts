@@ -102,6 +102,16 @@ export class TokenShopListenerService
     }, this.pollIntervalMs);
   }
 
+  async syncNow() {
+    await this.syncOnce();
+    const syncState = await this.getOrCreateSyncState();
+
+    return {
+      status: "ok",
+      lastSyncedBlock: Number(syncState.lastSyncedBlock),
+    };
+  }
+
   private async syncOnce() {
     if (!this.provider || !this.contract) {
       return;

@@ -3,6 +3,8 @@
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": true,
+    "noEmit": true,
     "jsx": "react-jsx",
     "moduleResolution": "Node",
     "esModuleInterop": true,

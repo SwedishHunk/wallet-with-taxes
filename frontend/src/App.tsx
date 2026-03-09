@@ -19,6 +19,7 @@ import {
 } from "./lib/RouteGuards";
 import { AppLayout } from "./components/AppLayout";
 import { Page, PageHeader, Card } from "./components/ui/index";
+import RoleGateway from "./pages/RoleGateway";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import StudioSelector from "./pages/StudioSelector";
@@ -31,6 +32,8 @@ import CreateFirstPersonalAccount from "./pages/CreateFirstPersonalAccount";
 import PersonalAccountLogin from "./pages/PersonalAccountLogin";
 import { GameControl } from "./pages/GameControl";
 import Games from "./pages/Games";
+import Settings from "./pages/Settings";
+import PlayerPortal from "./player/PlayerPortal";
 import { ROUTES } from "./routes";
 import "./index.css";
 
@@ -60,8 +63,9 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes (no layout) */}
-      <Route path={ROUTES.root} element={<Login />} />
+      <Route path={ROUTES.root} element={<RoleGateway />} />
       <Route path={ROUTES.login} element={<Login />} />
+      <Route path="/player/*" element={<PlayerPortal />} />
       <Route
         path={ROUTES.signup}
         element={
@@ -127,10 +131,7 @@ function AppRoutes() {
           path={ROUTES.settings}
           element={
             <ProtectedMemberAuth>
-              <Page>
-                <PageHeader title="Inställningar" />
-                <Card>TODO: Settings page</Card>
-              </Page>
+              <Settings />
             </ProtectedMemberAuth>
           }
         />

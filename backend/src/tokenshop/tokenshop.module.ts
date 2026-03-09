@@ -12,6 +12,7 @@ import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
 import { TokenShopQuotesController } from "./tokenshop-quotes.controller";
 import { TokenShopQueryService } from "./tokenshop-query.service";
 import { TokenShopShopController } from "./tokenshop-shop.controller";
+import { TokenShopSyncController } from "./tokenshop-sync.controller";
 import { TokenShopUserController } from "./tokenshop-user.controller";
 import { TokenShopAdminApiGuard } from "./guards/tokenshop-admin-api.guard";
 import { TokenShopListenerService } from "./tokenshop-listener.service";
@@ -27,6 +28,7 @@ import { TokenShopListenerService } from "./tokenshop-listener.service";
     TokenShopAnalyticsController,
     TokenShopUserController,
     TokenShopAdminController,
+    TokenShopSyncController,
   ],
   providers: [
     TokenShopChainService,
