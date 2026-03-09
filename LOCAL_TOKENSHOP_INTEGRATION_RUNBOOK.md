@@ -28,6 +28,22 @@ Listening on 127.0.0.1:8545
 
 ## 2. Deploy TRI + TaxProcessor + TokenShop
 
+Preferred path after consolidation: deploy from `wallet-with-taxes/contracts`, not from `trolith-studio-token`.
+
+### Option A. Preferred consolidated deploy
+
+In terminal 2:
+
+```powershell
+cd "D:\VSC\LIA 2\Inner-Wallet\wallet-with-taxes\contracts"
+$env:PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+forge script script/DeployTokenShopIntegration.s.sol:DeployTokenShopIntegration --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+### Option B. Legacy deploy from Mohammed's repo
+
+Only use this if you need to compare behavior with his original setup.
+
 In terminal 2:
 
 ```powershell
@@ -83,7 +99,9 @@ Notes:
 
 ## 3b. Configure trolith-studio-token env files
 
-For the local integration deploy we ran, the contract deployment itself does not require a `.env` file because the script hardcodes the default Anvil deployer key in [script/DeployIntegration.s.sol](/d:/VSC/LIA%202/Inner-Wallet/trolith-studio-token/script/DeployIntegration.s.sol).
+For the consolidated deploy in this repo, the contract deployment does not require a `.env` file, but it does require `PRIVATE_KEY` to be present in the shell environment before running [DeployTokenShopIntegration.s.sol](/d:/VSC/LIA%202/Inner-Wallet/wallet-with-taxes/contracts/script/DeployTokenShopIntegration.s.sol).
+
+For Mohammed's legacy deploy, the script hardcodes the default Anvil deployer key in [script/DeployIntegration.s.sol](/d:/VSC/LIA%202/Inner-Wallet/trolith-studio-token/script/DeployIntegration.s.sol).
 
 If Mohammed wants to run his backend against the same local deployment, the relevant values in `trolith-studio-token/backend/.env` are:
 
@@ -100,6 +118,7 @@ Notes:
 - `SHOP_ADDRESS` in Mohammed's repo is the same contract as our `TOKENSHOP_ADDRESS`.
 - Their backend needs its own PostgreSQL database, separate from `wallet-with-taxes`.
 - `PORT` can be `3001` or any free local port, as long as they stay consistent in their frontend/backend setup.
+- After the consolidation in `wallet-with-taxes`, Mohammed's backend is optional. His frontend can point directly at our Nest backend routes under `/api/shop`, `/api/quotes`, `/api/analytics`, `/api/user`, and `/api/admin`.
 
 ## 4. Start wallet-with-taxes backend
 

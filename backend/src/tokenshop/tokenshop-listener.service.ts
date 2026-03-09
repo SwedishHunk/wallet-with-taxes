@@ -7,9 +7,9 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Contract, ethers, JsonRpcProvider, Log } from "ethers";
 import { DataSource, Repository } from "typeorm";
-import tokenShopAbi from "../shared/constants/abis/TokenShop.json";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { ShopEvent } from "./entities/shop-event.entity";
+import { TOKENSHOP_ABI } from "./tokenshop.abi";
 import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
 
 type TokenShopEventName = "Bought" | "Sold";
@@ -41,9 +41,9 @@ export class TokenShopListenerService
     : null;
   private readonly contract =
     this.provider && this.tokenShopAddress
-      ? new Contract(this.tokenShopAddress, tokenShopAbi, this.provider)
+      ? new Contract(this.tokenShopAddress, TOKENSHOP_ABI, this.provider)
       : null;
-  private readonly interface = new ethers.Interface(tokenShopAbi);
+  private readonly interface = new ethers.Interface(TOKENSHOP_ABI);
   private readonly ethAddress = ethers.ZeroAddress.toLowerCase();
 
   private timer: NodeJS.Timeout | null = null;
