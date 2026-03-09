@@ -3,8 +3,10 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Index,
 } from "typeorm";
 
+@Index(["source", "txHash", "logIndex"], { unique: true })
 @Entity()
 export class TaxEvent {
   @PrimaryGeneratedColumn()
@@ -33,4 +35,13 @@ export class TaxEvent {
 
   @Column({ type: "float", nullable: true })
   priceUSD?: number;
+
+  @Column({ type: "varchar", nullable: true })
+  source?: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  txHash?: string | null;
+
+  @Column({ type: "int", nullable: true })
+  logIndex?: number | null;
 }

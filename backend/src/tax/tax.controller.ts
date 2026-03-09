@@ -9,7 +9,7 @@ export class TaxController {
   @Get("summary")
   async getSummary(@Query("user") user: string) {
     if (!user) return { error: "Missing user address in query." };
-    return this.taxService.getSummary(user);
+    return this.taxService.getSummary(user.toLowerCase());
   }
 
   @Get("export")
@@ -19,6 +19,6 @@ export class TaxController {
       return;
     }
 
-    await this.taxService.exportEventsAsCSV(user, res);
+    await this.taxService.exportEventsAsCSV(user.toLowerCase(), res);
   }
 }

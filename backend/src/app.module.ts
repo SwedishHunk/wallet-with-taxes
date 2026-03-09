@@ -10,6 +10,7 @@ import { AssetsModule } from "./__assets/assets.module";
 import { EventsModule } from "./__events/events.module";
 import { AdminModule } from "./admin/admin.module";
 import { PlatformModule } from "./platform/platform.module";
+import { TokenShopModule } from "./tokenshop/tokenshop.module";
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { PlatformModule } from "./platform/platform.module";
     EventsModule,
     AdminModule,
     PlatformModule,
+    TokenShopModule,
   ],
 })
 export class AppModule {}

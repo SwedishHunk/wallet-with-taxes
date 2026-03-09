@@ -22,12 +22,17 @@ export class TaxService {
   ) {}
 
   async logEvent(data: Partial<TaxEvent>) {
-    const event = this.repo.create(data);
+    const normalizedData = {
+      ...data,
+      userAddress: data.userAddress?.toLowerCase(),
+      assetAddress: data.assetAddress?.toLowerCase(),
+    };
+    const event = this.repo.create(normalizedData);
     return this.repo.save(event);
   }
   async getEventsForUser(userAddress: string): Promise<TaxEvent[]> {
     return this.repo.find({
-      where: { userAddress },
+      where: { userAddress: userAddress.toLowerCase() },
       order: { timestamp: "ASC" },
     });
   }
@@ -99,6 +104,12 @@ export class TaxService {
 
   async exportEventsAsCSV(userAddress: string, res: Response): Promise<void> {
     const events = await this.getEventsForUser(userAddress);
+    if (events.length === 0) {
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=tax-report.csv");
+      res.send("Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD");
+      return;
+    }
 
     const formatted: TaxCsvRow[] = events.map((e) => ({
       Date: e.timestamp.toISOString(),
