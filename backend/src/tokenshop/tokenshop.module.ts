@@ -2,12 +2,13 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { TaxModule } from "../tax/tax.module";
+import { ShopEvent } from "./entities/shop-event.entity";
 import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
 import { TokenShopListenerService } from "./tokenshop-listener.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TaxEvent, TokenShopSyncState]),
+    TypeOrmModule.forFeature([TaxEvent, TokenShopSyncState, ShopEvent]),
     TaxModule,
   ],
   providers: [TokenShopListenerService],

@@ -6,10 +6,10 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Contract, ethers, JsonRpcProvider, Log } from "ethers";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import tokenShopAbi from "../shared/constants/abis/TokenShop.json";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
-import { TaxService } from "../tax/tax.service";
+import { ShopEvent } from "./entities/shop-event.entity";
 import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
 
 type TokenShopEventName = "Bought" | "Sold";
@@ -22,6 +22,7 @@ type ParsedTokenShopEvent = {
   triAmountRaw: bigint;
   txHash: string;
   logIndex: number;
+  blockNumber: number;
 };
 
 @Injectable()
@@ -52,11 +53,13 @@ export class TokenShopListenerService
     : null;
 
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(TaxEvent)
     private readonly taxEventRepo: Repository<TaxEvent>,
+    @InjectRepository(ShopEvent)
+    private readonly shopEventRepo: Repository<ShopEvent>,
     @InjectRepository(TokenShopSyncState)
     private readonly syncStateRepo: Repository<TokenShopSyncState>,
-    private readonly taxService: TaxService,
   ) {}
 
   async onModuleInit() {
@@ -194,6 +197,7 @@ export class TokenShopListenerService
         triAmountRaw,
         txHash: log.transactionHash,
         logIndex: log.index,
+        blockNumber: log.blockNumber,
       };
     } catch {
       return null;
@@ -201,18 +205,6 @@ export class TokenShopListenerService
   }
 
   private async persistParsedEvent(event: ParsedTokenShopEvent) {
-    const existing = await this.taxEventRepo.findOne({
-      where: {
-        source: "tokenshop",
-        txHash: event.txHash,
-        logIndex: event.logIndex,
-      },
-    });
-
-    if (existing) {
-      return;
-    }
-
     const triAmount = Number(ethers.formatUnits(event.triAmountRaw, 18));
     if (!Number.isFinite(triAmount) || triAmount <= 0) {
       return;
@@ -224,22 +216,75 @@ export class TokenShopListenerService
     );
     const placeholderUnitPrice =
       paymentAmount !== null ? paymentAmount / triAmount : undefined;
+    const normalizedAssetAddress = (this.triTokenAddress ?? "TRI").toLowerCase();
+    const normalizedPayAsset = event.payAsset.toLowerCase();
+    const taxType = event.name === "Bought" ? "acquisition" : "disposal";
+    const shopEventType = event.name === "Bought" ? "BUY" : "SELL";
 
-    await this.taxService.logEvent({
-      type: event.name === "Bought" ? "acquisition" : "disposal",
-      userAddress: event.userAddress,
-      assetAddress: this.triTokenAddress ?? "TRI",
-      tokenId: 0,
-      amount: triAmount,
-      feeUSD: 0,
-      priceUSD:
-        placeholderUnitPrice !== undefined &&
-        Number.isFinite(placeholderUnitPrice)
-          ? placeholderUnitPrice
-          : undefined,
-      source: "tokenshop",
-      txHash: event.txHash,
-      logIndex: event.logIndex,
+    await this.dataSource.transaction(async (manager) => {
+      const transactionalTaxRepo = manager.getRepository(TaxEvent);
+      const transactionalShopEventRepo = manager.getRepository(ShopEvent);
+
+      const existingTaxEvent = await transactionalTaxRepo.findOne({
+        where: {
+          source: "tokenshop",
+          txHash: event.txHash,
+          logIndex: event.logIndex,
+        },
+      });
+      if (existingTaxEvent) {
+        return;
+      }
+
+      const existingShopEvent = await transactionalShopEventRepo.findOne({
+        where: {
+          txHash: event.txHash,
+          logIndex: event.logIndex,
+        },
+      });
+      if (existingShopEvent) {
+        return;
+      }
+
+      await transactionalShopEventRepo.save(
+        transactionalShopEventRepo.create({
+          type: shopEventType,
+          blockNumber: event.blockNumber,
+          txHash: event.txHash,
+          logIndex: event.logIndex,
+          user: event.userAddress,
+          asset: normalizedPayAsset,
+          assetSymbol:
+            normalizedPayAsset === this.ethAddress ? "ETH" : normalizedPayAsset,
+          amountIn:
+            event.name === "Bought"
+              ? event.amountInRaw.toString()
+              : event.triAmountRaw.toString(),
+          amountOut:
+            event.name === "Bought"
+              ? event.triAmountRaw.toString()
+              : event.amountInRaw.toString(),
+        }),
+      );
+
+      await transactionalTaxRepo.save(
+        transactionalTaxRepo.create({
+          type: taxType,
+          userAddress: event.userAddress,
+          assetAddress: normalizedAssetAddress,
+          tokenId: 0,
+          amount: triAmount,
+          feeUSD: 0,
+          priceUSD:
+            placeholderUnitPrice !== undefined &&
+            Number.isFinite(placeholderUnitPrice)
+              ? placeholderUnitPrice
+              : undefined,
+          source: "tokenshop",
+          txHash: event.txHash,
+          logIndex: event.logIndex,
+        }),
+      );
     });
   }
 

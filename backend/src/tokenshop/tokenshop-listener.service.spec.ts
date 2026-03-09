@@ -1,7 +1,8 @@
 import { ethers } from "ethers";
+import { DataSource } from "typeorm";
 import tokenShopAbi from "../shared/constants/abis/TokenShop.json";
-import { TaxService } from "../tax/tax.service";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
+import { ShopEvent } from "./entities/shop-event.entity";
 import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
 import { TokenShopListenerService } from "./tokenshop-listener.service";
 
@@ -47,26 +48,42 @@ function encodeEventLog(
     transactionHash:
       "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     index: 7,
+    blockNumber: 0,
   };
 }
 
 describe("TokenShopListenerService", () => {
   let taxEventRepo: MockRepo<TaxEvent>;
+  let shopEventRepo: MockRepo<ShopEvent>;
   let syncStateRepo: MockRepo<TokenShopSyncState>;
-  let taxService: { logEvent: jest.Mock };
+  let dataSource: { transaction: jest.Mock };
   let service: TokenShopListenerService;
 
   beforeEach(() => {
     taxEventRepo = makeRepo<TaxEvent>();
+    shopEventRepo = makeRepo<ShopEvent>();
     syncStateRepo = makeRepo<TokenShopSyncState>();
-    taxService = {
-      logEvent: jest.fn().mockResolvedValue(undefined),
+    dataSource = {
+      transaction: jest.fn(async (callback) =>
+        callback({
+          getRepository: (entity: unknown) => {
+            if (entity === TaxEvent) {
+              return taxEventRepo;
+            }
+            if (entity === ShopEvent) {
+              return shopEventRepo;
+            }
+            throw new Error("Unexpected repository");
+          },
+        }),
+      ),
     };
 
     service = new TokenShopListenerService(
+      dataSource as unknown as DataSource,
       taxEventRepo as never,
+      shopEventRepo as never,
       syncStateRepo as never,
-      taxService as unknown as TaxService,
     );
   });
 
@@ -89,11 +106,13 @@ describe("TokenShopListenerService", () => {
       triAmountRaw: ethers.parseUnits("250", 18),
       txHash: log.transactionHash,
       logIndex: 7,
+      blockNumber: 0,
     });
   });
 
-  it("persistParsedEvent stores a tokenshop acquisition with replay metadata", async () => {
+  it("persistParsedEvent stores both shop event and tax event atomically", async () => {
     taxEventRepo.findOne.mockResolvedValueOnce(null);
+    shopEventRepo.findOne.mockResolvedValueOnce(null);
     (service as any).triTokenAddress =
       "0x9999999999999999999999999999999999999999";
 
@@ -106,9 +125,22 @@ describe("TokenShopListenerService", () => {
       txHash:
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       logIndex: 3,
+      blockNumber: 42,
     });
 
-    expect(taxService.logEvent).toHaveBeenCalledWith({
+    expect(shopEventRepo.create).toHaveBeenCalledWith({
+      type: "BUY",
+      blockNumber: 42,
+      txHash:
+        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      logIndex: 3,
+      user: "0xabc",
+      asset: ethers.ZeroAddress.toLowerCase(),
+      assetSymbol: "ETH",
+      amountIn: ethers.parseEther("2").toString(),
+      amountOut: ethers.parseUnits("100", 18).toString(),
+    });
+    expect(taxEventRepo.create).toHaveBeenCalledWith({
       type: "acquisition",
       userAddress: "0xabc",
       assetAddress: "0x9999999999999999999999999999999999999999",
@@ -123,7 +155,7 @@ describe("TokenShopListenerService", () => {
     });
   });
 
-  it("persistParsedEvent skips duplicates", async () => {
+  it("persistParsedEvent skips duplicates when tax event already exists", async () => {
     taxEventRepo.findOne.mockResolvedValueOnce({
       id: 1,
     });
@@ -137,9 +169,33 @@ describe("TokenShopListenerService", () => {
       txHash:
         "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       logIndex: 9,
+      blockNumber: 9,
     });
 
-    expect(taxService.logEvent).not.toHaveBeenCalled();
+    expect(shopEventRepo.save).not.toHaveBeenCalled();
+    expect(taxEventRepo.save).not.toHaveBeenCalled();
+  });
+
+  it("persistParsedEvent skips duplicates when shop event already exists", async () => {
+    taxEventRepo.findOne.mockResolvedValueOnce(null);
+    shopEventRepo.findOne.mockResolvedValueOnce({
+      id: 1,
+    });
+
+    await (service as any).persistParsedEvent({
+      name: "Bought",
+      userAddress: "0xabc",
+      payAsset: ethers.ZeroAddress.toLowerCase(),
+      amountInRaw: ethers.parseEther("1"),
+      triAmountRaw: ethers.parseUnits("10", 18),
+      txHash:
+        "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      logIndex: 1,
+      blockNumber: 8,
+    });
+
+    expect(shopEventRepo.save).not.toHaveBeenCalled();
+    expect(taxEventRepo.save).not.toHaveBeenCalled();
   });
 
   it("syncOnce ingests bought and sold events and updates sync state", async () => {
@@ -151,6 +207,7 @@ describe("TokenShopListenerService", () => {
     syncStateRepo.findOne.mockResolvedValueOnce(syncState);
     syncStateRepo.save.mockResolvedValue(syncState);
     taxEventRepo.findOne.mockResolvedValue(null);
+    shopEventRepo.findOne.mockResolvedValue(null);
 
     (service as any).provider = {
       getBlockNumber: jest.fn().mockResolvedValue(6),
@@ -187,23 +244,8 @@ describe("TokenShopListenerService", () => {
 
     await (service as any).syncOnce();
 
-    expect(taxService.logEvent).toHaveBeenCalledTimes(2);
-    expect(taxService.logEvent).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        type: "acquisition",
-        amount: 10,
-        source: "tokenshop",
-      }),
-    );
-    expect(taxService.logEvent).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        type: "disposal",
-        amount: 5,
-        source: "tokenshop",
-      }),
-    );
+    expect(shopEventRepo.save).toHaveBeenCalledTimes(2);
+    expect(taxEventRepo.save).toHaveBeenCalledTimes(2);
     expect(syncStateRepo.save).toHaveBeenCalledWith({
       id: "tokenshop",
       lastSyncedBlock: "6",
