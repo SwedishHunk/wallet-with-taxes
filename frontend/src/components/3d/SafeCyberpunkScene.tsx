@@ -21,13 +21,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 type Props = {
   intensity?: "full" | "subtle";
+  sacredGeometry?: "flower" | "merkaba" | "fibonacci";
 };
 
-export default function SafeCyberpunkScene({ intensity = "full" }: Props) {
+export default function SafeCyberpunkScene({ intensity = "full", sacredGeometry }: Props) {
   return (
     <ErrorBoundary>
       <Suspense fallback={null}>
-        <LazyCyberpunkScene intensity={intensity} />
+        <LazyCyberpunkScene intensity={intensity} sacredGeometry={sacredGeometry} />
       </Suspense>
     </ErrorBoundary>
   );

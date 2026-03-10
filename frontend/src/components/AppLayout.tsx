@@ -25,7 +25,7 @@ import "./AppLayout.css";
 export function AppLayout() {
   return (
     <div className="app-layout">
-      <CyberpunkScene intensity="subtle" />
+      <CyberpunkScene intensity="subtle" sacredGeometry="fibonacci" />
       <FilmGrainOverlay />
       <Header />
       <main className="app-content">

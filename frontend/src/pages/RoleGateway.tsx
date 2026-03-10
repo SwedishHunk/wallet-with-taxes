@@ -26,7 +26,7 @@ const cardHoverOwner = {
 export default function RoleGateway() {
   return (
     <div className="role-gateway">
-      <CyberpunkScene intensity="full" />
+      <CyberpunkScene intensity="full" sacredGeometry="flower" />
       <FilmGrainOverlay />
       <div className="role-gateway__backdrop" />
       <motion.div

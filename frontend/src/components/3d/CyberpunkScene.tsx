@@ -1,9 +1,18 @@
 import { useRef, useEffect } from "react";
 import * as THREE from "three";
+import { createFlowerOfLife, animateFlowerOfLife } from "./FlowerOfLife";
+import { createMerkaba, animateMerkaba } from "./Merkaba";
+import { createFibonacciSpiral, animateFibonacciSpiral } from "./FibonacciSpiral";
 
-type Props = { intensity?: "full" | "subtle" };
+type Props = {
+  intensity?: "full" | "subtle";
+  sacredGeometry?: "flower" | "merkaba" | "fibonacci";
+};
 
-export default function CyberpunkScene({ intensity = "full" }: Props) {
+export default function CyberpunkScene({
+  intensity = "full",
+  sacredGeometry,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isSubtle = intensity === "subtle";
 
@@ -15,6 +24,8 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
     // === Scene & Camera ===
@@ -22,26 +33,32 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 0, 6);
 
-    // === Lighting ===
-    scene.add(new THREE.AmbientLight(0xffffff, 0.15));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    dirLight.position.set(5, 5, 5);
-    scene.add(dirLight);
+    // === Lighting — warm 432Hz palette with neon accents ===
+    scene.add(new THREE.AmbientLight(0xfff8e7, 0.1)); // warm ambient
 
-    const cyanLight = new THREE.PointLight(0x00d4ff, 0.6, 15);
+    const warmLight = new THREE.DirectionalLight(0xffd700, 0.2);
+    warmLight.position.set(5, 5, 5);
+    scene.add(warmLight);
+
+    // Neon accent lights
+    const cyanLight = new THREE.PointLight(0x00d4ff, 0.5, 15);
     cyanLight.position.set(-4, 3, 2);
     scene.add(cyanLight);
 
-    const purpleLight = new THREE.PointLight(0xa855f7, 0.4, 12);
+    const purpleLight = new THREE.PointLight(0xa855f7, 0.35, 12);
     purpleLight.position.set(4, -2, 3);
     scene.add(purpleLight);
 
-    const greenLight = new THREE.PointLight(0x00ff88, 0.3, 10);
-    greenLight.position.set(0, -4, 4);
-    scene.add(greenLight);
+    const roseLight = new THREE.PointLight(0xff6b9d, 0.25, 10);
+    roseLight.position.set(0, -4, 4);
+    scene.add(roseLight);
+
+    const goldLight = new THREE.PointLight(0xffd700, 0.3, 12);
+    goldLight.position.set(0, 3, 3);
+    scene.add(goldLight);
 
     // === Star field ===
-    const starCount = isSubtle ? 1200 : 2500;
+    const starCount = isSubtle ? 1000 : 2000;
     const starPositions = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
       starPositions[i * 3] = (Math.random() - 0.5) * 100;
@@ -51,17 +68,17 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
     const starMat = new THREE.PointsMaterial({
-      size: 0.08,
-      color: 0x88ccff,
+      size: 0.06,
+      color: 0xffe8a0,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.5,
       sizeAttenuation: true,
       depthWrite: false,
     });
     const stars = new THREE.Points(starGeo, starMat);
     scene.add(stars);
 
-    // === Neon particles ===
+    // === Warm neon particles ===
     function createParticles(count: number, color: number) {
       const pos = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
@@ -72,60 +89,30 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
       const mat = new THREE.PointsMaterial({
-        size: 0.12,
+        size: 0.1,
         color,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.4,
         sizeAttenuation: true,
         depthWrite: false,
       });
       return new THREE.Points(geo, mat);
     }
-    const cyanParticles = createParticles(isSubtle ? 25 : 60, 0x00d4ff);
-    const purpleParticles = createParticles(isSubtle ? 15 : 35, 0xa855f7);
-    scene.add(cyanParticles);
-    scene.add(purpleParticles);
+    const goldParticles = createParticles(isSubtle ? 15 : 40, 0xffd700);
+    const tealParticles = createParticles(isSubtle ? 10 : 25, 0x4fd1c5);
+    scene.add(goldParticles);
+    scene.add(tealParticles);
 
-    // === Floating meshes ===
-    type MeshConfig = {
-      pos: [number, number, number];
-      geo: THREE.BufferGeometry;
-      color: number;
-      scale: number;
-      speed: number;
-    };
+    // === Sacred Geometry ===
+    let sacredGroup: THREE.Group | null = null;
 
-    const meshConfigs: MeshConfig[] = isSubtle
-      ? [
-          { pos: [-4, 2, -4], geo: new THREE.IcosahedronGeometry(1, 4), color: 0x00d4ff, scale: 0.4, speed: 0.8 },
-          { pos: [4, -1, -3], geo: new THREE.OctahedronGeometry(1, 2), color: 0xa855f7, scale: 0.25, speed: 0.6 },
-        ]
-      : [
-          { pos: [-3.5, 1.5, -2], geo: new THREE.IcosahedronGeometry(1, 4), color: 0x00d4ff, scale: 0.8, speed: 1.2 },
-          { pos: [3.5, -1, -1.5], geo: new THREE.TorusKnotGeometry(0.8, 0.3, 128, 32), color: 0xa855f7, scale: 0.5, speed: 0.8 },
-          { pos: [2, 2.5, -3], geo: new THREE.OctahedronGeometry(1, 2), color: 0x00ff88, scale: 0.35, speed: 1.5 },
-          { pos: [-2, -2, -2.5], geo: new THREE.IcosahedronGeometry(1, 4), color: 0x00d4ff, scale: 0.3, speed: 1 },
-          { pos: [0, -3, -4], geo: new THREE.TorusGeometry(1, 0.4, 32, 64), color: 0xa855f7, scale: 0.45, speed: 0.6 },
-        ];
-
-    const meshes: THREE.Mesh[] = meshConfigs.map(({ pos, geo, color, scale, speed }) => {
-      const mat = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 0.5,
-        metalness: 0.1,
-        roughness: 0.2,
-        transparent: true,
-        opacity: 0.85,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(...pos);
-      mesh.scale.setScalar(scale);
-      mesh.userData.speed = speed;
-      mesh.userData.initialY = pos[1];
-      scene.add(mesh);
-      return mesh;
-    });
+    if (sacredGeometry === "flower") {
+      sacredGroup = createFlowerOfLife(scene);
+    } else if (sacredGeometry === "merkaba") {
+      sacredGroup = createMerkaba(scene);
+    } else if (sacredGeometry === "fibonacci") {
+      sacredGroup = createFibonacciSpiral(scene);
+    }
 
     // === Mouse tracking ===
     const mouse = { x: 0, y: 0 };
@@ -150,32 +137,35 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
     const animate = () => {
       animId = requestAnimationFrame(animate);
       const elapsed = clock.getElapsedTime();
-      const delta = clock.getDelta();
 
-      // Rotate stars slowly
-      stars.rotation.y += 0.0003;
+      // Stars slow rotation
+      stars.rotation.y += 0.0002;
       stars.rotation.x += 0.0001;
 
-      // Animate particles
-      const cyanArr = cyanParticles.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < cyanArr.length / 3; i++) {
-        cyanArr[i * 3 + 1] += Math.sin(elapsed + i) * 0.001;
+      // Particle drift
+      const goldArr = goldParticles.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < goldArr.length / 3; i++) {
+        goldArr[i * 3 + 1] += Math.sin(elapsed + i) * 0.0008;
       }
-      cyanParticles.geometry.attributes.position.needsUpdate = true;
+      goldParticles.geometry.attributes.position.needsUpdate = true;
 
-      const purpleArr = purpleParticles.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < purpleArr.length / 3; i++) {
-        purpleArr[i * 3 + 1] += Math.cos(elapsed + i * 0.7) * 0.001;
+      const tealArr = tealParticles.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < tealArr.length / 3; i++) {
+        tealArr[i * 3 + 1] += Math.cos(elapsed + i * 0.7) * 0.0008;
       }
-      purpleParticles.geometry.attributes.position.needsUpdate = true;
+      tealParticles.geometry.attributes.position.needsUpdate = true;
 
-      // Rotate and float meshes
-      meshes.forEach((m) => {
-        const spd = m.userData.speed as number;
-        m.rotation.x += 0.003 * spd;
-        m.rotation.y += 0.005 * spd;
-        m.position.y = (m.userData.initialY as number) + Math.sin(elapsed * spd) * 0.3;
-      });
+      // Animate sacred geometry
+      if (sacredGroup) {
+        if (sacredGeometry === "flower") animateFlowerOfLife(sacredGroup, elapsed);
+        else if (sacredGeometry === "merkaba") animateMerkaba(sacredGroup, elapsed);
+        else if (sacredGeometry === "fibonacci") animateFibonacciSpiral(sacredGroup, elapsed);
+      }
+
+      // Neon light pulsing
+      cyanLight.intensity = 0.5 + Math.sin(elapsed * 0.8) * 0.15;
+      purpleLight.intensity = 0.35 + Math.sin(elapsed * 0.6 + 1) * 0.1;
+      goldLight.intensity = 0.3 + Math.sin(elapsed * 1.14) * 0.1; // 432Hz harmonic
 
       // Camera parallax
       camera.position.x = THREE.MathUtils.lerp(camera.position.x, mouse.x * 0.5, 0.02);
@@ -193,9 +183,11 @@ export default function CyberpunkScene({ intensity = "full" }: Props) {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
-      container.removeChild(renderer.domElement);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
     };
-  }, [isSubtle]);
+  }, [isSubtle, sacredGeometry]);
 
   return (
     <div
