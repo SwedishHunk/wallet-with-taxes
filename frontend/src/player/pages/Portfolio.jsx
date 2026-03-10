@@ -260,6 +260,8 @@ export default function Portfolio() {
     estimatedCurrentValueEth !== null && estimatedCostBasisEth !== null
       ? estimatedCurrentValueEth - estimatedCostBasisEth
       : null;
+  const pnlStatus = getPnlStatus(unrealizedPnlEth);
+  const usesOnlyEthHistory = positions.every((position) => position.symbol === "ETH");
 
   return (
     <div>
@@ -353,6 +355,11 @@ export default function Portfolio() {
               : "—"
           }
           sub="Average ETH paid per TRI"
+          meta={
+            usesOnlyEthHistory
+              ? "Based on your full TRI trade history"
+              : "Based on ETH-funded buys only"
+          }
           color="cyan"
           icon={ChartNoAxesCombined}
         />
@@ -376,7 +383,8 @@ export default function Portfolio() {
                 )} ETH`
               : "—"
           }
-          sub="Estimate against ETH cost basis"
+          sub={pnlStatus}
+          meta="Estimate against ETH cost basis"
           color={unrealizedPnlEth !== null && unrealizedPnlEth < 0 ? "pink" : "green"}
           icon={Landmark}
         />
@@ -596,4 +604,20 @@ function getCurrentTriPriceEth(config) {
 
 function syncStatusKey(syncing) {
   return syncing ? "syncing" : "idle";
+}
+
+function getPnlStatus(unrealizedPnlEth) {
+  if (unrealizedPnlEth === null || unrealizedPnlEth === undefined) {
+    return "Need ETH trade history to calculate";
+  }
+
+  if (Math.abs(unrealizedPnlEth) < 0.000001) {
+    return "Roughly break-even";
+  }
+
+  if (unrealizedPnlEth > 0) {
+    return "Currently in profit";
+  }
+
+  return "Currently at a loss";
 }
