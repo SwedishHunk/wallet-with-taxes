@@ -217,6 +217,20 @@ input::placeholder, select::placeholder, textarea::placeholder {
   to { transform: rotate(360deg); }
 }
 
+/* Shared logo triangle animations (used in AppLayout + player Navbar) */
+@keyframes triPulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(0,212,255,0.55)) drop-shadow(0 0 6px rgba(168,85,247,0.30)); }
+  50%       { filter: drop-shadow(0 0 9px rgba(0,212,255,0.90)) drop-shadow(0 0 18px rgba(168,85,247,0.65)) drop-shadow(0 0 28px rgba(0,212,255,0.35)); }
+}
+
+@keyframes triSpin3D {
+  0%   { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+  25%  { transform: perspective(180px) rotateY(18deg)  rotateZ(4deg); }
+  50%  { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+  75%  { transform: perspective(180px) rotateY(-18deg) rotateZ(-4deg); }
+  100% { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+}
+
 /* ===== Utility Animation Classes ===== */
 
 .animate-fadeInUp {

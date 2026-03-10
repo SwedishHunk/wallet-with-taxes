@@ -287,7 +287,7 @@ export default function WalletInfo() {
                     <input type="text" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} placeholder="e.g., Initial deposit" disabled={submitting === "deposit"} className={inputCls} />
                   </div>
                   <div style={{ flex: 1 }} />
-                  <button type="submit" disabled={submitting === "deposit"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: card.btnGrad, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "deposit" ? 0.5 : 1 }}>
+                  <button type="submit" disabled={submitting === "deposit"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: `1px solid ${card.accent}70`, background: `${card.accent}15`, color: card.accent, fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "deposit" ? 0.5 : 1, backdropFilter: "blur(8px)" }}>
                     {submitting === "deposit" ? "Depositing…" : "Deposit"}
                   </button>
                 </form>
@@ -304,7 +304,7 @@ export default function WalletInfo() {
                     <input type="text" value={withdrawDesc} onChange={e => setWithdrawDesc(e.target.value)} placeholder="e.g., Game completion" disabled={submitting === "withdraw"} className={inputCls} />
                   </div>
                   <div style={{ flex: 1 }} />
-                  <button type="submit" disabled={submitting === "withdraw"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: card.btnGrad, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "withdraw" ? 0.5 : 1 }}>
+                  <button type="submit" disabled={submitting === "withdraw"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: `1px solid ${card.accent}70`, background: `${card.accent}15`, color: card.accent, fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "withdraw" ? 0.5 : 1, backdropFilter: "blur(8px)" }}>
                     {submitting === "withdraw" ? "Withdrawing…" : "Withdraw"}
                   </button>
                 </form>
@@ -329,7 +329,7 @@ export default function WalletInfo() {
                     <label className={labelCls}>Description (optional)</label>
                     <input type="text" value={transferDesc} onChange={e => setTransferDesc(e.target.value)} placeholder="e.g., Reward transfer" disabled={submitting === "transfer"} className={inputCls} />
                   </div>
-                  <button type="submit" disabled={submitting === "transfer"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: card.btnGrad, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "transfer" ? 0.5 : 1 }}>
+                  <button type="submit" disabled={submitting === "transfer"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: `1px solid ${card.accent}70`, background: `${card.accent}15`, color: card.accent, fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "transfer" ? 0.5 : 1, backdropFilter: "blur(8px)" }}>
                     {submitting === "transfer" ? "Transferring…" : "Transfer"}
                   </button>
                 </form>

@@ -42,19 +42,29 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, #00d4ff 0%, #a855f7 100%)',
-                boxShadow: '0 0 15px rgba(0, 212, 255, 0.3)',
-              }}
-            >
-              <span className="text-white font-bold text-sm" style={{ fontFamily: '"Orbitron", sans-serif' }}>T</span>
+            {/* Animated neon triangle — same as studio layout */}
+            <div style={{ flexShrink: 0, animation: 'triPulse 3s ease-in-out infinite, triSpin3D 9s ease-in-out infinite', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.55)) drop-shadow(0 0 8px rgba(168,85,247,0.35))' }}>
+              <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                <defs>
+                  <linearGradient id="triStrokeP" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00d4ff" />
+                    <stop offset="100%" stopColor="#a855f7" />
+                  </linearGradient>
+                  <linearGradient id="triStroke2P" x1="100%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#a855f7" />
+                    <stop offset="100%" stopColor="#00d4ff" />
+                  </linearGradient>
+                </defs>
+                <polygon points="17,6 30,28 4,28" stroke="rgba(168,85,247,0.22)" strokeWidth="1.5" transform="translate(1.2,1.2)" />
+                <polygon points="17,6 30,28 4,28" stroke="url(#triStrokeP)" strokeWidth="2.2" />
+                <polygon points="17,12 25.5,26 8.5,26" stroke="url(#triStroke2P)" strokeWidth="1.1" opacity="0.6" />
+                <circle cx="17" cy="21" r="1.6" fill="#00d4ff" opacity="0.85" />
+              </svg>
             </div>
-            <span className="font-bold text-lg tracking-tight">
-              <span className="glow-text-cyan" style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: '0.04em' }}>Triolith</span>
-              <span className="text-gray-500 ml-1.5 text-sm font-normal">Player</span>
-            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="glow-text-cyan" style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: '0.04em', fontWeight: 700, fontSize: '1.15rem' }}>Triolith</span>
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(255,255,255,0.32)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Player</span>
+            </div>
           </div>
 
           {/* Nav links */}
