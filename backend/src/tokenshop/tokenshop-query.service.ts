@@ -17,6 +17,8 @@ export class TokenShopQueryService {
   async getShopConfig() {
     const contract = this.chainService.getContract();
     const tokenAddress = await this.chainService.getTokenAddress();
+    const ethUsd = this.parseEnvNumber(process.env.TOKENSHOP_ETH_USD);
+    const usdSek = this.parseEnvNumber(process.env.TOKENSHOP_USD_SEK);
 
     const [feeBps, maxEthIn, maxGenIn, paused, buyRateEth, sellRateEth, totalSupply] =
       await Promise.all([
@@ -42,6 +44,14 @@ export class TokenShopQueryService {
           buyRate: ethers.formatUnits(buyRateEth, 18),
           sellRate: ethers.formatUnits(sellRateEth, 18),
         },
+      },
+      valuation: {
+        ethUsd,
+        usdSek,
+        source:
+          ethUsd !== null || usdSek !== null
+            ? "manual_env_snapshot"
+            : "unconfigured",
       },
       genTotalSupply: totalSupply,
     };
@@ -245,5 +255,14 @@ export class TokenShopQueryService {
     } catch {
       return "0";
     }
+  }
+
+  private parseEnvNumber(value?: string) {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 }

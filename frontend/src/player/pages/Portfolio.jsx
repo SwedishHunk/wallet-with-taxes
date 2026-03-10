@@ -37,6 +37,18 @@ function formatDisplayNumber(value) {
     : value.toFixed(4);
 }
 
+function formatCurrency(value, currency) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("sv-SE", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function timeAgo(timestamp) {
   const diff = Date.now() - new Date(timestamp).getTime();
   const mins = Math.floor(diff / 60000);
@@ -249,19 +261,68 @@ export default function Portfolio() {
   const totalBuys = positions.reduce((sum, position) => sum + position.buys, 0);
   const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
   const triBalance = balance?.genBalance ? Number(balance.genBalance) : 0;
+  const trackedTriPosition = positions.reduce(
+    (sum, position) => sum + Number(position.netGen || 0),
+    0
+  );
   const currentTriPriceEth = getCurrentTriPriceEth(config);
-  const estimatedCurrentValueEth =
+  const ethUsd = Number(config?.valuation?.ethUsd);
+  const usdSek = Number(config?.valuation?.usdSek);
+  const currentTriPriceUsd =
+    currentTriPriceEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? currentTriPriceEth * ethUsd
+      : null;
+  const currentTriPriceSek =
+    currentTriPriceUsd !== null && Number.isFinite(usdSek) && usdSek > 0
+      ? currentTriPriceUsd * usdSek
+      : null;
+  const walletMarkedValueEth =
     currentTriPriceEth !== null ? triBalance * currentTriPriceEth : null;
+  const estimatedCurrentValueEth =
+    currentTriPriceEth !== null ? trackedTriPosition * currentTriPriceEth : null;
+  const estimatedCurrentValueUsd =
+    estimatedCurrentValueEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? estimatedCurrentValueEth * ethUsd
+      : null;
+  const estimatedCurrentValueSek =
+    estimatedCurrentValueUsd !== null && Number.isFinite(usdSek) && usdSek > 0
+      ? estimatedCurrentValueUsd * usdSek
+      : null;
   const ethPosition = positions.find((position) => position.symbol === "ETH");
   const averageEntryPriceEth = ethPosition ? getAverageBuyPriceValue(ethPosition) : null;
+  const averageEntryTriPerEth =
+    averageEntryPriceEth !== null && averageEntryPriceEth > 0
+      ? 1 / averageEntryPriceEth
+      : null;
+  const currentTriPerEth =
+    currentTriPriceEth !== null && currentTriPriceEth > 0 ? 1 / currentTriPriceEth : null;
   const estimatedCostBasisEth =
-    averageEntryPriceEth !== null ? triBalance * averageEntryPriceEth : null;
+    averageEntryPriceEth !== null ? trackedTriPosition * averageEntryPriceEth : null;
+  const estimatedCostBasisUsd =
+    estimatedCostBasisEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? estimatedCostBasisEth * ethUsd
+      : null;
   const unrealizedPnlEth =
     estimatedCurrentValueEth !== null && estimatedCostBasisEth !== null
       ? estimatedCurrentValueEth - estimatedCostBasisEth
       : null;
+  const unrealizedPnlUsd =
+    estimatedCurrentValueUsd !== null && estimatedCostBasisUsd !== null
+      ? estimatedCurrentValueUsd - estimatedCostBasisUsd
+      : null;
   const pnlStatus = getPnlStatus(unrealizedPnlEth);
   const usesOnlyEthHistory = positions.every((position) => position.symbol === "ETH");
+  const hasFiatValuation = Number.isFinite(ethUsd) && ethUsd > 0;
+  const hasSekValuation = hasFiatValuation && Number.isFinite(usdSek) && usdSek > 0;
+  const valuationSource = config?.valuation?.source || "unconfigured";
+  const rateShiftWarning =
+    averageEntryTriPerEth !== null &&
+    currentTriPerEth !== null &&
+    currentTriPerEth / averageEntryTriPerEth > 5
+      ? `Rate shift: ${formatDisplayNumber(averageEntryTriPerEth)} TRI/ETH historically vs ${formatDisplayNumber(
+          currentTriPerEth
+        )} TRI/ETH now.`
+      : null;
 
   return (
     <div>
@@ -309,18 +370,21 @@ export default function Portfolio() {
           label="TRI Balance"
           value={balance?.genBalance || "0"}
           sub="Current wallet holdings"
+          meta="Full wallet balance, regardless of source"
           color="cyan"
           icon={Coins}
         />
         <StatCard
-          label="Total Buys"
-          value={totalBuys}
+          label="Tracked TRI Position"
+          value={formatDisplayNumber(trackedTriPosition)}
+          sub="Net TRI from TokenShop history"
           color="green"
-          icon={ArrowDownLeft}
+          icon={Activity}
         />
         <StatCard
-          label="Total Sells"
-          value={totalSells}
+          label="Total Buys / Sells"
+          value={`${totalBuys} / ${totalSells}`}
+          sub="Tracked TokenShop trade count"
           color="pink"
           icon={ArrowUpRight}
         />
@@ -331,8 +395,22 @@ export default function Portfolio() {
           Performance Snapshot
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          Simple ETH-based view using the current TokenShop rate and your historical ETH entries.
+          ETH-based valuation for the tracked TokenShop position, with optional USD/SEK snapshots from backend config.
         </p>
+        <p className="text-[11px] text-gray-500 mt-2">
+          {hasFiatValuation
+            ? `Valuation source: ${formatValuationSource(valuationSource)}${
+                hasSekValuation
+                  ? ` • ETH/USD ${formatDisplayNumber(ethUsd)} • USD/SEK ${formatDisplayNumber(
+                      usdSek
+                    )}`
+                  : ` • ETH/USD ${formatDisplayNumber(ethUsd)}`
+              }`
+            : "Valuation source: ETH-only estimate from current TokenShop rate"}
+        </p>
+        {rateShiftWarning && (
+          <p className="text-[11px] text-neon-pink mt-2">{rateShiftWarning}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
@@ -344,6 +422,19 @@ export default function Portfolio() {
               : "—"
           }
           sub="Based on current TokenShop ETH sell rate"
+          meta={
+            `${
+              currentTriPerEth !== null
+                ? `${formatDisplayNumber(currentTriPerEth)} TRI/ETH`
+                : "TRI/ETH unavailable"
+            }${
+              hasFiatValuation
+                ? ` • ${formatCurrency(currentTriPriceUsd, "USD")}${
+                  hasSekValuation ? ` • ${formatCurrency(currentTriPriceSek, "SEK")}` : ""
+                }`
+                : ""
+            }`
+          }
           color="purple"
           icon={Activity}
         />
@@ -356,9 +447,11 @@ export default function Portfolio() {
           }
           sub="Average ETH paid per TRI"
           meta={
-            usesOnlyEthHistory
-              ? "Based on your full TRI trade history"
-              : "Based on ETH-funded buys only"
+            `${formatDisplayNumber(averageEntryTriPerEth)} TRI/ETH${
+              usesOnlyEthHistory
+                ? " • Based on your full TRI trade history"
+                : " • Based on ETH-funded buys only"
+            }`
           }
           color="cyan"
           icon={ChartNoAxesCombined}
@@ -370,12 +463,19 @@ export default function Portfolio() {
               ? `${formatDisplayNumber(estimatedCurrentValueEth)} ETH`
               : "—"
           }
-          sub="Current TRI balance marked to shop rate"
+          sub="Tracked TokenShop TRI marked to shop rate"
+          meta={
+            hasFiatValuation
+              ? `${formatCurrency(estimatedCurrentValueUsd, "USD")}${
+                  hasSekValuation ? ` • ${formatCurrency(estimatedCurrentValueSek, "SEK")}` : ""
+                }`
+              : "Fiat estimate unavailable"
+          }
           color="green"
           icon={Coins}
         />
         <StatCard
-          label="Unrealized PnL"
+          label="Tracked Position PnL"
           value={
             unrealizedPnlEth !== null
               ? `${unrealizedPnlEth >= 0 ? "+" : ""}${formatDisplayNumber(
@@ -384,10 +484,45 @@ export default function Portfolio() {
               : "—"
           }
           sub={pnlStatus}
-          meta="Estimate against ETH cost basis"
+          meta={
+            hasFiatValuation
+              ? `${formatCurrency(unrealizedPnlUsd, "USD")} vs ETH cost basis`
+              : "Estimate against ETH cost basis"
+          }
           color={unrealizedPnlEth !== null && unrealizedPnlEth < 0 ? "pink" : "green"}
           icon={Landmark}
         />
+      </div>
+
+      <div className="card mb-8">
+        <p className="label mb-1">Wallet vs Tracked Position</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Wallet balance can include TRI from minting, transfers, or sources outside TokenShop. Performance metrics above only use tracked TokenShop activity.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-3 bg-dark-700/50 rounded-lg">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Wallet TRI</p>
+            <p className="text-lg font-mono text-gray-100 mt-1">
+              {formatDisplayNumber(triBalance)} TRI
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {walletMarkedValueEth !== null
+                ? `${formatDisplayNumber(walletMarkedValueEth)} ETH at current shop rate`
+                : "Current ETH mark unavailable"}
+            </p>
+          </div>
+          <div className="p-3 bg-dark-700/50 rounded-lg">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+              Tracked TokenShop TRI
+            </p>
+            <p className="text-lg font-mono text-gray-100 mt-1">
+              {formatDisplayNumber(trackedTriPosition)} TRI
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Used for value and PnL above to avoid mixing in unrelated wallet TRI.
+            </p>
+          </div>
+        </div>
       </div>
 
       {(compatibleBalances.length > 0 || supportedAssets?.length > 0) && (
@@ -454,6 +589,7 @@ export default function Portfolio() {
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Avg buy price: {formatAverageBuyPrice(p)} {p.symbol}/TRI
+                    {getInverseAverageBuyPrice(p) ? ` • ${getInverseAverageBuyPrice(p)} TRI/${p.symbol}` : ""}
                   </p>
                 </div>
               </div>
@@ -593,6 +729,16 @@ function getAverageBuyPriceValue(position) {
   return totalPaid / totalGenOut;
 }
 
+function getInverseAverageBuyPrice(position) {
+  const average = getAverageBuyPriceValue(position);
+  if (average === null || average <= 0) {
+    return null;
+  }
+
+  const inverse = 1 / average;
+  return inverse >= 1 ? inverse.toFixed(4) : inverse.toPrecision(4);
+}
+
 function getCurrentTriPriceEth(config) {
   const sellRate = Number(config?.rates?.eth?.sellRate);
   if (!Number.isFinite(sellRate) || sellRate <= 0) {
@@ -620,4 +766,12 @@ function getPnlStatus(unrealizedPnlEth) {
   }
 
   return "Currently at a loss";
+}
+
+function formatValuationSource(source) {
+  if (source === "manual_env_snapshot") {
+    return "manual backend snapshot";
+  }
+
+  return "unconfigured";
 }
