@@ -66,6 +66,43 @@ function shortenTxHash(txHash) {
   return `${txHash.slice(0, 10)}...${txHash.slice(-6)}`;
 }
 
+function calculateEventFee(event, feeBps) {
+  const feeFactor = 1 - feeBps / 10000;
+  if (!Number.isFinite(feeFactor) || feeFactor <= 0 || feeFactor >= 1) {
+    return null;
+  }
+
+  const assetDecimals = event.assetSymbol === "ETH" ? 18 : 6;
+
+  if (event.type === "BUY") {
+    const netTriOut = Number(formatAmount(event.amountOut, 18));
+    if (!Number.isFinite(netTriOut)) {
+      return null;
+    }
+
+    const grossTriOut = netTriOut / feeFactor;
+    return {
+      feeAmount: grossTriOut - netTriOut,
+      feeSymbol: "TRI",
+      netAmount: netTriOut,
+      netSymbol: "TRI",
+    };
+  }
+
+  const netAssetOut = Number(formatAmount(event.amountOut, assetDecimals));
+  if (!Number.isFinite(netAssetOut)) {
+    return null;
+  }
+
+  const grossAssetOut = netAssetOut / feeFactor;
+  return {
+    feeAmount: grossAssetOut - netAssetOut,
+    feeSymbol: event.assetSymbol,
+    netAmount: netAssetOut,
+    netSymbol: event.assetSymbol,
+  };
+}
+
 export default function Portfolio() {
   const { isConnected, address, provider } = useWallet();
   const [syncing, setSyncing] = useState(false);
@@ -208,6 +245,7 @@ export default function Portfolio() {
 
   const positions = history?.positions || [];
   const events = history?.events || [];
+  const feeBps = Number(config?.feeBps || 0);
   const totalBuys = positions.reduce((sum, position) => sum + position.buys, 0);
   const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
   const triBalance = balance?.genBalance ? Number(balance.genBalance) : 0;
@@ -486,6 +524,27 @@ export default function Portfolio() {
                     <p className="text-xs text-gray-500 mt-1">
                       {formatTimestamp(e.timestamp)}
                     </p>
+                    <div className="text-[11px] text-gray-500 mt-1">
+                      {(() => {
+                        const feeDetails = calculateEventFee(e, feeBps);
+                        if (!feeDetails) {
+                          return null;
+                        }
+
+                        return (
+                          <>
+                            <p>
+                              Fee: {formatDisplayNumber(feeDetails.feeAmount)}{" "}
+                              {feeDetails.feeSymbol}
+                            </p>
+                            <p>
+                              Net after fee: {formatDisplayNumber(feeDetails.netAmount)}{" "}
+                              {feeDetails.netSymbol}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
                     <div className="flex items-center justify-end gap-2 text-[11px] text-gray-600 mt-0.5">
                       <span>{timeAgo(e.timestamp)}</span>
                       <span>•</span>
