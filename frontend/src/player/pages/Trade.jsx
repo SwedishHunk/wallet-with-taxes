@@ -5,7 +5,7 @@ import { useContracts } from "../hooks/useContracts";
 import { useApiData, apiGet, triggerSync } from "../hooks/useApi";
 import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
-import { ArrowDownUp, Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -199,7 +199,12 @@ export default function Trade() {
 
     if (mode === "buy" && selectedAsset.address === ETH_ADDRESS) {
       const maxEthIn = config?.maxEthIn ? Number(config.maxEthIn) : null;
-      if (maxEthIn !== null && Number.isFinite(maxEthIn) && numericAmount > maxEthIn) {
+      if (
+        maxEthIn !== null &&
+        Number.isFinite(maxEthIn) &&
+        maxEthIn > 0 &&
+        numericAmount > maxEthIn
+      ) {
         return "Amount exceeds the current maximum ETH buy limit.";
       }
 
@@ -320,6 +325,9 @@ export default function Trade() {
   const isBuy = mode === "buy";
   const isEth = selectedAsset?.address === ETH_ADDRESS;
   const preflightError = getPreflightError();
+  const maxEthIn = config?.maxEthIn ? Number(config.maxEthIn) : null;
+  const maxTriIn = config?.maxGenIn ? Number(config.maxGenIn) : null;
+  const feePercent = config?.feePercent ? Number(config.feePercent) : 0;
 
   function formatBalance(value) {
     if (value === null || value === undefined || Number.isNaN(value)) {
@@ -327,6 +335,24 @@ export default function Trade() {
     }
     return value >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value.toFixed(4);
   }
+
+  function formatTradeNumber(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "—";
+    }
+    return value >= 1000
+      ? value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+      : value.toFixed(4);
+  }
+
+  const grossOutput = quote
+    ? Number(isBuy ? quote.genOut : quote.amountOut)
+    : null;
+  const estimatedFeeAmount =
+    grossOutput !== null ? (grossOutput * feePercent) / 100 : null;
+  const estimatedNetOutput =
+    grossOutput !== null ? grossOutput - (estimatedFeeAmount ?? 0) : null;
+  const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
 
   return (
     <div className="max-w-lg mx-auto">
@@ -344,37 +370,47 @@ export default function Trade() {
       {/* Trade Card */}
       <div className="card border-dark-500">
         {isConnected && (
-          <div
-            className={`mb-6 grid grid-cols-1 gap-3 ${
-              isEth ? "sm:grid-cols-2" : "sm:grid-cols-3"
-            }`}
-          >
-            <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                ETH Balance
+          <div className="mb-6">
+            <div className="mb-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                Current Wallet Balances
               </p>
-              <p className="mt-1 font-mono text-sm text-gray-100">
-                {formatBalance(ethBalance)}
+              <p className="text-xs text-gray-400 mt-1">
+                Live balances from the connected wallet for trade-compatible assets.
               </p>
             </div>
-            <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                TRI Balance
-              </p>
-              <p className="mt-1 font-mono text-sm text-gray-100">
-                {tokenBalance?.genBalance ?? "—"}
-              </p>
-            </div>
-            {!isEth && (
+            <div
+              className={`grid grid-cols-1 gap-3 ${
+                isEth ? "sm:grid-cols-2" : "sm:grid-cols-3"
+              }`}
+            >
               <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                  {selectedAsset ? `${selectedAsset.symbol} Balance` : "Asset Balance"}
+                  ETH Balance
                 </p>
                 <p className="mt-1 font-mono text-sm text-gray-100">
-                  {selectedAsset ? formatBalance(selectedAssetBalance) : "—"}
+                  {formatBalance(ethBalance)}
                 </p>
               </div>
-            )}
+              <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                  TRI Balance
+                </p>
+                <p className="mt-1 font-mono text-sm text-gray-100">
+                  {tokenBalance?.genBalance ?? "—"}
+                </p>
+              </div>
+              {!isEth && (
+                <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                    {selectedAsset ? `${selectedAsset.symbol} Balance` : "Asset Balance"}
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-gray-100">
+                    {selectedAsset ? formatBalance(selectedAssetBalance) : "—"}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -455,33 +491,45 @@ export default function Trade() {
           />
         </div>
 
-        {/* Arrow Divider */}
-        <div className="flex justify-center my-2">
-          <div className="p-2 rounded-full bg-dark-700 border border-dark-500">
-            <ArrowDownUp size={16} className="text-gray-400" />
-          </div>
-        </div>
-
         {/* Quote Display */}
         <div className="mb-6">
           <label className="label">
             {isBuy
-              ? "You receive (TRI)"
-              : `You receive (${selectedAsset?.symbol || "..."})`}
+              ? "Estimated receive after fee (TRI)"
+              : `Estimated receive after fee (${selectedAsset?.symbol || "..."})`}
           </label>
           <div className="input-field bg-dark-900 text-lg flex items-center justify-between">
             {quoteLoading ? (
               <span className="text-gray-500 animate-pulse">Fetching quote...</span>
-            ) : quote ? (
+            ) : estimatedNetOutput !== null ? (
               <span className={isBuy ? "glow-text-green" : "glow-text-pink"}>
-                {isBuy ? quote.genOut : quote.amountOut}
+                {formatTradeNumber(estimatedNetOutput)}
               </span>
             ) : (
               <span className="text-gray-600">—</span>
             )}
           </div>
-          {quote?.note && (
-            <p className="text-xs text-gray-600 mt-1">{quote.note}</p>
+          {quote && (
+            <div className="mt-2 space-y-1 text-xs text-gray-500">
+              <div className="flex justify-between">
+                <span>Gross quote</span>
+                <span className="font-mono">
+                  {formatTradeNumber(grossOutput)} {outputSymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Estimated fee</span>
+                <span className="font-mono">
+                  {formatTradeNumber(estimatedFeeAmount)} {outputSymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Net after fee</span>
+                <span className="font-mono">
+                  {formatTradeNumber(estimatedNetOutput)} {outputSymbol}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
@@ -500,6 +548,18 @@ export default function Trade() {
                 <span className="font-mono">{config.feePercent}%</span>
               </div>
             )}
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>{isBuy ? "Max buy" : "Max sell"}</span>
+              <span className="font-mono">
+                {isBuy
+                  ? maxEthIn && maxEthIn > 0
+                    ? `${config.maxEthIn} ETH`
+                    : "Unlimited"
+                  : maxTriIn && maxTriIn > 0
+                  ? `${config.maxGenIn} TRI`
+                  : "Unlimited"}
+              </span>
+            </div>
             {!isEth && (
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>Decimals</span>

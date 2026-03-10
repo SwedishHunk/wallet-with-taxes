@@ -169,7 +169,9 @@ contract TokenShop is Ownable {
         require(!paused, "paused");
         require(supportedTokens[address(0)], "eth not supported");
         require(msg.value > 0, "no payment");
-        require(msg.value <= maxEthIn, "over maxEthIn");
+        if (maxEthIn > 0) {
+            require(msg.value <= maxEthIn, "over maxEthIn");
+        }
 
         uint256 grossGenOut = getQuoteBuyETH(msg.value);
         require(grossGenOut > 0, "too little");
@@ -206,7 +208,9 @@ contract TokenShop is Ownable {
         require(!paused, "paused");
         require(supportedTokens[address(0)], "eth not supported");
         require(genIn > 0, "zero genIn");
-        require(genIn <= maxGenIn, "over maxGenIn");
+        if (maxGenIn > 0) {
+            require(genIn <= maxGenIn, "over maxGenIn");
+        }
 
         uint256 grossEthOut = getQuoteSellToETH(genIn);
         require(grossEthOut > 0, "too little");
@@ -232,7 +236,9 @@ contract TokenShop is Ownable {
         require(!paused, "paused");
         require(supportedTokens[asset], "asset not supported");
         require(genIn > 0, "zero genIn");
-        require(genIn <= maxGenIn, "over maxGenIn");
+        if (maxGenIn > 0) {
+            require(genIn <= maxGenIn, "over maxGenIn");
+        }
 
         uint256 grossTokenOut = getQuoteSellToToken(asset, genIn);
         require(grossTokenOut > 0, "too little");

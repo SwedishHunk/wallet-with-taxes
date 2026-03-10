@@ -178,11 +178,15 @@ export default function Admin() {
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
               <p className="text-xs text-gray-500">Max ETH In</p>
-              <p className="text-sm font-mono">{config.maxEthIn}</p>
+              <p className="text-sm font-mono">
+                {Number(config.maxEthIn) > 0 ? config.maxEthIn : "Unlimited"}
+              </p>
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
               <p className="text-xs text-gray-500">Max TRI In</p>
-              <p className="text-sm font-mono">{config.maxGenIn}</p>
+              <p className="text-sm font-mono">
+                {Number(config.maxGenIn) > 0 ? config.maxGenIn : "Unlimited"}
+              </p>
             </div>
           </div>
         </div>
@@ -305,7 +309,7 @@ export default function Admin() {
               type="number"
               value={maxEthIn}
               onChange={(e) => setMaxEthIn(e.target.value)}
-              placeholder="Max ETH in (e.g. 0.05)"
+              placeholder="Max ETH in (0 = unlimited)"
               className="input-field"
               step="any"
             />
@@ -313,7 +317,7 @@ export default function Admin() {
               type="number"
               value={maxGenIn}
               onChange={(e) => setMaxGenIn(e.target.value)}
-              placeholder="Max TRI in (e.g. 50)"
+              placeholder="Max TRI in (0 = unlimited)"
               className="input-field"
               step="any"
             />

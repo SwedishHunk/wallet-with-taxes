@@ -2,9 +2,20 @@ import { useWallet } from "../context/WalletContext";
 import { useApiData, triggerSync } from "../hooks/useApi";
 import StatCard from "../components/StatCard";
 import ErrorBanner from "../components/ErrorBanner";
-import { Coins, ArrowDownLeft, ArrowUpRight, RefreshCw, Wallet } from "lucide-react";
+import {
+  Coins,
+  ArrowDownLeft,
+  ArrowUpRight,
+  RefreshCw,
+  Wallet,
+  Landmark,
+  Layers,
+} from "lucide-react";
 import { ethers } from "ethers";
 import { useState, useEffect } from "react";
+
+const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ERC20_BALANCE_ABI = ["function balanceOf(address) view returns (uint256)"];
 
 function formatAmount(raw, decimals = 18) {
   try {
@@ -12,6 +23,16 @@ function formatAmount(raw, decimals = 18) {
   } catch {
     return raw;
   }
+}
+
+function formatDisplayNumber(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return value >= 1000
+    ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : value.toFixed(4);
 }
 
 function timeAgo(timestamp) {
@@ -25,8 +46,10 @@ function timeAgo(timestamp) {
 }
 
 export default function Portfolio() {
-  const { isConnected, address } = useWallet();
+  const { isConnected, address, provider } = useWallet();
   const [syncing, setSyncing] = useState(false);
+  const [ethBalance, setEthBalance] = useState(null);
+  const [compatibleBalances, setCompatibleBalances] = useState([]);
 
   const { data: balance, loading: balLoading, error: balError, refresh: refreshBal } = useApiData(
     isConnected ? `/user/${address}/balance` : null
@@ -34,8 +57,13 @@ export default function Portfolio() {
   const { data: history, loading: histLoading, error: histError, refresh: refreshHist } = useApiData(
     isConnected ? `/user/${address}/history` : null
   );
+  const {
+    data: supportedAssets,
+    error: assetsError,
+    refresh: refreshAssets,
+  } = useApiData(isConnected ? "/shop/supported-assets" : null);
 
-  const apiError = balError || histError;
+  const apiError = balError || histError || assetsError;
 
   // Auto-refresh every 15 seconds so new trades show up
   useEffect(() => {
@@ -43,15 +71,95 @@ export default function Portfolio() {
     const interval = setInterval(() => {
       refreshBal();
       refreshHist();
+      refreshAssets();
     }, 15000);
     return () => clearInterval(interval);
-  }, [isConnected, refreshBal, refreshHist]);
+  }, [isConnected, refreshBal, refreshHist, refreshAssets]);
+
+  useEffect(() => {
+    if (!isConnected || !address || !provider) {
+      setEthBalance(null);
+      return;
+    }
+
+    let active = true;
+
+    provider
+      .getBalance(address)
+      .then((rawBalance) => {
+        if (!active) return;
+        setEthBalance(Number(ethers.formatEther(rawBalance)));
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load ETH balance:", error);
+        setEthBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, provider, syncStatusKey(syncing)]);
+
+  useEffect(() => {
+    if (!isConnected || !address || !provider || !supportedAssets?.length) {
+      setCompatibleBalances([]);
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      try {
+        const balances = await Promise.all(
+          supportedAssets
+            .filter((asset) => asset.address !== ETH_ADDRESS)
+            .map(async (asset) => {
+              if (asset.symbol === "TRI") {
+                return {
+                  symbol: asset.symbol,
+                  address: asset.address,
+                  balance: balance?.genBalance ? Number(balance.genBalance) : 0,
+                };
+              }
+
+              const erc20 = new ethers.Contract(
+                asset.address,
+                ERC20_BALANCE_ABI,
+                provider
+              );
+              const rawBalance = await erc20.balanceOf(address);
+              return {
+                symbol: asset.symbol,
+                address: asset.address,
+                balance: Number(ethers.formatUnits(rawBalance, asset.decimals)),
+              };
+            })
+        );
+
+        if (!active) return;
+        setCompatibleBalances(
+          balances
+            .filter((asset) => asset.symbol !== "TRI")
+            .sort((a, b) => b.balance - a.balance)
+        );
+      } catch (error) {
+        if (!active) return;
+        console.error("Failed to load compatible balances:", error);
+        setCompatibleBalances([]);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, provider, supportedAssets, balance]);
 
   async function handleRefresh() {
     setSyncing(true);
     try {
       await triggerSync();
-      await Promise.all([refreshBal(), refreshHist()]);
+      await Promise.all([refreshBal(), refreshHist(), refreshAssets()]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -73,6 +181,8 @@ export default function Portfolio() {
 
   const positions = history?.positions || [];
   const events = history?.events || [];
+  const totalBuys = positions.reduce((sum, position) => sum + position.buys, 0);
+  const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
 
   return (
     <div>
@@ -99,33 +209,88 @@ export default function Portfolio() {
       {/* Error Banner */}
       <ErrorBanner message={apiError} onRetry={handleRefresh} />
 
-      {/* Balance Card */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="mb-8">
+        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+          Current Holdings
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Live balances from the connected wallet and supported trading assets.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          label="ETH Balance"
+          value={formatDisplayNumber(ethBalance)}
+          sub="Native wallet balance"
+          color="purple"
+          icon={Landmark}
+        />
         <StatCard
           label="TRI Balance"
           value={balance?.genBalance || "0"}
-          sub="Your current balance"
+          sub="Current wallet holdings"
           color="cyan"
           icon={Coins}
         />
         <StatCard
           label="Total Buys"
-          value={positions.reduce((s, p) => s + p.buys, 0)}
+          value={totalBuys}
           color="green"
           icon={ArrowDownLeft}
         />
         <StatCard
           label="Total Sells"
-          value={positions.reduce((s, p) => s + p.sells, 0)}
+          value={totalSells}
           color="pink"
           icon={ArrowUpRight}
         />
       </div>
 
-      {/* Net Positions */}
+      {(compatibleBalances.length > 0 || supportedAssets?.length > 0) && (
+        <div className="card mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Layers size={16} className="text-gray-400" />
+            <p className="label">Compatible Asset Balances</p>
+          </div>
+          {compatibleBalances.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No supported ERC-20 balances detected in this wallet yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {compatibleBalances.map((asset) => (
+                <div
+                  key={asset.address}
+                  className="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg"
+                >
+                  <div>
+                    <span className="text-sm font-semibold text-gray-200">
+                      {asset.symbol}
+                    </span>
+                    <span className="text-xs text-gray-500 ml-2">
+                      Trade-compatible wallet asset
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono text-gray-100">
+                      {formatDisplayNumber(asset.balance)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Trading Breakdown */}
       {positions.length > 0 && (
         <div className="card mb-8">
-          <p className="label mb-4">Net Positions by Asset</p>
+          <p className="label mb-1">Trading Breakdown by Payment Asset</p>
+          <p className="text-xs text-gray-500 mb-4">
+            Shows how your TRI position was built or reduced through each payment asset.
+          </p>
           <div className="space-y-3">
             {positions.map((p) => (
               <div
@@ -134,15 +299,18 @@ export default function Portfolio() {
               >
                 <div>
                   <span className="text-sm font-semibold text-gray-200">{p.symbol}</span>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <div className="text-xs text-gray-500 mt-1">
                     {p.buys} buys · {p.sells} sells
-                  </span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-mono font-semibold ${
                     Number(p.netGen) >= 0 ? "text-neon-green" : "text-neon-pink"
                   }`}>
                     {Number(p.netGen) >= 0 ? "+" : ""}{p.netGen} TRI
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Avg buy price: {formatAverageBuyPrice(p)} {p.symbol}/TRI
                   </p>
                 </div>
               </div>
@@ -225,4 +393,24 @@ export default function Portfolio() {
       </div>
     </div>
   );
+}
+
+function formatAverageBuyPrice(position) {
+  const totalGenOut = Number(position.totalGenOut || 0);
+  if (!Number.isFinite(totalGenOut) || totalGenOut <= 0) {
+    return "—";
+  }
+
+  const assetDecimals = position.symbol === "ETH" ? 18 : 6;
+  const totalPaid = Number(formatAmount(position.totalPaidIn, assetDecimals));
+  if (!Number.isFinite(totalPaid)) {
+    return "—";
+  }
+
+  const average = totalPaid / totalGenOut;
+  return average >= 1 ? average.toFixed(6) : average.toPrecision(4);
+}
+
+function syncStatusKey(syncing) {
+  return syncing ? "syncing" : "idle";
 }
