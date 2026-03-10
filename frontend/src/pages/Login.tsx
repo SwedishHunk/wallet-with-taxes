@@ -1,11 +1,14 @@
 // src/pages/Login.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { ROUTES } from "../routes";
 import { login, getStudios } from "../lib/users";
 import { setAuthToken } from "../lib/api";
 import { useAuthState } from "../lib/AuthContext";
 import { useLoginStudio } from "../lib/useAuth";
+import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
+import FilmGrainOverlay from "../components/3d/FilmGrainOverlay";
 import "../style/Login.css";
 import "../style/Bright.css";
 
@@ -21,9 +24,6 @@ export default function Login() {
   const [studioError, setStudioError] = useState<string | null>(null);
   const [studioLoading, setStudioLoading] = useState(false);
 
-  // Keep errors until next interaction; no auto-clear so user can read them
-
-  // Redirect if already fully authenticated
   useEffect(() => {
     if (authContext.state === "Studio+MemberActive") {
       navigate(ROUTES.dashboard, { replace: true });
@@ -39,7 +39,6 @@ export default function Login() {
       setAuthToken(data.token);
       localStorage.setItem("token", data.token);
 
-      // Fetch studios to resolve name + confirmed studioId
       let studioId = data.user.studioId;
       let studioName = data.user.email;
 
@@ -77,11 +76,32 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      <CyberpunkScene intensity="full" />
+      <FilmGrainOverlay />
       <div className="login-grid">
-        <div className="login-box">
-          <h1 className="login-title">Studio login</h1>
+        <motion.div
+          className="login-box"
+          initial={{ opacity: 0, y: 30, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 25 }}
+        >
+          <motion.h1
+            className="login-title"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            Studio login
+          </motion.h1>
+
           {studioError && (
-            <div className="bright-alert bright-alert-error" aria-live="polite">
+            <motion.div
+              className="bright-alert bright-alert-error"
+              aria-live="polite"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            >
               <div>{studioError}</div>
               <button
                 type="button"
@@ -89,11 +109,18 @@ export default function Login() {
                 onClick={() => setStudioError(null)}>
                 Stäng
               </button>
-            </div>
+            </motion.div>
           )}
+
           {showStudioForm ? (
-            <form className="login-fields" onSubmit={handleStudioLogin}>
-              <input
+            <motion.form
+              className="login-fields"
+              onSubmit={handleStudioLogin}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+            >
+              <motion.input
                 type="email"
                 placeholder="Email"
                 className="login-input"
@@ -101,8 +128,9 @@ export default function Login() {
                 onChange={(e) => setStudioEmail(e.target.value)}
                 autoComplete="username"
                 required
+                whileFocus={{ borderColor: "#00d4ff", boxShadow: "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)" }}
               />
-              <input
+              <motion.input
                 type="password"
                 placeholder="Password"
                 className="login-input"
@@ -110,37 +138,57 @@ export default function Login() {
                 onChange={(e) => setStudioPassword(e.target.value)}
                 autoComplete="current-password"
                 required
+                whileFocus={{ borderColor: "#00d4ff", boxShadow: "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)" }}
               />
-              <button
+              <motion.button
                 type="submit"
                 className="login-button"
-                disabled={studioLoading}>
+                disabled={studioLoading}
+                whileHover={studioLoading ? {} : { scale: 1.02, y: -2 }}
+                whileTap={studioLoading ? {} : { scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
                 {studioLoading ? "Signing in..." : "Sign in to studio"}
-              </button>
-            </form>
+              </motion.button>
+            </motion.form>
           ) : (
-            <div className="login-note">
+            <motion.div
+              className="login-note"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
               Studio-session redan aktiv. Fortsätt till member-login.
-              <button
+              <motion.button
                 type="button"
                 className="login-button"
                 style={{ marginTop: "12px" }}
-                onClick={() => navigate(ROUTES.memberLogin)}>
+                onClick={() => navigate(ROUTES.memberLogin)}
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
                 Logga in som medlem
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
+
           {showStudioForm && (
-            <p className="login-footer">
+            <motion.p
+              className="login-footer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.4 }}
+            >
               Har du ingen studio?{" "}
               <span
                 className="signup-link"
                 onClick={() => navigate(ROUTES.createStudio)}>
                 Skapa studio
               </span>
-            </p>
+            </motion.p>
           )}
-        </div>
+        </motion.div>
       </div>
     </div>
   );

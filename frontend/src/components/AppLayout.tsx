@@ -18,11 +18,15 @@ import { useAuthState } from "../lib/AuthContext";
 import { useLogout, useCanManageMembers } from "../lib/useAuth";
 import { ROUTES } from "../routes";
 import { APP_NAME, APP_SHORT_NAME, APP_YEAR } from "../config/app";
+import CyberpunkScene from "./3d/SafeCyberpunkScene";
+import FilmGrainOverlay from "./3d/FilmGrainOverlay";
 import "./AppLayout.css";
 
 export function AppLayout() {
   return (
     <div className="app-layout">
+      <CyberpunkScene intensity="subtle" />
+      <FilmGrainOverlay />
       <Header />
       <main className="app-content">
         <Outlet />

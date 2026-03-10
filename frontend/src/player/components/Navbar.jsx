@@ -14,17 +14,46 @@ export default function Navbar() {
   const { isAdmin } = useWallet();
 
   return (
-    <nav className="bg-dark-800 border-b border-dark-600 sticky top-0 z-50">
+    <nav
+      className="sticky top-0 z-50"
+      style={{
+        background: 'rgba(8, 12, 24, 0.75)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(0, 212, 255, 0.1)',
+        position: 'relative',
+      }}
+    >
+      {/* Animated gradient glow line */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: -1,
+          left: 0,
+          right: 0,
+          height: 1,
+          background: 'linear-gradient(90deg, transparent 0%, rgba(0, 212, 255, 0.4) 20%, rgba(168, 85, 247, 0.4) 50%, rgba(0, 212, 255, 0.4) 80%, transparent 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'gradientShift 4s ease infinite',
+        }}
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center">
-              <span className="text-dark-900 font-bold text-sm">T</span>
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #00d4ff 0%, #a855f7 100%)',
+                boxShadow: '0 0 15px rgba(0, 212, 255, 0.3)',
+              }}
+            >
+              <span className="text-white font-bold text-sm" style={{ fontFamily: '"Orbitron", sans-serif' }}>T</span>
             </div>
             <span className="font-bold text-lg tracking-tight">
-              <span className="glow-text-cyan">Triolith</span>
-              <span className="text-gray-400 ml-1 text-sm font-normal">Studio</span>
+              <span className="glow-text-cyan" style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: '0.04em' }}>Triolith</span>
+              <span className="text-gray-500 ml-1.5 text-sm font-normal">Player</span>
             </span>
           </div>
 
@@ -35,12 +64,19 @@ export default function Navbar() {
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-dark-600 text-neon-cyan shadow-neon"
-                      : "text-gray-400 hover:text-white hover:bg-dark-700"
+                      ? "text-white"
+                      : "text-gray-400 hover:text-white"
                   }`
                 }
+                style={({ isActive }) => isActive ? {
+                  background: 'rgba(0, 212, 255, 0.08)',
+                  border: '1px solid rgba(0, 212, 255, 0.2)',
+                  boxShadow: '0 0 15px rgba(0, 212, 255, 0.1)',
+                  color: '#00d4ff',
+                } : {}}
+                end={to === "/player"}
               >
                 <Icon size={16} />
                 {label}
@@ -51,12 +87,18 @@ export default function Navbar() {
               <NavLink
                 to="/player/admin"
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-neon-purple/10 text-neon-purple shadow-neon-purple border border-neon-purple/30"
-                      : "text-gray-400 hover:text-neon-purple hover:bg-dark-700"
+                      ? "text-white"
+                      : "text-gray-400 hover:text-purple-400"
                   }`
                 }
+                style={({ isActive }) => isActive ? {
+                  background: 'rgba(168, 85, 247, 0.1)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  boxShadow: '0 0 15px rgba(168, 85, 247, 0.1)',
+                  color: '#a855f7',
+                } : {}}
               >
                 <Settings size={16} />
                 Admin

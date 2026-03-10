@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useWallet } from "../context/WalletContext";
 import { Wallet, LogOut, Shield } from "lucide-react";
 
@@ -7,31 +8,62 @@ export default function ConnectWallet() {
 
   if (isConnected) {
     return (
-      <div className="flex items-center gap-3">
+      <motion.div
+        className="flex items-center gap-3"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      >
         {isAdmin && (
-          <span className="badge bg-neon-purple/10 text-neon-purple border border-neon-purple/20">
+          <motion.span
+            className="badge bg-neon-purple/10 text-neon-purple border border-neon-purple/20"
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.1 }}
+            whileHover={{ scale: 1.08 }}
+          >
             <Shield size={12} className="mr-1" />
             Admin
-          </span>
+          </motion.span>
         )}
-        <span className="font-mono text-xs text-gray-400 bg-dark-700 px-3 py-1.5 rounded-lg border border-dark-500">
+        <motion.span
+          className="font-mono text-xs text-gray-400 px-3 py-1.5 rounded-lg"
+          style={{
+            background: "rgba(15, 20, 40, 0.6)",
+            border: "1px solid rgba(100, 120, 180, 0.15)",
+          }}
+          whileHover={{
+            borderColor: "rgba(0, 212, 255, 0.3)",
+            transition: { duration: 0.2 },
+          }}
+        >
           {address.slice(0, 6)}...{address.slice(-4)}
-        </span>
-        <button
+        </motion.span>
+        <motion.button
           onClick={disconnect}
           className="p-2 text-gray-400 hover:text-neon-pink transition-colors"
           title="Disconnect"
+          whileHover={{ scale: 1.15, rotate: -10 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
         >
           <LogOut size={16} />
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
     );
   }
 
   return (
-    <button onClick={connect} disabled={connecting} className="btn-primary flex items-center gap-2">
+    <motion.button
+      onClick={connect}
+      disabled={connecting}
+      className="btn-primary flex items-center gap-2"
+      whileHover={connecting ? {} : { scale: 1.05, y: -2 }}
+      whileTap={connecting ? {} : { scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    >
       <Wallet size={16} />
       {connecting ? "Connecting..." : "Connect Wallet"}
-    </button>
+    </motion.button>
   );
 }

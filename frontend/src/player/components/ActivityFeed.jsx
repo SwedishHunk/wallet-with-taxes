@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { ethers } from "ethers";
 
@@ -24,6 +25,23 @@ function timeAgo(timestamp) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+  },
+};
+
+const rowVariants = {
+  hidden: { opacity: 0, x: -16 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { type: "spring", stiffness: 300, damping: 28 },
+  },
+};
+
 export default function ActivityFeed({ events = [], loading }) {
   if (loading) {
     return (
@@ -31,7 +49,13 @@ export default function ActivityFeed({ events = [], loading }) {
         <p className="label mb-4">Recent Activity</p>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-dark-700 rounded-lg animate-pulse" />
+            <motion.div
+              key={i}
+              className="h-12 rounded-lg"
+              style={{ background: "rgba(15, 20, 40, 0.6)" }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.15 }}
+            />
           ))}
         </div>
       </div>
@@ -42,30 +66,51 @@ export default function ActivityFeed({ events = [], loading }) {
     <div className="card">
       <p className="label mb-4">Recent Activity</p>
       {events.length === 0 ? (
-        <p className="text-gray-500 text-sm text-center py-8">No activity yet</p>
+        <motion.p
+          className="text-gray-500 text-sm text-center py-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          No activity yet
+        </motion.p>
       ) : (
-        <div className="space-y-2">
+        <motion.div
+          className="space-y-2"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {events.map((e, i) => {
             const isBuy = e.type === "BUY";
             const assetDecimals = e.assetSymbol === "ETH" ? 18 : 6;
 
             return (
-              <div
+              <motion.div
                 key={`${e.txHash}-${i}`}
-                className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-dark-700/50 hover:bg-dark-700 transition-colors"
+                className="flex items-center justify-between py-2.5 px-3 rounded-lg transition-colors"
+                style={{ background: "rgba(15, 20, 40, 0.4)" }}
+                variants={rowVariants}
+                whileHover={{
+                  backgroundColor: "rgba(15, 20, 40, 0.7)",
+                  x: 4,
+                  transition: { type: "spring", stiffness: 400, damping: 25 },
+                }}
               >
                 <div className="flex items-center gap-3">
-                  <div
+                  <motion.div
                     className={`p-1.5 rounded-lg ${
                       isBuy ? "bg-neon-green/10" : "bg-neon-pink/10"
                     }`}
+                    whileHover={{ scale: 1.15, rotate: isBuy ? -8 : 8 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
                   >
                     {isBuy ? (
                       <ArrowDownLeft size={14} className="text-neon-green" />
                     ) : (
                       <ArrowUpRight size={14} className="text-neon-pink" />
                     )}
-                  </div>
+                  </motion.div>
                   <div>
                     <span className={isBuy ? "badge-buy" : "badge-sell"}>
                       {e.type}
@@ -102,10 +147,10 @@ export default function ActivityFeed({ events = [], loading }) {
                     Block {e.block} · {timeAgo(e.timestamp)}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

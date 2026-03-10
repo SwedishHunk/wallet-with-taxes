@@ -1,4 +1,5 @@
 import { ButtonHTMLAttributes, ReactNode } from "react";
+import { motion } from "framer-motion";
 import "./ui.css";
 
 type Variant = "primary" | "secondary" | "danger";
@@ -12,14 +13,20 @@ export function Button({
   variant = "primary",
   children,
   className,
+  disabled,
   ...rest
 }: ButtonProps) {
   return (
-    <button
+    <motion.button
       data-variant={variant}
       className={["ui-button", className].filter(Boolean).join(" ")}
-      {...rest}>
+      whileHover={disabled ? {} : { scale: 1.03, y: -2 }}
+      whileTap={disabled ? {} : { scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      disabled={disabled}
+      {...(rest as any)}
+    >
       {children}
-    </button>
+    </motion.button>
   );
 }
