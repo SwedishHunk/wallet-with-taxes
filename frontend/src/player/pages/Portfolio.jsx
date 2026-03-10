@@ -319,9 +319,9 @@ export default function Portfolio() {
     averageEntryTriPerEth !== null &&
     currentTriPerEth !== null &&
     currentTriPerEth / averageEntryTriPerEth > 5
-      ? `Current shop rate is much weaker than your historical fills: ${formatDisplayNumber(
-          averageEntryTriPerEth
-        )} TRI/ETH then vs ${formatDisplayNumber(currentTriPerEth)} TRI/ETH now.`
+      ? `Rate shift: ${formatDisplayNumber(averageEntryTriPerEth)} TRI/ETH historically vs ${formatDisplayNumber(
+          currentTriPerEth
+        )} TRI/ETH now.`
       : null;
 
   return (
@@ -475,7 +475,7 @@ export default function Portfolio() {
           icon={Coins}
         />
         <StatCard
-          label="Unrealized PnL"
+          label="Tracked Position PnL"
           value={
             unrealizedPnlEth !== null
               ? `${unrealizedPnlEth >= 0 ? "+" : ""}${formatDisplayNumber(
@@ -589,6 +589,7 @@ export default function Portfolio() {
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Avg buy price: {formatAverageBuyPrice(p)} {p.symbol}/TRI
+                    {getInverseAverageBuyPrice(p) ? ` • ${getInverseAverageBuyPrice(p)} TRI/${p.symbol}` : ""}
                   </p>
                 </div>
               </div>
@@ -726,6 +727,16 @@ function getAverageBuyPriceValue(position) {
   }
 
   return totalPaid / totalGenOut;
+}
+
+function getInverseAverageBuyPrice(position) {
+  const average = getAverageBuyPriceValue(position);
+  if (average === null || average <= 0) {
+    return null;
+  }
+
+  const inverse = 1 / average;
+  return inverse >= 1 ? inverse.toFixed(4) : inverse.toPrecision(4);
 }
 
 function getCurrentTriPriceEth(config) {
