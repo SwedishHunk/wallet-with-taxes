@@ -45,6 +45,25 @@ function timeAgo(timestamp) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function formatTimestamp(timestamp) {
+  return new Date(timestamp).toLocaleString("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function shortenTxHash(txHash) {
+  if (!txHash) {
+    return "—";
+  }
+
+  return `${txHash.slice(0, 10)}...${txHash.slice(-6)}`;
+}
+
 export default function Portfolio() {
   const { isConnected, address, provider } = useWallet();
   const [syncing, setSyncing] = useState(false);
@@ -321,7 +340,10 @@ export default function Portfolio() {
 
       {/* Transaction History */}
       <div className="card">
-        <p className="label mb-4">Transaction History</p>
+        <p className="label mb-1">Transaction History</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Recent buy and sell activity for the connected wallet.
+        </p>
         {histLoading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -383,7 +405,14 @@ export default function Portfolio() {
                         </span>
                       </p>
                     )}
-                    <p className="text-xs text-gray-600 mt-0.5">{timeAgo(e.timestamp)}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatTimestamp(e.timestamp)}
+                    </p>
+                    <div className="flex items-center justify-end gap-2 text-[11px] text-gray-600 mt-0.5">
+                      <span>{timeAgo(e.timestamp)}</span>
+                      <span>•</span>
+                      <span className="font-mono">{shortenTxHash(e.txHash)}</span>
+                    </div>
                   </div>
                 </div>
               );
