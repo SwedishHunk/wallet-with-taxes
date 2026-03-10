@@ -290,6 +290,12 @@ export default function Portfolio() {
       : null;
   const ethPosition = positions.find((position) => position.symbol === "ETH");
   const averageEntryPriceEth = ethPosition ? getAverageBuyPriceValue(ethPosition) : null;
+  const averageEntryTriPerEth =
+    averageEntryPriceEth !== null && averageEntryPriceEth > 0
+      ? 1 / averageEntryPriceEth
+      : null;
+  const currentTriPerEth =
+    currentTriPriceEth !== null && currentTriPriceEth > 0 ? 1 / currentTriPriceEth : null;
   const estimatedCostBasisEth =
     averageEntryPriceEth !== null ? trackedTriPosition * averageEntryPriceEth : null;
   const estimatedCostBasisUsd =
@@ -309,6 +315,14 @@ export default function Portfolio() {
   const hasFiatValuation = Number.isFinite(ethUsd) && ethUsd > 0;
   const hasSekValuation = hasFiatValuation && Number.isFinite(usdSek) && usdSek > 0;
   const valuationSource = config?.valuation?.source || "unconfigured";
+  const rateShiftWarning =
+    averageEntryTriPerEth !== null &&
+    currentTriPerEth !== null &&
+    currentTriPerEth / averageEntryTriPerEth > 5
+      ? `Current shop rate is much weaker than your historical fills: ${formatDisplayNumber(
+          averageEntryTriPerEth
+        )} TRI/ETH then vs ${formatDisplayNumber(currentTriPerEth)} TRI/ETH now.`
+      : null;
 
   return (
     <div>
@@ -394,6 +408,9 @@ export default function Portfolio() {
               }`
             : "Valuation source: ETH-only estimate from current TokenShop rate"}
         </p>
+        {rateShiftWarning && (
+          <p className="text-[11px] text-neon-pink mt-2">{rateShiftWarning}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
@@ -406,11 +423,17 @@ export default function Portfolio() {
           }
           sub="Based on current TokenShop ETH sell rate"
           meta={
-            hasFiatValuation
-              ? `${formatCurrency(currentTriPriceUsd, "USD")}${
+            `${
+              currentTriPerEth !== null
+                ? `${formatDisplayNumber(currentTriPerEth)} TRI/ETH`
+                : "TRI/ETH unavailable"
+            }${
+              hasFiatValuation
+                ? ` • ${formatCurrency(currentTriPriceUsd, "USD")}${
                   hasSekValuation ? ` • ${formatCurrency(currentTriPriceSek, "SEK")}` : ""
                 }`
-              : "Add TOKENSHOP_ETH_USD to enable fiat view"
+                : ""
+            }`
           }
           color="purple"
           icon={Activity}
@@ -424,9 +447,11 @@ export default function Portfolio() {
           }
           sub="Average ETH paid per TRI"
           meta={
-            usesOnlyEthHistory
-              ? "Based on your full TRI trade history"
-              : "Based on ETH-funded buys only"
+            `${formatDisplayNumber(averageEntryTriPerEth)} TRI/ETH${
+              usesOnlyEthHistory
+                ? " • Based on your full TRI trade history"
+                : " • Based on ETH-funded buys only"
+            }`
           }
           color="cyan"
           icon={ChartNoAxesCombined}
