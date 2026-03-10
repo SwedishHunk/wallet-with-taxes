@@ -1,4 +1,11 @@
-export default function StatCard({ label, value, sub, color = "cyan", icon: Icon }) {
+export default function StatCard({
+  label,
+  value,
+  sub,
+  meta,
+  color = "cyan",
+  icon: Icon,
+}) {
   const glowClass = {
     cyan: "glow-text-cyan",
     green: "glow-text-green",
@@ -22,6 +29,7 @@ export default function StatCard({ label, value, sub, color = "cyan", icon: Icon
             {value}
           </p>
           {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+          {meta && <p className="text-[11px] text-gray-400 mt-1">{meta}</p>}
         </div>
         {Icon && (
           <div className={`p-2 rounded-lg bg-dark-700`}>
