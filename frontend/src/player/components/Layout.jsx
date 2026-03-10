@@ -23,7 +23,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen relative" style={{ background: 'linear-gradient(135deg, #050810 0%, #0a0e1a 40%, #0d1225 100%)' }}>
-      <CyberpunkScene intensity="subtle" sacredGeometry="merkaba" />
+      <CyberpunkScene intensity="subtle" sacredGeometry="metatron" />
       <FilmGrainOverlay />
       <Navbar />
       <AnimatePresence mode="wait">

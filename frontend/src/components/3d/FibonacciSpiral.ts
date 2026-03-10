@@ -1,138 +1,120 @@
 import * as THREE from "three";
 
 /**
- * Fibonacci Spiral — Golden ratio particle trail
- * Amber/gold gradient, slow unfurling rotation
- * Organic flow with neon accents
+ * Fibonacci Phyllotaxis Sphere — golden angle distribution on a 3D sphere
+ * 400 glowing points + inner spiral core + subtle wireframe sphere
+ * Gold/amber palette, slow meditative rotation, ~5.5s breathing pulse
  */
+
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399963 rad
+
 export function createFibonacciSpiral(scene: THREE.Scene) {
   const group = new THREE.Group();
-  const PHI = (1 + Math.sqrt(5)) / 2; // Golden ratio 1.618...
 
-  // Build spiral from 500 points
-  const pointCount = 500;
-  const positions = new Float32Array(pointCount * 3);
-  const colors = new Float32Array(pointCount * 3);
+  // === Fibonacci sphere: 400 points via golden angle phyllotaxis ===
+  const N = 520;
+  const positions = new Float32Array(N * 3);
+  const colors = new Float32Array(N * 3);
+  const R = 2.8;
 
-  for (let i = 0; i < pointCount; i++) {
-    const t = i / pointCount;
-    const angle = i * 2.399963; // Golden angle in radians
-    const r = Math.sqrt(i) * 0.15;
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    const inclination = Math.acos(1 - 2 * t); // 0 → PI
+    const azimuth = i * GOLDEN_ANGLE;
 
-    // Spiral positions
-    positions[i * 3] = r * Math.cos(angle);
-    positions[i * 3 + 1] = r * Math.sin(angle);
-    positions[i * 3 + 2] = (t - 0.5) * 0.5; // slight Z depth
+    positions[i * 3]     = R * Math.sin(inclination) * Math.cos(azimuth);
+    positions[i * 3 + 1] = R * Math.cos(inclination);
+    positions[i * 3 + 2] = R * Math.sin(inclination) * Math.sin(azimuth);
 
-    // Color gradient: gold → amber → neon cyan at tips
+    // Gold at poles → amber at equator
+    const lat = Math.abs(Math.cos(inclination));
     const color = new THREE.Color();
-    if (t < 0.5) {
-      color.setHSL(0.12, 0.9, 0.5 + t * 0.3); // gold
-    } else {
-      color.lerpHSL(new THREE.Color(0x00d4ff), (t - 0.5) * 2); // transition to cyan
-      color.setHSL(0.12 + (t - 0.5) * 0.7, 0.9, 0.55);
-    }
-    colors[i * 3] = color.r;
+    color.lerpColors(new THREE.Color(0xff9f1c), new THREE.Color(0xffd700), lat);
+    colors[i * 3]     = color.r;
     colors[i * 3 + 1] = color.g;
     colors[i * 3 + 2] = color.b;
   }
 
-  const spiralGeo = new THREE.BufferGeometry();
-  spiralGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  spiralGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-
-  const spiralMat = new THREE.PointsMaterial({
-    size: 0.06,
+  const sphereGeo = new THREE.BufferGeometry();
+  sphereGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  sphereGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const sphereMat = new THREE.PointsMaterial({
+    size: 0.09,
     vertexColors: true,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.88,
     sizeAttenuation: true,
     depthWrite: false,
   });
-  const spiralPoints = new THREE.Points(spiralGeo, spiralMat);
-  spiralPoints.userData.isSpiralPoints = true;
-  group.add(spiralPoints);
+  const spherePoints = new THREE.Points(sphereGeo, sphereMat);
+  spherePoints.userData.isFibSphere = true;
+  group.add(spherePoints);
 
-  // Golden ratio rectangle outlines
-  let w = 1.5;
-  let h = w / PHI;
-  for (let i = 0; i < 8; i++) {
-    const rectShape = new THREE.Shape();
-    rectShape.moveTo(-w / 2, -h / 2);
-    rectShape.lineTo(w / 2, -h / 2);
-    rectShape.lineTo(w / 2, h / 2);
-    rectShape.lineTo(-w / 2, h / 2);
-    rectShape.lineTo(-w / 2, -h / 2);
-
-    const points = rectShape.getPoints(4);
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color().setHSL(0.12 + i * 0.06, 0.7, 0.5),
-      transparent: true,
-      opacity: 0.15 + (i * 0.03),
-    });
-    const line = new THREE.LineLoop(lineGeo, lineMat);
-    line.rotation.z = -i * Math.PI / 2;
-
-    // Offset based on fibonacci sequence
-    const offset = (w - h) / 2;
-    if (i % 4 === 0) line.position.set(offset, 0, i * 0.02);
-    else if (i % 4 === 1) line.position.set(0, offset, i * 0.02);
-    else if (i % 4 === 2) line.position.set(-offset, 0, i * 0.02);
-    else line.position.set(0, -offset, i * 0.02);
-
-    line.scale.setScalar(1 - i * 0.08);
-    group.add(line);
-
-    // Next fibonacci rectangle
-    const temp = h;
-    h = w - h;
-    w = temp;
+  // === Inner golden spiral (flat, XY plane) ===
+  const spiralPts: THREE.Vector3[] = [];
+  for (let i = 0; i < 220; i++) {
+    const angle = i * GOLDEN_ANGLE;
+    const r = Math.sqrt(i) * 0.1;
+    spiralPts.push(new THREE.Vector3(r * Math.cos(angle), r * Math.sin(angle), 0));
   }
+  const spiralGeo = new THREE.BufferGeometry().setFromPoints(spiralPts);
+  const spiralMat = new THREE.LineBasicMaterial({
+    color: 0xffd700,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+  const spiralLine = new THREE.Line(spiralGeo, spiralMat);
+  spiralLine.userData.isSpiral = true;
+  group.add(spiralLine);
 
-  // Neon accent ring around the spiral
-  const accentGeo = new THREE.TorusGeometry(3.5, 0.015, 16, 64);
-  const accentMat = new THREE.MeshStandardMaterial({
+  // === Subtle wireframe sphere ===
+  const wfGeo = new THREE.SphereGeometry(R, 16, 10);
+  const wfMat = new THREE.MeshBasicMaterial({
     color: 0xffbf00,
-    emissive: 0x00d4ff,
-    emissiveIntensity: 0.2,
     wireframe: true,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.05,
+    depthWrite: false,
   });
-  const accentRing = new THREE.Mesh(accentGeo, accentMat);
-  group.add(accentRing);
+  group.add(new THREE.Mesh(wfGeo, wfMat));
+
+  // === Glowing golden core ===
+  const coreGeo = new THREE.SphereGeometry(0.13, 16, 16);
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: 0xffd700,
+    emissive: 0xffd700,
+    emissiveIntensity: 1.2,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.userData.isCore = true;
+  group.add(core);
 
   group.userData.type = "fibonacci";
-  group.scale.setScalar(0.8);
   scene.add(group);
-
   return group;
 }
 
 export function animateFibonacciSpiral(group: THREE.Group, elapsed: number) {
-  // Slow unfurling rotation
-  group.rotation.z = elapsed * 0.1;
-
-  // Gentle tilt
-  group.rotation.x = Math.sin(elapsed * 0.15) * 0.12;
-  group.rotation.y = Math.cos(elapsed * 0.12) * 0.08;
+  // Slow rotation (~20s/revolution on Y, gentle X drift)
+  group.rotation.y = elapsed * (Math.PI * 2) / 20;
+  group.rotation.x = Math.sin(elapsed * 0.18) * 0.12;
 
   // Breathing pulse: ~5.5s
-  const breath = 0.8 * (1 + Math.sin(elapsed * 1.14) * 0.05);
+  const breath = 1 + Math.sin(elapsed * 1.14) * 0.05;
   group.scale.setScalar(breath);
 
-  // Animate spiral particle flow
   group.children.forEach((child) => {
-    if (child.userData.isSpiralPoints) {
-      const points = child as THREE.Points;
-      const positions = points.geometry.attributes.position.array as Float32Array;
-      const count = positions.length / 3;
-      for (let i = 0; i < count; i++) {
-        // Gentle Z breathing
-        positions[i * 3 + 2] = ((i / count) - 0.5) * 0.5 + Math.sin(elapsed * 1.14 + i * 0.02) * 0.03;
-      }
-      points.geometry.attributes.position.needsUpdate = true;
+    // Inner spiral counter-rotates slowly
+    if (child.userData.isSpiral) {
+      (child as THREE.Line).rotation.z = -elapsed * 0.18;
+    }
+    // Core glow pulse
+    if (child.userData.isCore) {
+      const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 1.2 + Math.sin(elapsed * 1.14) * 0.5;
     }
   });
 }
