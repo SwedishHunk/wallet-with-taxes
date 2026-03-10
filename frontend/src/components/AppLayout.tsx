@@ -16,7 +16,7 @@ import React from "react";
 import { Link, NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   Users, Gamepad2, SlidersHorizontal, LayoutDashboard,
-  ArrowLeft, LogOut, LogIn, UserPlus, UserCheck,
+  LogOut, LogIn, UserPlus, UserCheck,
 } from "lucide-react";
 import { useAuthState } from "../lib/AuthContext";
 import { useLogout, useCanManageMembers } from "../lib/useAuth";
@@ -122,8 +122,8 @@ function Header() {
               <button className="btn btn-outline" onClick={() => navigate(ROUTES.memberLogin)}>
                 <UserCheck size={15} /> Select Member
               </button>
-              <button className="btn btn-danger" onClick={logoutStudio}>
-                <LogOut size={15} /> Logout
+              <button className="btn-ghost-danger" onClick={logoutStudio} title="Logout">
+                <LogOut size={16} />
               </button>
             </>
           )}
@@ -139,12 +139,9 @@ function Header() {
                 <span className="value">{authContext.memberSession?.email}</span>
                 {authContext.memberSession?.isOwner && <span className="owner-badge">Owner</span>}
               </div>
-              {/* Logout actions */}
-              <button className="btn btn-outline" onClick={logoutMember}>
-                <ArrowLeft size={15} /> Back to Studio
-              </button>
-              <button className="btn btn-danger" onClick={logoutStudio}>
-                <LogOut size={15} /> Logout Completely
+              {/* Logout */}
+              <button className="btn-ghost-danger" onClick={logoutStudio} title="Logout">
+                <LogOut size={16} />
               </button>
             </>
           )}

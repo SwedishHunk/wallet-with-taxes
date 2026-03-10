@@ -41,10 +41,24 @@ export default function ConnectWallet() {
         </motion.span>
         <motion.button
           onClick={disconnect}
-          className="p-2 text-gray-400 hover:text-neon-pink transition-colors"
-          title="Disconnect"
-          whileHover={{ scale: 1.15, rotate: -10 }}
-          whileTap={{ scale: 0.9 }}
+          title="Logout"
+          style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: "34px", height: "34px", padding: 0,
+            background: "transparent",
+            border: "1px solid transparent",
+            borderRadius: "12px",
+            color: "rgba(255,255,255,0.38)",
+            cursor: "pointer",
+            flexShrink: 0,
+            transition: "color 0.2s ease, border-color 0.2s ease, background 0.2s ease",
+          }}
+          whileHover={{
+            color: "#ff3366",
+            borderColor: "rgba(255,51,102,0.35)",
+            backgroundColor: "rgba(255,51,102,0.08)",
+          }}
+          whileTap={{ scale: 0.93 }}
           transition={{ type: "spring", stiffness: 400, damping: 15 }}
         >
           <LogOut size={16} />

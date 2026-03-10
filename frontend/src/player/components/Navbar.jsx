@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
@@ -40,8 +40,8 @@ export default function Navbar() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
+          {/* Logo — links to landing page */}
+          <Link to="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
             {/* Animated neon triangle — same as studio layout */}
             <div style={{ flexShrink: 0, animation: 'triPulse 3s ease-in-out infinite, triSpin3D 9s ease-in-out infinite', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.55)) drop-shadow(0 0 8px rgba(168,85,247,0.35))' }}>
               <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
@@ -65,7 +65,7 @@ export default function Navbar() {
               <span className="glow-text-cyan" style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: '0.04em', fontWeight: 700, fontSize: '1.15rem' }}>Triolith</span>
               <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(255,255,255,0.32)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Player</span>
             </div>
-          </div>
+          </Link>
 
           {/* Nav links */}
           <div className="flex items-center gap-1">
