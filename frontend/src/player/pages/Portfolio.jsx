@@ -302,6 +302,7 @@ export default function Portfolio() {
   const usesOnlyEthHistory = positions.every((position) => position.symbol === "ETH");
   const hasFiatValuation = Number.isFinite(ethUsd) && ethUsd > 0;
   const hasSekValuation = hasFiatValuation && Number.isFinite(usdSek) && usdSek > 0;
+  const valuationSource = config?.valuation?.source || "unconfigured";
 
   return (
     <div>
@@ -372,6 +373,17 @@ export default function Portfolio() {
         </p>
         <p className="text-xs text-gray-400 mt-1">
           ETH-based valuation with optional USD/SEK snapshots from backend config.
+        </p>
+        <p className="text-[11px] text-gray-500 mt-2">
+          {hasFiatValuation
+            ? `Valuation source: ${formatValuationSource(valuationSource)}${
+                hasSekValuation
+                  ? ` • ETH/USD ${formatDisplayNumber(ethUsd)} • USD/SEK ${formatDisplayNumber(
+                      usdSek
+                    )}`
+                  : ` • ETH/USD ${formatDisplayNumber(ethUsd)}`
+              }`
+            : "Valuation source: ETH-only estimate from current TokenShop rate"}
         </p>
       </div>
 
@@ -678,4 +690,12 @@ function getPnlStatus(unrealizedPnlEth) {
   }
 
   return "Currently at a loss";
+}
+
+function formatValuationSource(source) {
+  if (source === "manual_env_snapshot") {
+    return "manual backend snapshot";
+  }
+
+  return "unconfigured";
 }
