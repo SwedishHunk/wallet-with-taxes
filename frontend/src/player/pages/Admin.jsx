@@ -31,7 +31,7 @@ function AdminAction({ title, icon: Icon, children, color = "purple" }) {
         <Icon size={16} className="text-gray-400" />
         <h3 className="text-sm font-bold text-gray-200">{title}</h3>
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "8px" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "8px" }}>
         {children}
       </div>
     </div>
@@ -196,7 +196,7 @@ export default function Admin() {
 
       {/* Admin Actions — organized layout */}
       {/* Row 1: Quick actions (Pause + Fee) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" style={{ position: "relative", zIndex: 2 }}>
         {/* Pause / Unpause */}
         <AdminAction title="Pause Control" icon={Pause} color="pink">
           <div className="flex gap-2">
@@ -261,7 +261,7 @@ export default function Admin() {
       </div>
 
       {/* Row 2: Rates, Limits & Withdraw — 3-column row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4" style={{ position: "relative", zIndex: 2 }}>
         {/* Rates */}
         <AdminAction title="Set Rates" icon={TrendingUp} color="green">
           <div className="space-y-2">
@@ -286,25 +286,26 @@ export default function Admin() {
               placeholder="Sell rate (TRI per 1 unit)"
               className="input-field"
             />
-            <button
-              onClick={() =>
-                execTx(
-                  (shop) =>
-                    shop.setRates(
-                      rateAsset,
-                      ethers.parseUnits(buyRate, 18),
-                      ethers.parseUnits(sellRate, 18)
-                    ),
-                  setRateStatus,
-                  setRateMsg
-                )
-              }
-              className="btn-primary w-full"
-              disabled={rateStatus === "pending" || !buyRate || !sellRate || !ready}
-            >
-              Update Rates
-            </button>
           </div>
+          <button
+            onClick={() =>
+              execTx(
+                (shop) =>
+                  shop.setRates(
+                    rateAsset,
+                    ethers.parseUnits(buyRate, 18),
+                    ethers.parseUnits(sellRate, 18)
+                  ),
+                setRateStatus,
+                setRateMsg
+              )
+            }
+            className="btn-primary w-full"
+            style={{ marginTop: "auto" }}
+            disabled={rateStatus === "pending" || !buyRate || !sellRate || !ready}
+          >
+            Update Rates
+          </button>
           <TxResult status={rateStatus} message={rateMsg} />
         </AdminAction>
 
@@ -327,39 +328,40 @@ export default function Admin() {
               className="input-field"
               step="any"
             />
-            <button
-              onClick={async () => {
-                setLimitStatus("pending");
-                setLimitMsg("Confirm in wallet...");
-                try {
-                  const shop = getShop();
-                  if (!shop) {
-                    throw new Error(
-                      "TokenShop contract is not ready yet. Verify wallet connection and shop config."
-                    );
-                  }
-                  if (maxEthIn) {
-                    const tx = await shop.setMaxEthIn(ethers.parseEther(maxEthIn));
-                    await tx.wait();
-                  }
-                  if (maxGenIn) {
-                    const tx = await shop.setMaxGenIn(ethers.parseUnits(maxGenIn, 18));
-                    await tx.wait();
-                  }
-                  setLimitStatus("success");
-                  setLimitMsg("Limits updated!");
-                  refreshConfig();
-                } catch (err) {
-                  setLimitStatus("error");
-                  setLimitMsg(formatTxError(err, "Failed"));
-                }
-              }}
-              className="btn-primary w-full"
-              disabled={limitStatus === "pending" || (!maxEthIn && !maxGenIn) || !ready}
-            >
-              Update Limits
-            </button>
           </div>
+          <button
+            onClick={async () => {
+              setLimitStatus("pending");
+              setLimitMsg("Confirm in wallet...");
+              try {
+                const shop = getShop();
+                if (!shop) {
+                  throw new Error(
+                    "TokenShop contract is not ready yet. Verify wallet connection and shop config."
+                  );
+                }
+                if (maxEthIn) {
+                  const tx = await shop.setMaxEthIn(ethers.parseEther(maxEthIn));
+                  await tx.wait();
+                }
+                if (maxGenIn) {
+                  const tx = await shop.setMaxGenIn(ethers.parseUnits(maxGenIn, 18));
+                  await tx.wait();
+                }
+                setLimitStatus("success");
+                setLimitMsg("Limits updated!");
+                refreshConfig();
+              } catch (err) {
+                setLimitStatus("error");
+                setLimitMsg(formatTxError(err, "Failed"));
+              }
+            }}
+            className="btn-primary w-full"
+            style={{ marginTop: "auto" }}
+            disabled={limitStatus === "pending" || (!maxEthIn && !maxGenIn) || !ready}
+          >
+            Update Limits
+          </button>
           <TxResult status={limitStatus} message={limitMsg} />
         </AdminAction>
 
@@ -381,23 +383,24 @@ export default function Admin() {
               className="input-field"
               step="any"
             />
-            <button
-              onClick={() =>
-                execTx(
-                  (shop) =>
-                    shop.withdrawETH(withdrawTo, ethers.parseEther(withdrawAmount)),
-                  setWithdrawStatus,
-                  setWithdrawMsg
-                )
-              }
-              className="btn-danger w-full"
-              disabled={
-                withdrawStatus === "pending" || !withdrawTo || !withdrawAmount || !ready
-              }
-            >
-              Withdraw
-            </button>
           </div>
+          <button
+            onClick={() =>
+              execTx(
+                (shop) =>
+                  shop.withdrawETH(withdrawTo, ethers.parseEther(withdrawAmount)),
+                setWithdrawStatus,
+                setWithdrawMsg
+              )
+            }
+            className="btn-danger w-full"
+            style={{ marginTop: "auto" }}
+            disabled={
+              withdrawStatus === "pending" || !withdrawTo || !withdrawAmount || !ready
+            }
+          >
+            Withdraw
+          </button>
           <TxResult status={withdrawStatus} message={withdrawMsg} />
         </AdminAction>
       </div>

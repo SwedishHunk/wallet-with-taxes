@@ -185,8 +185,7 @@ export default function WalletInfo() {
     const isHovered = hoveredCard === id;
     return {
       scale:      isHovered ? 1.04 : 1,
-      z:          isHovered ? 20 : 0,
-      transition: { type: "spring", stiffness: 280, damping: 24 },
+      transition: { type: "spring" as const, stiffness: 280, damping: 24 },
     };
   }
 
@@ -242,7 +241,7 @@ export default function WalletInfo() {
       )}
 
       {/* ── Domino Cards ───────────────────────────────────────────────── */}
-      <div style={{ perspective: "1000px", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
         {CARDS.map((card) => (
           <motion.div
             key={card.id}
@@ -257,10 +256,9 @@ export default function WalletInfo() {
               boxShadow: hoveredCard === card.id
                 ? `0 0 40px ${card.glow}, 0 8px 32px rgba(0,0,0,0.5)`
                 : `0 0 15px rgba(0,0,0,0.3)`,
-              transformStyle: "preserve-3d",
-              display: "flex",
-              flexDirection: "column",
               transition: "border-color 0.2s, box-shadow 0.2s",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             <h3 style={{ color: card.accent, fontFamily: "Orbitron,Inter,sans-serif", fontSize: 14, marginBottom: 14, letterSpacing: "0.05em", flexShrink: 0 }}>
