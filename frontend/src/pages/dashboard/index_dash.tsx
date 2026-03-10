@@ -10,6 +10,7 @@ import {
   Badge,
 } from "../../components/ui/index";
 import WalletInfo from "./WalletInfo";
+import EconomicEventsPanel from "./EconomicEventsPanel";
 import "../../style/Dashboard.css";
 
 export default function Dashboard() {
@@ -106,6 +107,10 @@ export default function Dashboard() {
       {/* Game Wallet UI */}
       <Card>
         <WalletInfo />
+      </Card>
+
+      <Card>
+        <EconomicEventsPanel />
       </Card>
     </Page>
   );

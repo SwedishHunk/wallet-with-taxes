@@ -1,17 +1,18 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useParams } from "react-router-dom";
 import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
 
-const navItems = [
-  { to: "/player", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/player/trade", label: "Trade", icon: ArrowLeftRight },
-  { to: "/player/portfolio", label: "Portfolio", icon: Briefcase },
-  { to: "/player/tax", label: "Tax", icon: Receipt },
-];
-
 export default function Navbar() {
   const { isAdmin } = useWallet();
+  const { gameId } = useParams();
+  const base = gameId ? `/player/game/${gameId}` : "/player";
+  const navItems = [
+    { to: `${base}`, label: "Dashboard", icon: LayoutDashboard },
+    { to: `${base}/trade`, label: "Trade", icon: ArrowLeftRight },
+    { to: `${base}/portfolio`, label: "Portfolio", icon: Briefcase },
+    { to: `${base}/tax`, label: "Tax", icon: Receipt },
+  ];
 
   return (
     <nav className="bg-dark-800 border-b border-dark-600 sticky top-0 z-50">
@@ -30,6 +31,14 @@ export default function Navbar() {
 
           {/* Nav links */}
           <div className="flex items-center gap-1">
+            {gameId && (
+              <NavLink
+                to="/player/trade"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700"
+              >
+                Global
+              </NavLink>
+            )}
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -49,7 +58,7 @@ export default function Navbar() {
 
             {isAdmin && (
               <NavLink
-                to="/player/admin"
+                to={`${base}/admin`}
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive

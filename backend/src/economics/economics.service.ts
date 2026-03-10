@@ -59,6 +59,13 @@ export class EconomicsService {
     });
   }
 
+  getEventsForStudioGame(studioId: string, gameId: string) {
+    return this.repo.find({
+      where: { studioId, gameId },
+      order: { timestamp: "DESC", createdAt: "DESC" },
+    });
+  }
+
   getEventsForGame(gameId: string) {
     return this.repo.find({
       where: { gameId },

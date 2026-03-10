@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
-import { useApiData, apiGet, triggerSync } from "../hooks/useApi";
+import { useApiData, apiGet, apiPost, triggerSync } from "../hooks/useApi";
 import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
@@ -15,6 +16,7 @@ const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
   const { isConnected, address, provider } = useWallet();
+  const { gameId } = useParams();
   const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
     useContracts();
 
@@ -66,10 +68,25 @@ export default function Trade() {
   const [config, setConfig] = useState(null);
   const [ethBalance, setEthBalance] = useState(null);
   const [selectedAssetBalance, setSelectedAssetBalance] = useState(null);
+  const [gameSession, setGameSession] = useState(null);
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!gameId || !address) {
+      setGameSession(null);
+      return;
+    }
+
+    apiPost("/player/session", { gameId, walletAddress: address })
+      .then(setGameSession)
+      .catch((error) => {
+        console.error("Failed to resolve player session:", error);
+        setGameSession(null);
+      });
+  }, [gameId, address]);
 
   useEffect(() => {
     if (!isConnected || !address || !provider) {
@@ -314,6 +331,33 @@ export default function Trade() {
       } catch {
         // sync failed silently — not critical
       }
+
+      if (gameId && address) {
+        try {
+          await apiPost("/player/game-economic-event", {
+            gameId,
+            walletAddress: address,
+            txHash: tx.hash,
+            eventType: isBuy ? "buy_tri" : "sell_tri",
+            assetKey: "tri",
+            assetSymbol: "TRI",
+            amount: isBuy
+              ? String(estimatedNetOutput ?? 0)
+              : amount,
+            direction: isBuy ? "in" : "out",
+            metadata: {
+              tradeMode: mode,
+              tradeAssetAddress: selectedAsset.address,
+              tradeAssetSymbol: selectedAsset.symbol,
+              tradeAmountInput: amount,
+              tradeNetOutput: estimatedNetOutput,
+              playerScope: "game",
+            },
+          });
+        } catch (eventError) {
+          console.error("Failed to log game-scoped economic event:", eventError);
+        }
+      }
     } catch (err) {
       setTxStatus("error");
       const reason = formatTxError(err, "Transaction failed");
@@ -361,7 +405,16 @@ export default function Trade() {
         <h1 className="text-3xl font-bold">
           <span className="glow-text-cyan">Trade</span>
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
+        <p className="text-gray-500 text-sm mt-1">
+          {gameSession
+            ? `Game-scoped trade for ${gameSession.gameName}`
+            : "Buy or sell TRI tokens"}
+        </p>
+        {gameSession && (
+          <p className="text-[11px] text-neon-purple mt-2">
+            Trades from this route are attributed to studio and game monitoring.
+          </p>
+        )}
       </div>
 
       {/* Error Banner — shows if asset loading failed */}
