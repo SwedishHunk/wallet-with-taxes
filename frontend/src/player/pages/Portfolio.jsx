@@ -10,6 +10,8 @@ import {
   Wallet,
   Landmark,
   Layers,
+  Activity,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { ethers } from "ethers";
 import { useState, useEffect } from "react";
@@ -81,8 +83,13 @@ export default function Portfolio() {
     error: assetsError,
     refresh: refreshAssets,
   } = useApiData(isConnected ? "/shop/supported-assets" : null);
+  const {
+    data: config,
+    error: configError,
+    refresh: refreshConfig,
+  } = useApiData(isConnected ? "/shop/config" : null);
 
-  const apiError = balError || histError || assetsError;
+  const apiError = balError || histError || assetsError || configError;
 
   // Auto-refresh every 15 seconds so new trades show up
   useEffect(() => {
@@ -91,9 +98,10 @@ export default function Portfolio() {
       refreshBal();
       refreshHist();
       refreshAssets();
+      refreshConfig();
     }, 15000);
     return () => clearInterval(interval);
-  }, [isConnected, refreshBal, refreshHist, refreshAssets]);
+  }, [isConnected, refreshBal, refreshHist, refreshAssets, refreshConfig]);
 
   useEffect(() => {
     if (!isConnected || !address || !provider) {
@@ -178,7 +186,7 @@ export default function Portfolio() {
     setSyncing(true);
     try {
       await triggerSync();
-      await Promise.all([refreshBal(), refreshHist(), refreshAssets()]);
+      await Promise.all([refreshBal(), refreshHist(), refreshAssets(), refreshConfig()]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -202,6 +210,18 @@ export default function Portfolio() {
   const events = history?.events || [];
   const totalBuys = positions.reduce((sum, position) => sum + position.buys, 0);
   const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
+  const triBalance = balance?.genBalance ? Number(balance.genBalance) : 0;
+  const currentTriPriceEth = getCurrentTriPriceEth(config);
+  const estimatedCurrentValueEth =
+    currentTriPriceEth !== null ? triBalance * currentTriPriceEth : null;
+  const ethPosition = positions.find((position) => position.symbol === "ETH");
+  const averageEntryPriceEth = ethPosition ? getAverageBuyPriceValue(ethPosition) : null;
+  const estimatedCostBasisEth =
+    averageEntryPriceEth !== null ? triBalance * averageEntryPriceEth : null;
+  const unrealizedPnlEth =
+    estimatedCurrentValueEth !== null && estimatedCostBasisEth !== null
+      ? estimatedCurrentValueEth - estimatedCostBasisEth
+      : null;
 
   return (
     <div>
@@ -263,6 +283,64 @@ export default function Portfolio() {
           value={totalSells}
           color="pink"
           icon={ArrowUpRight}
+        />
+      </div>
+
+      <div className="mb-8">
+        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+          Performance Snapshot
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Simple ETH-based view using the current TokenShop rate and your historical ETH entries.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          label="Current TRI Price"
+          value={
+            currentTriPriceEth !== null
+              ? `${formatDisplayNumber(currentTriPriceEth)} ETH`
+              : "—"
+          }
+          sub="Based on current TokenShop ETH sell rate"
+          color="purple"
+          icon={Activity}
+        />
+        <StatCard
+          label="Average Entry"
+          value={
+            averageEntryPriceEth !== null
+              ? `${formatDisplayNumber(averageEntryPriceEth)} ETH`
+              : "—"
+          }
+          sub="Average ETH paid per TRI"
+          color="cyan"
+          icon={ChartNoAxesCombined}
+        />
+        <StatCard
+          label="Est. Current Value"
+          value={
+            estimatedCurrentValueEth !== null
+              ? `${formatDisplayNumber(estimatedCurrentValueEth)} ETH`
+              : "—"
+          }
+          sub="Current TRI balance marked to shop rate"
+          color="green"
+          icon={Coins}
+        />
+        <StatCard
+          label="Unrealized PnL"
+          value={
+            unrealizedPnlEth !== null
+              ? `${unrealizedPnlEth >= 0 ? "+" : ""}${formatDisplayNumber(
+                  unrealizedPnlEth
+                )} ETH`
+              : "—"
+          }
+          sub="Estimate against ETH cost basis"
+          color={unrealizedPnlEth !== null && unrealizedPnlEth < 0 ? "pink" : "green"}
+          icon={Landmark}
         />
       </div>
 
@@ -425,19 +503,36 @@ export default function Portfolio() {
 }
 
 function formatAverageBuyPrice(position) {
+  const average = getAverageBuyPriceValue(position);
+  if (average === null) {
+    return "—";
+  }
+
+  return average >= 1 ? average.toFixed(6) : average.toPrecision(4);
+}
+
+function getAverageBuyPriceValue(position) {
   const totalGenOut = Number(position.totalGenOut || 0);
   if (!Number.isFinite(totalGenOut) || totalGenOut <= 0) {
-    return "—";
+    return null;
   }
 
   const assetDecimals = position.symbol === "ETH" ? 18 : 6;
   const totalPaid = Number(formatAmount(position.totalPaidIn, assetDecimals));
   if (!Number.isFinite(totalPaid)) {
-    return "—";
+    return null;
   }
 
-  const average = totalPaid / totalGenOut;
-  return average >= 1 ? average.toFixed(6) : average.toPrecision(4);
+  return totalPaid / totalGenOut;
+}
+
+function getCurrentTriPriceEth(config) {
+  const sellRate = Number(config?.rates?.eth?.sellRate);
+  if (!Number.isFinite(sellRate) || sellRate <= 0) {
+    return null;
+  }
+
+  return 1 / sellRate;
 }
 
 function syncStatusKey(syncing) {
