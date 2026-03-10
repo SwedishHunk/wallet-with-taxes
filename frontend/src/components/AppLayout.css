@@ -178,29 +178,38 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  background: rgba(var(--primary-rgb), 0.05);
-  border: 1px solid rgba(var(--primary-rgb), 0.10);
+  padding: 6px 14px;
+  background: rgba(var(--primary-rgb), 0.06);
+  border: 1px solid rgba(var(--primary-rgb), 0.12);
   border-radius: 999px;
-  white-space: nowrap;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  max-width: 420px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .member-info-compact .label {
   font-weight: 600;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 
 .member-info-compact .value {
   color: var(--text-bright);
   font-weight: 600;
+  font-size: 0.8rem;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-info-compact .divider {
-  color: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.15);
+  flex-shrink: 0;
 }
 
 /* ── Admin links row ── */

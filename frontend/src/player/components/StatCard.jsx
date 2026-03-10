@@ -59,12 +59,12 @@ export default function StatCard({
             className={`text-2xl font-bold font-mono mt-1 ${glowClass}`}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.15 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.06 }}
           >
             {value}
           </motion.p>
           {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-          {meta && <p className="text-[11px] text-gray-400 mt-1">{meta}</p>}
+          {meta && <p className="text-xs text-gray-400 mt-1" style={{ fontSize: "12px" }}>{meta}</p>}
         </div>
         {Icon && (
           <motion.div

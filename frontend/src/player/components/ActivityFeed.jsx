@@ -4,7 +4,11 @@ import { ethers } from "ethers";
 
 function formatAmount(raw, decimals = 18) {
   try {
-    return Number(ethers.formatUnits(raw, decimals)).toFixed(4);
+    const num = Number(ethers.formatUnits(raw, decimals));
+    return new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    }).format(num);
   } catch {
     return raw;
   }

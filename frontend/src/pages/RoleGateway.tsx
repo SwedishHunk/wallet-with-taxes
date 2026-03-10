@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeInUp, scalePop } from "../lib/motionPresets";
+import { useLanguage } from "../lib/LanguageContext";
 import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
 import FilmGrainOverlay from "../components/3d/FilmGrainOverlay";
 import "./RoleGateway.css";
@@ -24,11 +25,14 @@ const cardHoverOwner = {
 };
 
 export default function RoleGateway() {
+  const { t } = useLanguage();
+
   return (
     <div className="role-gateway">
       <CyberpunkScene intensity="full" sacredGeometry="flower" />
       <FilmGrainOverlay />
       <div className="role-gateway__backdrop" />
+
       <motion.div
         className="role-gateway__panel"
         initial="hidden"
@@ -43,12 +47,11 @@ export default function RoleGateway() {
           className="role-gateway__title"
           variants={fadeInUp}
         >
-          Välj hur du vill gå in i systemet
+          {t("role.title")}
         </motion.h1>
 
         <motion.p className="role-gateway__intro" variants={fadeInUp}>
-          Player-flödet går till TokenShop, trading och portfolio. Spelägare går
-          till studio-, medlem- och plattformsdelen.
+          {t("role.intro")}
         </motion.p>
 
         <motion.div className="role-gateway__choices" variants={staggerContainer}>
@@ -60,11 +63,11 @@ export default function RoleGateway() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                Player
+                {t("role.player")}
               </motion.span>
-              <span className="role-card__headline">Handla TRI och följ portfolio</span>
+              <span className="role-card__headline">{t("role.player.headline")}</span>
               <span className="role-card__body">
-                Dashboard, trade, tax och wallet-koppling i samma frontend.
+                {t("role.player.body")}
               </span>
             </Link>
           </motion.div>
@@ -77,13 +80,13 @@ export default function RoleGateway() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
               >
-                Spelägare
+                {t("role.owner")}
               </motion.span>
               <span className="role-card__headline">
-                Logga in till studio- och kontrollpanelen
+                {t("role.owner.headline")}
               </span>
               <span className="role-card__body">
-                Studio-login, members, games, settings och owner-styrning.
+                {t("role.owner.body")}
               </span>
             </Link>
           </motion.div>

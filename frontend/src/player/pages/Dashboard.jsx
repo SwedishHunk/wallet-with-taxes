@@ -2,6 +2,7 @@ import { useApiData, triggerSync } from "../hooks/useApi";
 import StatCard from "../components/StatCard";
 import ActivityFeed from "../components/ActivityFeed";
 import ErrorBanner from "../components/ErrorBanner";
+import { fmtNum } from "../utils/formatNumber";
 import {
   Coins,
   TrendingUp,
@@ -78,29 +79,29 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="TRI Total Supply"
-          value={summary?.genTotalSupply || "0"}
+          value={fmtNum(summary?.genTotalSupply) || "0"}
           sub="Circulating tokens"
           color="cyan"
           icon={Coins}
         />
         <StatCard
           label="Total Buys"
-          value={summary?.totalBuys ?? "—"}
-          sub={`${summary?.totalGenMinted || 0} TRI minted`}
+          value={fmtNum(summary?.totalBuys) ?? "—"}
+          sub={`${fmtNum(summary?.totalGenMinted || 0)} TRI minted`}
           color="green"
           icon={TrendingUp}
         />
         <StatCard
           label="Total Sells"
-          value={summary?.totalSells ?? "—"}
-          sub={`${summary?.totalGenBurned || 0} TRI burned`}
+          value={fmtNum(summary?.totalSells) ?? "—"}
+          sub={`${fmtNum(summary?.totalGenBurned || 0)} TRI burned`}
           color="pink"
           icon={TrendingDown}
         />
         <StatCard
           label="Unique Users"
-          value={summary?.uniqueUsers ?? "—"}
-          sub={`${summary?.uniqueBuyers || 0} buyers · ${summary?.uniqueSellers || 0} sellers`}
+          value={fmtNum(summary?.uniqueUsers) ?? "—"}
+          sub={`${fmtNum(summary?.uniqueBuyers || 0)} buyers · ${fmtNum(summary?.uniqueSellers || 0)} sellers`}
           color="purple"
           icon={Users}
         />
@@ -126,7 +127,7 @@ export default function Dashboard() {
                     className="flex items-center justify-between py-2 px-3 bg-dark-700/50 rounded-lg"
                   >
                     <span className="text-sm font-medium text-gray-300">{symbol}</span>
-                    <span className="font-mono text-sm glow-text-cyan">{amount}</span>
+                    <span className="font-mono text-sm glow-text-cyan">{fmtNum(amount)}</span>
                   </div>
                 ))}
             </div>

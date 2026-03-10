@@ -9,6 +9,7 @@ import {
 } from "../../lib/platform";
 import { getStudioMembers } from "../../lib/users";
 import { useAuthState } from "../../lib/AuthContext";
+import { fmtNum } from "../../player/utils/formatNumber";
 
 interface LedgerEntry {
   id: string;
@@ -78,8 +79,6 @@ export default function WalletInfo() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Domino state
-  const [activeCard, setActiveCard] = useState<CardId | null>(null);
   const [hoveredCard, setHoveredCard] = useState<CardId | null>(null);
 
   const [depositAmount, setDepositAmount] = useState("");
@@ -181,17 +180,13 @@ export default function WalletInfo() {
     return <p className="text-amber-300/60">Select a game first</p>;
   }
 
-  // ─── Domino animation helper ──────────────────────────────────────────────
+  // ─── Hover expand helper ──────────────────────────────────────────────────
   function getCardMotion(id: CardId) {
-    const isActive  = activeCard === id;
-    const isOther   = activeCard !== null && activeCard !== id;
-    const isHovered = hoveredCard === id && activeCard === null;
-
+    const isHovered = hoveredCard === id;
     return {
-      scale:       isActive ? 1.07 : isOther ? 0.92 : isHovered ? 1.03 : 1,
-      z:           isActive ? 40 : isOther ? -20 : 0,
-      opacity:     isOther ? 0.65 : 1,
-      transition:  { type: "spring", stiffness: 260, damping: 22 },
+      scale:      isHovered ? 1.04 : 1,
+      z:          isHovered ? 20 : 0,
+      transition: { type: "spring", stiffness: 280, damping: 24 },
     };
   }
 
@@ -227,7 +222,7 @@ export default function WalletInfo() {
                 padding: "12px 14px",
               }}>
                 <p style={{ fontSize: 11, color: "#a8a29e", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</p>
-                <p style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: "monospace" }}>{value}</p>
+                <p style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: "monospace" }}>{fmtNum(value)}</p>
               </div>
             ))}
           </div>
@@ -254,28 +249,25 @@ export default function WalletInfo() {
             animate={getCardMotion(card.id)}
             onHoverStart={() => setHoveredCard(card.id)}
             onHoverEnd={() => setHoveredCard(null)}
-            onClick={() => setActiveCard(prev => prev === card.id ? null : card.id)}
             style={{
               background: "rgba(6,5,15,0.85)",
-              border: `1px solid ${activeCard === card.id ? card.accent + "55" : card.accent + "22"}`,
+              border: `1px solid ${hoveredCard === card.id ? card.accent + "55" : card.accent + "22"}`,
               borderRadius: 14,
               padding: 20,
-              cursor: "pointer",
-              boxShadow: activeCard === card.id
+              boxShadow: hoveredCard === card.id
                 ? `0 0 40px ${card.glow}, 0 8px 32px rgba(0,0,0,0.5)`
                 : `0 0 15px rgba(0,0,0,0.3)`,
               transformStyle: "preserve-3d",
-              userSelect: "none",
               display: "flex",
               flexDirection: "column",
+              transition: "border-color 0.2s, box-shadow 0.2s",
             }}
           >
             <h3 style={{ color: card.accent, fontFamily: "Orbitron,Inter,sans-serif", fontSize: 14, marginBottom: 14, letterSpacing: "0.05em", flexShrink: 0 }}>
               {card.title}
             </h3>
 
-            {/* Stop click propagation inside forms so card doesn't toggle */}
-            <div onClick={(e) => e.stopPropagation()} style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {card.id === "deposit" && (
                 <form onSubmit={handleDeposit} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
                   <div>
@@ -368,7 +360,7 @@ export default function WalletInfo() {
                       )}
                       <div style={{ color: "#57534e", fontSize: 11 }}>{new Date(entry.createdAt).toLocaleString()}</div>
                     </div>
-                    <div style={{ fontWeight: 700, color: entry.type === "deposit" ? "#4ade80" : entry.type === "withdraw" ? "#f87171" : "#818cf8", fontFamily: "monospace", fontSize: 14 }}>{entry.amount}</div>
+                    <div style={{ fontWeight: 700, color: entry.type === "deposit" ? "#4ade80" : entry.type === "withdraw" ? "#f87171" : "#818cf8", fontFamily: "monospace", fontSize: 14 }}>{fmtNum(entry.amount)}</div>
                   </div>
                 ))}
               </div>

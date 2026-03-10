@@ -2,71 +2,162 @@
    Members — Gaming Studio Theme
    ======================================== */
 
-.members-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+/* ── Form ── */
+.members-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.members-table th {
-  padding: 12px 16px;
-  text-align: left;
+.members-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.members-form-group > label {
   font-family: "Orbitron", "Inter", sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  border-bottom: 1px solid rgba(var(--primary-rgb), 0.1);
 }
 
-.members-table td {
+.members-form-group input[type="email"],
+.members-form-group input[type="password"],
+.members-form-group input[type="text"] {
+  width: 100%;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(var(--primary-rgb), 0.05);
-  color: var(--text);
-  font-size: 14px;
-  transition: background 0.2s ease;
+  background: rgba(var(--primary-rgb), 0.04);
+  border: 1px solid rgba(var(--primary-rgb), 0.12);
+  border-radius: 10px;
+  color: var(--text-bright);
+  font-size: 0.9rem;
+  font-family: "Inter", sans-serif;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
 }
 
-.members-table tr:hover td {
+.members-form-group input[type="email"]:focus,
+.members-form-group input[type="password"]:focus,
+.members-form-group input[type="text"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10),
+              0 0 12px rgba(var(--primary-rgb), 0.08);
+}
+
+.members-form-group input::placeholder {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+/* ── Permissions grid ── */
+.members-permissions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.members-permission-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
   background: rgba(var(--primary-rgb), 0.03);
+  border: 1px solid rgba(var(--primary-rgb), 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.members-table tr {
-  transition: background 0.2s ease;
+.members-permission-checkbox:hover {
+  border-color: rgba(var(--primary-rgb), 0.20);
+  background: rgba(var(--primary-rgb), 0.06);
 }
 
-/* Member row cards (if list format) */
-.member-row {
+.members-permission-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(var(--primary-rgb), 0.25);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.members-permission-checkbox input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.members-permission-checkbox input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.members-permission-checkbox label {
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Members list ── */
+.members-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.members-item {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.members-item:hover {
+  border-color: rgba(var(--primary-rgb), 0.20);
+  box-shadow: 0 0 16px rgba(var(--primary-rgb), 0.06);
+}
+
+.members-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: rgba(var(--primary-rgb), 0.02);
-  margin-bottom: 8px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-.member-row:hover {
-  border-color: rgba(var(--primary-rgb), 0.2);
-  box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.06);
-  transform: translateX(4px);
-}
-
-.member-email {
+.members-item-email {
   font-weight: 600;
+  font-size: 0.95rem;
   color: var(--text-bright);
+  margin: 0 0 6px;
 }
 
-.member-id {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.member-actions {
+.members-item-badges {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.members-item-date {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Error card ── */
+.members-error {
+  border-color: rgba(var(--error-rgb, 255,51,102), 0.30) !important;
+  background: rgba(var(--error-rgb, 255,51,102), 0.05) !important;
+  color: #ff3366;
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../lib/AuthContext";
 import { getGames, createGame } from "../lib/platform";
 import { ROUTES } from "../routes";
+import { useLanguage } from "../lib/LanguageContext";
 import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 
 interface Game {
@@ -14,6 +15,7 @@ interface Game {
 export default function Games() {
   const navigate = useNavigate();
   const { activeGame, setActiveGame } = useAuthState();
+  const { t } = useLanguage();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,21 +126,21 @@ export default function Games() {
   return (
     <Page>
       <PageHeader
-        title="Games"
-        subtitle="Välj ett game att arbeta med eller skapa ett nytt"
+        title={t("games.title")}
+        subtitle={t("games.subtitle")}
       />
 
       {activeGame && (
         <Card>
           <div style={{ marginBottom: "1rem" }}>
-            <strong>Aktivt game:</strong> {activeGame.name}{" "}
+            <strong>{t("games.activeGame")}:</strong> {activeGame.name}{" "}
             <Badge variant="permission">{activeGame.slug}</Badge>
           </div>
           <Button
             variant="secondary"
             onClick={() => setActiveGame(null)}
             style={{ marginRight: "0.5rem" }}>
-            Rensa aktivt game
+            Clear active game
           </Button>
         </Card>
       )}
@@ -151,17 +153,17 @@ export default function Games() {
 
       {loading ? (
         <Card>
-          <p>Laddar games...</p>
+          <p>Loading games...</p>
         </Card>
       ) : (
         <>
           {games.length === 0 ? (
             <Card>
-              <p>Inga games hittades. Skapa ditt första game nedan.</p>
+              <p>No games found. Create your first game below.</p>
             </Card>
           ) : (
             <Card>
-              <h3 style={{ marginTop: 0 }}>Tillgängliga games</h3>
+              <h3 style={{ marginTop: 0 }}>Available games</h3>
               <div
                 style={{
                   display: "flex",
@@ -193,7 +195,7 @@ export default function Games() {
                       onClick={() => handleSetActive(game)}
                       disabled={activeGame?.gameId === game.gameId}>
                       {activeGame?.gameId === game.gameId
-                        ? "Aktivt"
+                        ? "Active"
                         : "Set active"}
                     </Button>
                   </div>
@@ -205,11 +207,11 @@ export default function Games() {
           <Card>
             {!showCreateForm ? (
               <Button onClick={() => setShowCreateForm(true)}>
-                + Skapa nytt game
+                + Create new game
               </Button>
             ) : (
               <form onSubmit={handleCreateGame}>
-                <h3 style={{ marginTop: 0 }}>Skapa nytt game</h3>
+                <h3 style={{ marginTop: 0 }}>Create new game</h3>
                 <div style={{ marginBottom: "1rem" }}>
                   <label
                     htmlFor="gameName"
@@ -236,14 +238,14 @@ export default function Games() {
                   <label
                     htmlFor="gameSlug"
                     style={{ display: "block", marginBottom: "0.25rem" }}>
-                    Slug (frivillig):
+                    Slug (optional):
                   </label>
                   <input
                     id="gameSlug"
                     type="text"
                     value={newGameSlug}
                     onChange={(e) => setNewGameSlug(e.target.value)}
-                    placeholder="Lämna tomt för auto-generering"
+                    placeholder="Leave blank for auto-generation"
                     style={{
                       width: "100%",
                       padding: "0.5rem",
@@ -259,14 +261,14 @@ export default function Games() {
                         fontSize: "0.875rem",
                         color: "#666",
                       }}>
-                      Auto-genererad slug:{" "}
+                      Auto-generated slug:{" "}
                       <strong>{generateSlug(newGameName)}</strong>
                     </div>
                   )}
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <Button type="submit" disabled={creating}>
-                    {creating ? "Skapar..." : "Skapa"}
+                    {creating ? "Creating..." : "Create"}
                   </Button>
                   <Button
                     type="button"
@@ -277,7 +279,7 @@ export default function Games() {
                       setNewGameSlug("");
                       setError(null);
                     }}>
-                    Avbryt
+                    Cancel
                   </Button>
                 </div>
               </form>

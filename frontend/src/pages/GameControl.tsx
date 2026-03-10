@@ -12,6 +12,15 @@ import { ROUTES } from "../routes";
 import "../style/Bright.css";
 import PersonalAccountHeader from "../components/PersonalAccountHeader";
 
+function fmtNum(value: string | number, decimals = 2) {
+  const n = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(n)) return String(value);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  }).format(n);
+}
+
 interface Game {
   id: string;
   name: string;
@@ -202,20 +211,20 @@ export function GameControl() {
           <h3 className="bright-section-title">Wallet Balance</h3>
           <div style={{ marginBottom: "16px" }}>
             <div className="bright-text-large">
-              {wallet ? parseFloat(wallet.balance).toFixed(2) : "0.00"} Credits
+              {wallet ? fmtNum(wallet.balance) : "0.00"} Credits
             </div>
           </div>
           <div style={{ display: "grid", gap: "8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span className="bright-text-secondary">Total Deposited:</span>
               <strong>
-                {wallet ? parseFloat(wallet.totalDeposited).toFixed(2) : "0.00"}
+                {wallet ? fmtNum(wallet.totalDeposited) : "0.00"}
               </strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span className="bright-text-secondary">Total Withdrawn:</span>
               <strong>
-                {wallet ? parseFloat(wallet.totalWithdrawn).toFixed(2) : "0.00"}
+                {wallet ? fmtNum(wallet.totalWithdrawn) : "0.00"}
               </strong>
             </div>
           </div>

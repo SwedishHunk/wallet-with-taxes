@@ -26,12 +26,14 @@ function AdminAction({ title, icon: Icon, children, color = "purple" }) {
     cyan: "border-neon-cyan/20",
   };
   return (
-    <div className={`card border ${borderMap[color]}`}>
+    <div className={`card border ${borderMap[color]}`} style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="flex items-center gap-2 mb-4">
         <Icon size={16} className="text-gray-400" />
         <h3 className="text-sm font-bold text-gray-200">{title}</h3>
       </div>
-      {children}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "8px" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -192,8 +194,9 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Admin Actions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Admin Actions — organized layout */}
+      {/* Row 1: Quick actions (Pause + Fee) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Pause / Unpause */}
         <AdminAction title="Pause Control" icon={Pause} color="pink">
           <div className="flex gap-2">
@@ -255,7 +258,10 @@ export default function Admin() {
           )}
           <TxResult status={feeStatus} message={feeMsg} />
         </AdminAction>
+      </div>
 
+      {/* Row 2: Rates, Limits & Withdraw — 3-column row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         {/* Rates */}
         <AdminAction title="Set Rates" icon={TrendingUp} color="green">
           <div className="space-y-2">
@@ -270,14 +276,14 @@ export default function Admin() {
               type="number"
               value={buyRate}
               onChange={(e) => setBuyRate(e.target.value)}
-              placeholder="Buy rate (TRI per 1 unit, e.g. 1000)"
+              placeholder="Buy rate (TRI per 1 unit)"
               className="input-field"
             />
             <input
               type="number"
               value={sellRate}
               onChange={(e) => setSellRate(e.target.value)}
-              placeholder="Sell rate (TRI per 1 unit, e.g. 1000)"
+              placeholder="Sell rate (TRI per 1 unit)"
               className="input-field"
             />
             <button

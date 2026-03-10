@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAuthState } from "../lib/AuthContext";
 import { useLogout, useCanManageMembers } from "../lib/useAuth";
+import { useLanguage } from "../lib/LanguageContext";
 import { ROUTES } from "../routes";
 import { APP_NAME, APP_SHORT_NAME, APP_YEAR } from "../config/app";
 import CyberpunkScene from "./3d/SafeCyberpunkScene";
@@ -76,6 +77,7 @@ function Header() {
   const { authContext, isLoading, membersCount } = useAuthState();
   const { logoutStudio, logoutMember } = useLogout();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return <header className="app-header"><div className="header-container" /></header>;
@@ -105,10 +107,10 @@ function Header() {
           {authContext.state === "Unauthenticated" && (
             <>
               <Link to={ROUTES.login} className="btn btn-primary">
-                <LogIn size={15} /> Login
+                <LogIn size={15} /> {t("common.login")}
               </Link>
               <Link to={ROUTES.createStudio} className="btn btn-secondary">
-                <UserPlus size={15} /> Sign Up
+                <UserPlus size={15} /> {t("common.signup")}
               </Link>
             </>
           )}
@@ -120,7 +122,7 @@ function Header() {
                 <span className="status-badge">Studio Only</span>
               </div>
               <button className="btn btn-outline" onClick={() => navigate(ROUTES.memberLogin)}>
-                <UserCheck size={15} /> Select Member
+                <UserCheck size={15} /> {t("nav.selectMember")}
               </button>
               <button className="btn-ghost-danger" onClick={logoutStudio} title="Logout">
                 <LogOut size={16} />
@@ -158,6 +160,7 @@ function Header() {
 function AdminLinks() {
   const { authContext } = useAuthState();
   const canManageMembers = useCanManageMembers();
+  const { t } = useLanguage();
   const hasManageGames   = authContext.memberSession?.permissions.includes("ManageGames")   ?? false;
   const hasManageSettings = authContext.memberSession?.permissions.includes("ManageSettings") ?? false;
 
@@ -168,21 +171,21 @@ function AdminLinks() {
     <div className="admin-links">
       {canManageMembers && (
         <NavLink to={ROUTES.members} className={linkClass}>
-          <Users size={15} /> Members
+          <Users size={15} /> {t("nav.members")}
         </NavLink>
       )}
       {hasManageGames && (
         <NavLink to={ROUTES.games} className={linkClass}>
-          <Gamepad2 size={15} /> Games
+          <Gamepad2 size={15} /> {t("nav.games")}
         </NavLink>
       )}
       {hasManageSettings && (
         <NavLink to={ROUTES.settings} className={linkClass}>
-          <SlidersHorizontal size={15} /> Settings
+          <SlidersHorizontal size={15} /> {t("nav.settings")}
         </NavLink>
       )}
       <NavLink to={ROUTES.dashboard} className={linkClass}>
-        <LayoutDashboard size={15} /> Dashboard
+        <LayoutDashboard size={15} /> {t("nav.dashboard")}
       </NavLink>
     </div>
   );

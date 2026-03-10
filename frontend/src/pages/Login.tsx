@@ -7,6 +7,7 @@ import { login, getStudios } from "../lib/users";
 import { setAuthToken } from "../lib/api";
 import { useAuthState } from "../lib/AuthContext";
 import { useLoginStudio } from "../lib/useAuth";
+import { useLanguage } from "../lib/LanguageContext";
 import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
 import FilmGrainOverlay from "../components/3d/FilmGrainOverlay";
 import "../style/Login.css";
@@ -18,6 +19,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { authContext } = useAuthState();
   const { loginStudio } = useLoginStudio();
+  const { t } = useLanguage();
 
   const [studioEmail, setStudioEmail] = useState("");
   const [studioPassword, setStudioPassword] = useState("");
@@ -91,7 +93,7 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            Studio login
+            {t("login.title")}
           </motion.h1>
 
           {studioError && (
@@ -107,7 +109,7 @@ export default function Login() {
                 type="button"
                 className="login-alert-close"
                 onClick={() => setStudioError(null)}>
-                Stäng
+                {t("login.close")}
               </button>
             </motion.div>
           )}
@@ -148,7 +150,7 @@ export default function Login() {
                 whileTap={studioLoading ? {} : { scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                {studioLoading ? "Signing in..." : "Sign in to studio"}
+                {studioLoading ? t("login.loggingIn") : t("login.submit")}
               </motion.button>
             </motion.form>
           ) : (
@@ -158,7 +160,7 @@ export default function Login() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              Studio-session redan aktiv. Fortsätt till member-login.
+              Studio session already active. Continue to member login.
               <motion.button
                 type="button"
                 className="login-button"
@@ -168,7 +170,7 @@ export default function Login() {
                 whileTap={{ scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                Logga in som medlem
+                {t("member.loginBtn")}
               </motion.button>
             </motion.div>
           )}
@@ -180,11 +182,11 @@ export default function Login() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.4 }}
             >
-              Har du ingen studio?{" "}
+              {t("login.noAccount")}{" "}
               <span
                 className="signup-link"
                 onClick={() => navigate(ROUTES.createStudio)}>
-                Skapa studio
+                {t("login.createStudio")}
               </span>
             </motion.p>
           )}

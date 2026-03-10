@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
+import { useLanguage } from "../lib/LanguageContext";
 import { api } from "../lib/api";
 import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 import "../style/Members.css";
@@ -17,6 +18,7 @@ interface Member {
 
 export default function Members() {
   const { currentStudio, currentMember, isAuthenticated, studioSession } = useAuth();
+  const { t } = useLanguage();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -134,16 +136,16 @@ export default function Members() {
   return (
     <Page>
       <PageHeader
-        title="Hantera medlemmar"
+        title={t("members.manage")}
         subtitle={`Studio: ${currentStudio?.studioName}`}
       >
         {!showForm ? (
           <Button variant="primary" onClick={() => setShowForm(true)}>
-            + Lägg till medlem
+            {t("members.addMember")}
           </Button>
         ) : (
           <Button variant="secondary" onClick={() => setShowForm(false)}>
-            Avbryt
+            {t("common.cancel")}
           </Button>
         )}
       </PageHeader>
@@ -156,7 +158,7 @@ export default function Members() {
 
       {showForm && (
         <Card>
-          <h3>Skapa ny medlem</h3>
+          <h3>{t("members.createNew")}</h3>
           <form onSubmit={handleSubmit} className="members-form">
             <div className="members-form-group">
               <label>Email</label>
@@ -166,25 +168,25 @@ export default function Members() {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="medlem@example.com"
+                placeholder="member@example.com"
                 required
               />
             </div>
 
             <div className="members-form-group">
-              <label>Lösenord (frivilligt, genereras om tomlt)</label>
+              <label>Password (optional, auto-generated if blank)</label>
               <input
                 type="password"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                placeholder="Lämna tomt för slumpmässigt lösenord"
+                placeholder="Leave blank for a random password"
               />
             </div>
 
             <div className="members-form-group">
-              <label>Behörigheter</label>
+              <label>{t("members.permissions")}</label>
               <div className="members-permissions-grid">
                 {Object.entries(formData.permissions).map(([perm, checked]) => (
                   <div key={perm} className="members-permission-checkbox">
@@ -209,16 +211,16 @@ export default function Members() {
             </div>
 
             <Button type="submit" variant="primary">
-              Skapa medlem
+              {t("members.createBtn")}
             </Button>
           </form>
         </Card>
       )}
 
       {loading ? (
-        <Card>Laddar medlemmar...</Card>
+        <Card>Loading members...</Card>
       ) : members.length === 0 ? (
-        <Card>Ingen medlemmar ännu</Card>
+        <Card>{t("members.noMembers")}</Card>
       ) : (
         <div className="members-list-container">
           {members.map((member) => (
@@ -228,7 +230,7 @@ export default function Members() {
                   <p className="members-item-email">{member.email}</p>
                   <div className="members-item-badges">
                     {member.isOwner && (
-                      <Badge variant="owner">Ägare</Badge>
+                      <Badge variant="owner">Owner</Badge>
                     )}
                     {!member.isOwner && member.permissions.length > 0 && (
                       member.permissions.map((p) => (
@@ -238,12 +240,12 @@ export default function Members() {
                       ))
                     )}
                     {!member.isOwner && member.permissions.length === 0 && (
-                      <Badge>Läsåtkomst</Badge>
+                      <Badge>{t("members.readOnly")}</Badge>
                     )}
                   </div>
                 </div>
                 <small className="members-item-date">
-                  {new Date(member.createdAt).toLocaleDateString("sv-SE")}
+                  {new Date(member.createdAt).toLocaleDateString("en-US")}
                 </small>
               </div>
             </Card>

@@ -9,6 +9,8 @@ import {
 import { useEffect } from "react";
 import { setAuthToken } from "./lib/api";
 import { AuthProvider } from "./lib/AuthContext";
+import { LanguageProvider } from "./lib/LanguageContext";
+import LanguageToggle from "./components/LanguageToggle";
 import { useDocumentTitle } from "./lib/useDocumentTitle";
 import { APP_NAME } from "./config/app";
 import {
@@ -40,13 +42,13 @@ import "./index.css";
 function NotFound() {
   return (
     <Page>
-      <PageHeader title="404 - Rutt inte hittad" />
+      <PageHeader title="404 - Page not found" />
       <Card>
-        <p>Aktuell URL: {window.location.pathname}</p>
+        <p>Current URL: {window.location.pathname}</p>
         <a
           href={ROUTES.login}
           style={{ color: "var(--primary)", textDecoration: "underline" }}>
-          Gå till inloggning
+          Go to login
         </a>
       </Card>
     </Page>
@@ -190,9 +192,12 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <LanguageProvider>
+        <LanguageToggle />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }
