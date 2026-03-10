@@ -37,6 +37,18 @@ function formatDisplayNumber(value) {
     : value.toFixed(4);
 }
 
+function formatCurrency(value, currency) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("sv-SE", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function timeAgo(timestamp) {
   const diff = Date.now() - new Date(timestamp).getTime();
   const mins = Math.floor(diff / 60000);
@@ -250,18 +262,46 @@ export default function Portfolio() {
   const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
   const triBalance = balance?.genBalance ? Number(balance.genBalance) : 0;
   const currentTriPriceEth = getCurrentTriPriceEth(config);
+  const ethUsd = Number(config?.valuation?.ethUsd);
+  const usdSek = Number(config?.valuation?.usdSek);
+  const currentTriPriceUsd =
+    currentTriPriceEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? currentTriPriceEth * ethUsd
+      : null;
+  const currentTriPriceSek =
+    currentTriPriceUsd !== null && Number.isFinite(usdSek) && usdSek > 0
+      ? currentTriPriceUsd * usdSek
+      : null;
   const estimatedCurrentValueEth =
     currentTriPriceEth !== null ? triBalance * currentTriPriceEth : null;
+  const estimatedCurrentValueUsd =
+    estimatedCurrentValueEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? estimatedCurrentValueEth * ethUsd
+      : null;
+  const estimatedCurrentValueSek =
+    estimatedCurrentValueUsd !== null && Number.isFinite(usdSek) && usdSek > 0
+      ? estimatedCurrentValueUsd * usdSek
+      : null;
   const ethPosition = positions.find((position) => position.symbol === "ETH");
   const averageEntryPriceEth = ethPosition ? getAverageBuyPriceValue(ethPosition) : null;
   const estimatedCostBasisEth =
     averageEntryPriceEth !== null ? triBalance * averageEntryPriceEth : null;
+  const estimatedCostBasisUsd =
+    estimatedCostBasisEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
+      ? estimatedCostBasisEth * ethUsd
+      : null;
   const unrealizedPnlEth =
     estimatedCurrentValueEth !== null && estimatedCostBasisEth !== null
       ? estimatedCurrentValueEth - estimatedCostBasisEth
       : null;
+  const unrealizedPnlUsd =
+    estimatedCurrentValueUsd !== null && estimatedCostBasisUsd !== null
+      ? estimatedCurrentValueUsd - estimatedCostBasisUsd
+      : null;
   const pnlStatus = getPnlStatus(unrealizedPnlEth);
   const usesOnlyEthHistory = positions.every((position) => position.symbol === "ETH");
+  const hasFiatValuation = Number.isFinite(ethUsd) && ethUsd > 0;
+  const hasSekValuation = hasFiatValuation && Number.isFinite(usdSek) && usdSek > 0;
 
   return (
     <div>
@@ -331,7 +371,7 @@ export default function Portfolio() {
           Performance Snapshot
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          Simple ETH-based view using the current TokenShop rate and your historical ETH entries.
+          ETH-based valuation with optional USD/SEK snapshots from backend config.
         </p>
       </div>
 
@@ -344,6 +384,13 @@ export default function Portfolio() {
               : "—"
           }
           sub="Based on current TokenShop ETH sell rate"
+          meta={
+            hasFiatValuation
+              ? `${formatCurrency(currentTriPriceUsd, "USD")}${
+                  hasSekValuation ? ` • ${formatCurrency(currentTriPriceSek, "SEK")}` : ""
+                }`
+              : "Add TOKENSHOP_ETH_USD to enable fiat view"
+          }
           color="purple"
           icon={Activity}
         />
@@ -371,6 +418,13 @@ export default function Portfolio() {
               : "—"
           }
           sub="Current TRI balance marked to shop rate"
+          meta={
+            hasFiatValuation
+              ? `${formatCurrency(estimatedCurrentValueUsd, "USD")}${
+                  hasSekValuation ? ` • ${formatCurrency(estimatedCurrentValueSek, "SEK")}` : ""
+                }`
+              : "Fiat estimate unavailable"
+          }
           color="green"
           icon={Coins}
         />
@@ -384,7 +438,11 @@ export default function Portfolio() {
               : "—"
           }
           sub={pnlStatus}
-          meta="Estimate against ETH cost basis"
+          meta={
+            hasFiatValuation
+              ? `${formatCurrency(unrealizedPnlUsd, "USD")} vs ETH cost basis`
+              : "Estimate against ETH cost basis"
+          }
           color={unrealizedPnlEth !== null && unrealizedPnlEth < 0 ? "pink" : "green"}
           icon={Landmark}
         />
