@@ -261,6 +261,10 @@ export default function Portfolio() {
   const totalBuys = positions.reduce((sum, position) => sum + position.buys, 0);
   const totalSells = positions.reduce((sum, position) => sum + position.sells, 0);
   const triBalance = balance?.genBalance ? Number(balance.genBalance) : 0;
+  const trackedTriPosition = positions.reduce(
+    (sum, position) => sum + Number(position.netGen || 0),
+    0
+  );
   const currentTriPriceEth = getCurrentTriPriceEth(config);
   const ethUsd = Number(config?.valuation?.ethUsd);
   const usdSek = Number(config?.valuation?.usdSek);
@@ -272,8 +276,10 @@ export default function Portfolio() {
     currentTriPriceUsd !== null && Number.isFinite(usdSek) && usdSek > 0
       ? currentTriPriceUsd * usdSek
       : null;
-  const estimatedCurrentValueEth =
+  const walletMarkedValueEth =
     currentTriPriceEth !== null ? triBalance * currentTriPriceEth : null;
+  const estimatedCurrentValueEth =
+    currentTriPriceEth !== null ? trackedTriPosition * currentTriPriceEth : null;
   const estimatedCurrentValueUsd =
     estimatedCurrentValueEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
       ? estimatedCurrentValueEth * ethUsd
@@ -285,7 +291,7 @@ export default function Portfolio() {
   const ethPosition = positions.find((position) => position.symbol === "ETH");
   const averageEntryPriceEth = ethPosition ? getAverageBuyPriceValue(ethPosition) : null;
   const estimatedCostBasisEth =
-    averageEntryPriceEth !== null ? triBalance * averageEntryPriceEth : null;
+    averageEntryPriceEth !== null ? trackedTriPosition * averageEntryPriceEth : null;
   const estimatedCostBasisUsd =
     estimatedCostBasisEth !== null && Number.isFinite(ethUsd) && ethUsd > 0
       ? estimatedCostBasisEth * ethUsd
@@ -350,18 +356,21 @@ export default function Portfolio() {
           label="TRI Balance"
           value={balance?.genBalance || "0"}
           sub="Current wallet holdings"
+          meta="Full wallet balance, regardless of source"
           color="cyan"
           icon={Coins}
         />
         <StatCard
-          label="Total Buys"
-          value={totalBuys}
+          label="Tracked TRI Position"
+          value={formatDisplayNumber(trackedTriPosition)}
+          sub="Net TRI from TokenShop history"
           color="green"
-          icon={ArrowDownLeft}
+          icon={Activity}
         />
         <StatCard
-          label="Total Sells"
-          value={totalSells}
+          label="Total Buys / Sells"
+          value={`${totalBuys} / ${totalSells}`}
+          sub="Tracked TokenShop trade count"
           color="pink"
           icon={ArrowUpRight}
         />
@@ -372,7 +381,7 @@ export default function Portfolio() {
           Performance Snapshot
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          ETH-based valuation with optional USD/SEK snapshots from backend config.
+          ETH-based valuation for the tracked TokenShop position, with optional USD/SEK snapshots from backend config.
         </p>
         <p className="text-[11px] text-gray-500 mt-2">
           {hasFiatValuation
@@ -429,7 +438,7 @@ export default function Portfolio() {
               ? `${formatDisplayNumber(estimatedCurrentValueEth)} ETH`
               : "—"
           }
-          sub="Current TRI balance marked to shop rate"
+          sub="Tracked TokenShop TRI marked to shop rate"
           meta={
             hasFiatValuation
               ? `${formatCurrency(estimatedCurrentValueUsd, "USD")}${
@@ -458,6 +467,37 @@ export default function Portfolio() {
           color={unrealizedPnlEth !== null && unrealizedPnlEth < 0 ? "pink" : "green"}
           icon={Landmark}
         />
+      </div>
+
+      <div className="card mb-8">
+        <p className="label mb-1">Wallet vs Tracked Position</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Wallet balance can include TRI from minting, transfers, or sources outside TokenShop. Performance metrics above only use tracked TokenShop activity.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-3 bg-dark-700/50 rounded-lg">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Wallet TRI</p>
+            <p className="text-lg font-mono text-gray-100 mt-1">
+              {formatDisplayNumber(triBalance)} TRI
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {walletMarkedValueEth !== null
+                ? `${formatDisplayNumber(walletMarkedValueEth)} ETH at current shop rate`
+                : "Current ETH mark unavailable"}
+            </p>
+          </div>
+          <div className="p-3 bg-dark-700/50 rounded-lg">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+              Tracked TokenShop TRI
+            </p>
+            <p className="text-lg font-mono text-gray-100 mt-1">
+              {formatDisplayNumber(trackedTriPosition)} TRI
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Used for value and PnL above to avoid mixing in unrelated wallet TRI.
+            </p>
+          </div>
+        </div>
       </div>
 
       {(compatibleBalances.length > 0 || supportedAssets?.length > 0) && (
