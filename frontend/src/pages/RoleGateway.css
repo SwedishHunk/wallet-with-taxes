@@ -1,22 +1,57 @@
+/* ========================================
+   RoleGateway — Gaming Studio Landing
+   ======================================== */
+
 .role-gateway {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(28, 225, 197, 0.22), transparent 28%),
-    radial-gradient(circle at 80% 20%, rgba(255, 123, 92, 0.22), transparent 24%),
-    linear-gradient(135deg, #0b1221 0%, #131d34 48%, #1c2945 100%);
-  color: #f5f7fb;
+    radial-gradient(ellipse at 15% 10%, rgba(0, 212, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 85% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 35%),
+    radial-gradient(ellipse at 50% 90%, rgba(0, 255, 136, 0.04) 0%, transparent 40%),
+    linear-gradient(160deg, #030508 0%, #080c18 35%, #0a1020 65%, #060a14 100%);
+  color: #f0f3fb;
 }
 
+/* Animated grid backdrop */
 .role-gateway__backdrop {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.92), transparent);
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 70%);
+  animation: fadeIn 1.5s ease both;
+}
+
+/* Floating orbs */
+.role-gateway__backdrop::before,
+.role-gateway__backdrop::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: float 6s ease-in-out infinite;
+}
+
+.role-gateway__backdrop::before {
+  width: 300px;
+  height: 300px;
+  top: 10%;
+  left: 5%;
+  background: rgba(0, 212, 255, 0.06);
+  animation-delay: 0s;
+}
+
+.role-gateway__backdrop::after {
+  width: 250px;
+  height: 250px;
+  bottom: 15%;
+  right: 10%;
+  background: rgba(168, 85, 247, 0.06);
+  animation-delay: -3s;
 }
 
 .role-gateway__panel {
@@ -25,103 +60,179 @@
   max-width: 1120px;
   margin: 0 auto;
   padding: 96px 24px;
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .role-gateway__eyebrow {
   display: inline-flex;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(0, 212, 255, 0.2);
   border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  padding: 8px 18px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #a9bad9;
-  background: rgba(10, 14, 24, 0.3);
+  color: var(--primary);
+  background: rgba(0, 212, 255, 0.06);
+  font-weight: 600;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 
 .role-gateway__title {
-  max-width: 720px;
-  margin: 18px 0 14px;
-  font-size: clamp(2.6rem, 5vw, 5.4rem);
-  line-height: 0.96;
-  letter-spacing: -0.04em;
+  max-width: 780px;
+  margin: 22px 0 18px;
+  font-family: "Orbitron", "Inter", sans-serif;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, var(--primary) 60%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
 }
 
 .role-gateway__intro {
-  max-width: 720px;
-  margin: 0 0 42px;
-  font-size: 1.04rem;
-  line-height: 1.7;
-  color: #b8c4db;
+  max-width: 620px;
+  margin: 0 0 48px;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: var(--muted);
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
 
 .role-gateway__choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
+  gap: 24px;
 }
 
+/* ===== Role Cards — Glassmorphism + Neon ===== */
 .role-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-height: 280px;
-  padding: 28px;
-  border-radius: 28px;
+  padding: 32px;
+  border-radius: var(--radius-xl);
   text-decoration: none;
   color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(100, 140, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
   transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+/* Top edge glow line */
+.role-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
 .role-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px) scale(1.01);
+  text-decoration: none;
 }
 
+.role-card:hover::before {
+  opacity: 1;
+}
+
+/* Player card — Cyan neon */
 .role-card--player {
-  background: linear-gradient(160deg, rgba(8, 18, 32, 0.9), rgba(5, 53, 73, 0.72));
+  background: linear-gradient(
+    160deg,
+    rgba(5, 15, 30, 0.9) 0%,
+    rgba(0, 40, 60, 0.6) 100%
+  );
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(0, 212, 255, 0.05);
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.role-card--player::before {
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
 }
 
 .role-card--player:hover {
-  border-color: rgba(28, 225, 197, 0.45);
-  box-shadow: 0 28px 88px rgba(10, 188, 164, 0.18);
+  border-color: rgba(0, 212, 255, 0.35);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(0, 212, 255, 0.08),
+    inset 0 1px 0 rgba(0, 212, 255, 0.1);
 }
 
+/* Owner card — Purple neon */
 .role-card--owner {
-  background: linear-gradient(160deg, rgba(31, 18, 16, 0.86), rgba(92, 42, 18, 0.72));
+  background: linear-gradient(
+    160deg,
+    rgba(15, 8, 30, 0.9) 0%,
+    rgba(50, 20, 60, 0.6) 100%
+  );
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(168, 85, 247, 0.05);
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+.role-card--owner::before {
+  background: linear-gradient(90deg, transparent, var(--secondary), transparent);
 }
 
 .role-card--owner:hover {
-  border-color: rgba(255, 123, 92, 0.45);
-  box-shadow: 0 28px 88px rgba(255, 123, 92, 0.18);
+  border-color: rgba(168, 85, 247, 0.35);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(168, 85, 247, 0.08),
+    inset 0 1px 0 rgba(168, 85, 247, 0.1);
 }
 
 .role-card__label {
-  font-size: 0.78rem;
-  letter-spacing: 0.16em;
+  font-family: "Orbitron", "Inter", sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #9bb0d2;
+  font-weight: 600;
+}
+
+.role-card--player .role-card__label {
+  color: var(--primary);
+}
+
+.role-card--owner .role-card__label {
+  color: var(--secondary);
 }
 
 .role-card__headline {
-  font-size: 1.9rem;
-  line-height: 1.06;
+  font-size: 1.75rem;
+  line-height: 1.1;
   font-weight: 700;
+  color: var(--text-bright);
 }
 
 .role-card__body {
   max-width: 34ch;
-  color: #b3bfd7;
+  color: var(--muted);
   line-height: 1.65;
+  font-size: 0.95rem;
 }
 
+/* ===== Responsive ===== */
 @media (max-width: 800px) {
   .role-gateway__panel {
-    padding: 72px 20px;
+    padding: 64px 20px;
   }
 
   .role-gateway__choices {

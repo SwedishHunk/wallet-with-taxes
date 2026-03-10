@@ -13,7 +13,7 @@ import {
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
-  const { data: summary, loading: summaryLoading, error: summaryError, refresh: refreshSummary } = useApiData("/analytics/summary");
+  const { data: summary, error: summaryError, refresh: refreshSummary } = useApiData("/analytics/summary");
   const { data: activity, loading: activityLoading, error: activityError, refresh: refreshActivity } = useApiData("/analytics/activity?limit=10");
   const { data: liquidity, loading: liqLoading, error: liqError, refresh: refreshLiq } = useApiData("/shop/liquidity");
   const { data: config, loading: configLoading, error: configError } = useApiData("/shop/config");

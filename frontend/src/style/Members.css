@@ -1,104 +1,72 @@
-/* Layout & spacing (tokens-based colors applied via components) */
+/* ========================================
+   Members — Gaming Studio Theme
+   ======================================== */
 
-.members-error {
-  border-left: 4px solid var(--danger);
+.members-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
-.members-error p {
-  color: var(--danger);
-  margin: 0;
+.members-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: "Orbitron", "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(var(--primary-rgb), 0.1);
 }
 
-.members-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.members-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.members-form-group label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.members-form-group input {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+.members-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(var(--primary-rgb), 0.05);
   color: var(--text);
   font-size: 14px;
+  transition: background 0.2s ease;
 }
 
-.members-form-group input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+.members-table tr:hover td {
+  background: rgba(var(--primary-rgb), 0.03);
 }
 
-.members-permissions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+.members-table tr {
+  transition: background 0.2s ease;
 }
 
-.members-permission-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.members-permission-checkbox input {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.members-permission-checkbox label {
-  cursor: pointer;
-  font-weight: 500;
-  margin: 0;
-}
-
-.members-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.members-item {
-  cursor: default;
-}
-
-.members-item-header {
+/* Member row cards (if list format) */
+.member-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(var(--primary-rgb), 0.02);
+  margin-bottom: 8px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
-.members-item-email {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+.member-row:hover {
+  border-color: rgba(var(--primary-rgb), 0.2);
+  box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.06);
+  transform: translateX(4px);
+}
+
+.member-email {
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-bright);
 }
 
-.members-item-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.members-item-date {
+.member-id {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
   color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-  padding-top: 2px;
+}
+
+.member-actions {
+  display: flex;
+  gap: 8px;
 }
