@@ -16,5 +16,6 @@ import { PlatformModule } from "../platform/platform.module";
   ],
   providers: [UsersService],
   controllers: [UsersController],
+  exports: [UsersService],
 })
 export class UsersModule {}

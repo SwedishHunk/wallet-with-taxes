@@ -1,7 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeInUp, scalePop } from "../lib/motionPresets";
 import { useLanguage } from "../lib/LanguageContext";
+import { setAuthToken } from "../lib/api";
+import { useAuthState } from "../lib/AuthContext";
+import { devBootstrap } from "../lib/users";
 import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
 import FilmGrainOverlay from "../components/3d/FilmGrainOverlay";
 import "./RoleGateway.css";
@@ -26,6 +30,33 @@ const cardHoverOwner = {
 
 export default function RoleGateway() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { setStudioSession, setMemberSession, setActiveGame } = useAuthState();
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
+  const handleDevQuickstart = async () => {
+    try {
+      setBootstrapping(true);
+      setBootstrapError(null);
+
+      const { data } = await devBootstrap();
+      localStorage.setItem("token", data.token);
+      setAuthToken(data.token);
+      setStudioSession(data.studio);
+      setMemberSession(data.member);
+      setActiveGame(data.game);
+      navigate(data.routes.trade);
+    } catch (error: any) {
+      setBootstrapError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Dev bootstrap failed",
+      );
+    } finally {
+      setBootstrapping(false);
+    }
+  };
 
   return (
     <div className="role-gateway">
@@ -91,6 +122,59 @@ export default function RoleGateway() {
             </Link>
           </motion.div>
         </motion.div>
+
+        {import.meta.env.DEV && (
+          <motion.div
+            variants={fadeInUp}
+            style={{
+              marginTop: "1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.75rem",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleDevQuickstart}
+              disabled={bootstrapping}
+              style={{
+                border: "1px solid rgba(0, 212, 255, 0.35)",
+                background: "rgba(6, 14, 32, 0.8)",
+                color: "#8be9fd",
+                padding: "0.9rem 1.2rem",
+                borderRadius: "999px",
+                cursor: bootstrapping ? "wait" : "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {bootstrapping ? "Bootstrapping dev session..." : "Dev Quickstart"}
+            </button>
+            <div
+              style={{
+                color: "rgba(255,255,255,0.68)",
+                fontSize: "0.95rem",
+                textAlign: "center",
+                maxWidth: "42rem",
+              }}
+            >
+              Creates or reuses a dev studio, owner account, member session, test game,
+              sets active game, and opens game-scoped trade directly.
+            </div>
+            {bootstrapError && (
+              <div
+                style={{
+                  color: "#ff7aa2",
+                  fontSize: "0.95rem",
+                  textAlign: "center",
+                  maxWidth: "42rem",
+                }}
+              >
+                {bootstrapError}
+              </div>
+            )}
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );

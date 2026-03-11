@@ -22,3 +22,18 @@ export const linkWallet = (email: string, walletAddress: string) =>
   api.post("/users/link-wallet", { email, walletAddress });
 
 export const getMe = () => api.get<User>("/users/me");
+
+export const devBootstrap = (payload?: {
+  email?: string;
+  password?: string;
+  studioName?: string;
+  gameName?: string;
+  gameSlug?: string;
+}) =>
+  api.post("/admin/dev/bootstrap", payload ?? {}, {
+    headers: import.meta.env.VITE_DEV_BOOTSTRAP_KEY
+      ? {
+          "x-dev-bootstrap-key": import.meta.env.VITE_DEV_BOOTSTRAP_KEY,
+        }
+      : undefined,
+  });
