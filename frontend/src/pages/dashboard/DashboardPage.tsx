@@ -61,15 +61,6 @@ export default function DashboardPage() {
 
       {member && (
         <Card>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold">{activeGame.name}</h3>
-            <p className="text-sm text-gray-500">
-              Active game for current studio monitoring
-            </p>
-            <p className="text-xs text-gray-500 font-mono mt-1">
-              Game ID: {activeGame.gameId}
-            </p>
-          </div>
           <div className="dashboard-member-section">
             <div className="dashboard-member-info">
               <h3>{member.email}</h3>

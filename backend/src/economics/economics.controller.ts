@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -35,6 +36,8 @@ type LogPlayerEventBody = {
 
 @Controller()
 export class EconomicsController {
+  private readonly logger = new Logger(EconomicsController.name);
+
   constructor(
     private readonly economicsService: EconomicsService,
     private readonly playerEconomicsService: PlayerEconomicsService,
@@ -51,6 +54,9 @@ export class EconomicsController {
       );
     }
 
+    this.logger.log(
+      `Resolving player session for game=${gameId} wallet=${walletAddress.toLowerCase()}`,
+    );
     return this.playerEconomicsService.resolveSession(gameId, walletAddress);
   }
 
@@ -83,6 +89,9 @@ export class EconomicsController {
       );
     }
 
+    this.logger.log(
+      `Logging game economic event type=${body.eventType} game=${body.gameId} wallet=${body.walletAddress.toLowerCase()} amount=${body.amount}`,
+    );
     return this.playerEconomicsService.logGameScopedEvent({
       gameId: body.gameId,
       walletAddress: body.walletAddress,

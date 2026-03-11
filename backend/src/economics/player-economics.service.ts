@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "crypto";
 import { Repository } from "typeorm";
@@ -25,6 +25,8 @@ type LogGameScopedEventInput = {
 
 @Injectable()
 export class PlayerEconomicsService {
+  private readonly logger = new Logger(PlayerEconomicsService.name);
+
   constructor(
     @InjectRepository(Game)
     private readonly gameRepo: Repository<Game>,
@@ -49,6 +51,10 @@ export class PlayerEconomicsService {
     const user = await this.findOrCreateWalletUser(normalizedWallet);
     const gamePlayer = await this.findOrCreateGamePlayer(game, user);
 
+    this.logger.log(
+      `Resolved session studio=${game.studio.id} game=${game.id} player=${gamePlayer.id} wallet=${normalizedWallet}`,
+    );
+
     return {
       studioId: game.studio.id,
       studioName: game.studio.name,
@@ -63,6 +69,9 @@ export class PlayerEconomicsService {
 
   async logGameScopedEvent(input: LogGameScopedEventInput) {
     const session = await this.resolveSession(input.gameId, input.walletAddress);
+    this.logger.log(
+      `Persisting game-scoped event type=${input.eventType} game=${session.gameId} player=${session.gamePlayerId} tx=${input.txHash ?? "n/a"}`,
+    );
 
     return this.economicsService.logEvent({
       source: "player_portal",
@@ -89,6 +98,7 @@ export class PlayerEconomicsService {
   private async findOrCreateWalletUser(walletAddress: string) {
     const existing = await this.userRepo.findOne({ where: { walletAddress } });
     if (existing) {
+      this.logger.debug(`Reusing wallet user for ${walletAddress}`);
       return existing;
     }
 
@@ -104,6 +114,7 @@ export class PlayerEconomicsService {
       isAdmin: false,
     });
 
+    this.logger.log(`Creating synthetic wallet user for ${walletAddress}`);
     return this.userRepo.save(created);
   }
 
@@ -114,6 +125,9 @@ export class PlayerEconomicsService {
     });
 
     if (existing) {
+      this.logger.debug(
+        `Reusing game player ${existing.id} for game=${game.id} user=${user.id}`,
+      );
       return existing;
     }
 
@@ -124,6 +138,7 @@ export class PlayerEconomicsService {
       exp: 0,
     });
 
+    this.logger.log(`Creating game player for game=${game.id} user=${user.id}`);
     return this.gamePlayerRepo.save(created);
   }
 }

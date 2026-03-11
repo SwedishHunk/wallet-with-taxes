@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import {
@@ -27,6 +27,8 @@ export type LogEconomicEventInput = {
 
 @Injectable()
 export class EconomicsService {
+  private readonly logger = new Logger(EconomicsService.name);
+
   constructor(
     @InjectRepository(EconomicEvent)
     private readonly repo: Repository<EconomicEvent>,
@@ -49,7 +51,11 @@ export class EconomicsService {
       timestamp: input.timestamp ?? new Date(),
     });
 
-    return this.repo.save(event);
+    const saved = await this.repo.save(event);
+    this.logger.log(
+      `Saved economic event id=${saved.id} scope=${saved.scopeType} type=${saved.eventType} game=${saved.gameId ?? "n/a"} studio=${saved.studioId ?? "n/a"}`,
+    );
+    return saved;
   }
 
   getEventsForStudio(studioId: string) {

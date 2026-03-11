@@ -373,6 +373,9 @@ export default function Trade() {
           });
         } catch (eventError) {
           console.error("Failed to log game-scoped economic event:", eventError);
+          setTxMessage(
+            "Transaction confirmed, but game attribution failed. Check backend logs."
+          );
         }
       }
     } catch (err) {
