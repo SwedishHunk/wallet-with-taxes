@@ -17,7 +17,7 @@ const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
   const { t } = useLanguage();
-  const { isConnected, address, provider } = useWallet();
+  const { isConnected, address, provider, signer } = useWallet();
   const { gameId } = useParams();
   const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
     useContracts();
@@ -79,33 +79,66 @@ export default function Trade() {
   }, []);
 
   useEffect(() => {
-    if (!gameId || !address) {
+    if (!gameId || !address || !signer) {
       setGameSession(null);
       setGameSessionLoading(false);
       setGameSessionError("");
       return;
     }
 
+    let active = true;
+
     setGameSessionLoading(true);
     setGameSessionError("");
-    apiGet(
-      `/player/session?gameId=${encodeURIComponent(
-        gameId
-      )}&walletAddress=${encodeURIComponent(address)}`
-    )
+    thisPlayerSignedRequest("session", { gameId, walletAddress: address })
+      .then((auth) =>
+        apiPost("/player/session", {
+          gameId,
+          walletAddress: address,
+          nonce: auth.nonce,
+          signature: auth.signature,
+        })
+      )
       .then((session) => {
+        if (!active) return;
         setGameSession(session);
         setGameSessionError("");
       })
       .catch((error) => {
+        if (!active) return;
         console.error("Failed to resolve player session:", error);
         setGameSession(null);
         setGameSessionError("Game session could not be resolved yet.");
       })
       .finally(() => {
+        if (!active) return;
         setGameSessionLoading(false);
       });
-  }, [gameId, address]);
+
+    return () => {
+      active = false;
+    };
+  }, [gameId, address, signer]);
+
+  async function thisPlayerSignedRequest(purpose, { gameId, walletAddress }) {
+    if (!signer) {
+      throw new Error("Wallet signer is not ready");
+    }
+
+    const noncePayload = await apiGet(
+      `/player/nonce?walletAddress=${encodeURIComponent(
+        walletAddress
+      )}&purpose=${encodeURIComponent(purpose)}&gameId=${encodeURIComponent(
+        gameId
+      )}`
+    );
+    const signature = await signer.signMessage(noncePayload.message);
+
+    return {
+      nonce: noncePayload.nonce,
+      signature,
+    };
+  }
 
   useEffect(() => {
     if (!isConnected || !address || !provider) {
@@ -353,9 +386,16 @@ export default function Trade() {
 
       if (gameId && address) {
         try {
+          const auth = await thisPlayerSignedRequest("economic_event", {
+            gameId,
+            walletAddress: address,
+          });
+
           await apiPost("/player/game-economic-event", {
             gameId,
             walletAddress: address,
+            nonce: auth.nonce,
+            signature: auth.signature,
             txHash: tx.hash,
             eventType: isBuy ? "buy_tri" : "sell_tri",
             assetKey: "tri",
