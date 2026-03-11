@@ -19,7 +19,7 @@ export default function EconomicEventsPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadEvents = () => {
     if (!activeGame) {
       setEvents([]);
       return;
@@ -36,14 +36,34 @@ export default function EconomicEventsPanel() {
         setError("Failed to load player economic events");
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadEvents();
   }, [activeGame]);
 
   return (
     <div className="border rounded-lg p-4 shadow">
-      <h2 className="text-lg font-semibold mb-2">Player Economic Events</h2>
-      <p className="text-sm text-gray-600 mb-4">
-        Latest game-attributed player trades for the currently selected game.
-      </p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Player Economic Events</h2>
+          <p className="text-sm text-gray-600">
+            Latest game-attributed player trades for the currently selected game.
+          </p>
+          {activeGame && (
+            <p className="mt-1 text-xs text-gray-500">
+              Active game: <span className="font-semibold">{activeGame.name}</span>
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={loadEvents}
+          className="rounded border px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+        >
+          Refresh
+        </button>
+      </div>
 
       {loading ? <p className="text-gray-600">Loading events...</p> : null}
       {error ? <p className="text-red-600">{error}</p> : null}
