@@ -72,9 +72,9 @@ export default function Dashboard() {
             <div className="dashboard-member-info">
               <h3>{member.email}</h3>
               <p className="dashboard-member-ids">
-                Member ID: {member.memberId} | User ID: {member.userId}
+                {t("dash.memberId")} {member.memberId} · {t("dash.userId")} {member.userId}
               </p>
-              {member.isOwner && <Badge variant="owner">Owner</Badge>}
+              {member.isOwner && <Badge variant="owner">{t("common.owner")}</Badge>}
             </div>
 
             <div className="dashboard-permissions">

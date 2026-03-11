@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "../context/WalletContext";
+import { useLanguage } from "../../lib/LanguageContext";
 import ErrorBanner from "../components/ErrorBanner";
 import StatCard from "../components/StatCard";
 import {
@@ -40,6 +41,7 @@ import {
 const TAX_API = import.meta.env.VITE_TAX_API_URL || "";
 
 export default function TaxReport() {
+  const { t } = useLanguage();
   const { isConnected, address } = useWallet();
 
   const [summary, setSummary] = useState(null);
@@ -128,10 +130,10 @@ export default function TaxReport() {
           <Wallet size={40} className="text-gray-500" />
         </div>
         <h2 className="text-xl font-bold text-gray-300 mb-2">
-          Connect Your Wallet
+          {t("player.tax.connectWallet")}
         </h2>
         <p className="text-gray-500 text-sm">
-          Connect your wallet to view your tax report
+          {t("player.tax.connectDesc")}
         </p>
       </div>
     );
@@ -145,10 +147,10 @@ export default function TaxReport() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">
-              <span className="glow-text-green">Tax Report</span>
+              <span className="glow-text-green">{t("player.tax.title")}</span>
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Swedish crypto tax summary (Skatteverket)
+              {t("player.tax.subtitle")}
             </p>
           </div>
           <button
@@ -160,7 +162,7 @@ export default function TaxReport() {
               size={14}
               className={refreshing ? "animate-spin" : ""}
             />
-            Retry Connection
+            {t("player.tax.retryConn")}
           </button>
         </div>
 
@@ -169,26 +171,26 @@ export default function TaxReport() {
             <WifiOff size={32} className="text-neon-pink" />
           </div>
           <h2 className="text-lg font-bold text-gray-200 mb-2">
-            Tax Service Unavailable
+            {t("player.tax.unavailable")}
           </h2>
           <p className="text-gray-400 text-sm max-w-md mx-auto mb-4">
-            Could not connect to the tax backend at{" "}
+            {t("player.tax.couldNotConnect")}{" "}
             <code className="text-neon-cyan bg-dark-700 px-2 py-0.5 rounded text-xs">
               {TAX_API}
             </code>
           </p>
           <div className="bg-dark-700/50 rounded-lg p-4 max-w-md mx-auto text-left">
             <p className="text-sm text-gray-300 font-semibold mb-2">
-              To fix this:
+              {t("player.tax.toFix")}
             </p>
             <p className="text-sm text-gray-400 mb-1">
-              1. Make sure the wallet-with-taxes backend is running
+              {t("player.tax.step1")}
             </p>
             <p className="text-sm text-gray-400 mb-1">
-              2. Check that it is on port 3001 (or set <code className="text-neon-cyan text-xs">VITE_TAX_API_URL</code> in frontend/.env)
+              {t("player.tax.step2")}
             </p>
             <p className="text-sm text-gray-400">
-              3. Run: <code className="text-neon-cyan text-xs">cd wallet-with-taxes/backend && npm run start:dev</code>
+              {t("player.tax.step3")}
             </p>
           </div>
         </div>
@@ -208,10 +210,10 @@ export default function TaxReport() {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-3xl font-bold">
-              <span className="glow-text-green">Tax Report</span>
+              <span className="glow-text-green">{t("player.tax.title")}</span>
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Swedish crypto tax summary (Skatteverket)
+              {t("player.tax.subtitle")}
             </p>
           </div>
           {/* Connection status indicator */}
@@ -233,7 +235,7 @@ export default function TaxReport() {
                   backendOnline ? "bg-neon-green" : "bg-neon-pink"
                 }`}
               />
-              {backendOnline ? "Connected" : "Offline"}
+              {backendOnline ? t("player.tax.connected") : t("player.tax.offline")}
             </div>
           )}
         </div>
@@ -247,7 +249,7 @@ export default function TaxReport() {
               size={14}
               className={refreshing ? "animate-spin" : ""}
             />
-            Refresh
+            {t("player.tax.refresh")}
           </button>
           <button
             onClick={handleExportCSV}
@@ -255,7 +257,7 @@ export default function TaxReport() {
             className="btn-secondary flex items-center gap-2"
           >
             <Download size={14} />
-            Export CSV
+            {t("player.tax.exportCsv")}
           </button>
         </div>
       </div>
@@ -270,10 +272,9 @@ export default function TaxReport() {
         <div className="bg-neon-pink/5 border border-neon-pink/20 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-300">
             <span className="text-neon-pink font-semibold">
-              Connection lost:
+              {t("player.tax.connLost")}
             </span>{" "}
-            The tax backend at {TAX_API} is no longer responding.
-            The data shown below may be outdated. Click Refresh to reconnect.
+            {t("player.tax.connLostDesc")}
           </p>
         </div>
       )}
@@ -282,12 +283,9 @@ export default function TaxReport() {
       <div className="bg-neon-cyan/5 border border-neon-cyan/20 rounded-lg p-4 mb-8">
         <p className="text-sm text-gray-300">
           <span className="text-neon-cyan font-semibold">
-            How this works:
+            {t("player.tax.howItWorks")}
           </span>{" "}
-          Every time you buy or sell TRI tokens through the TokenShop, the
-          transaction is automatically recorded in the tax system. This page
-          shows your capital gains and losses calculated using Swedish tax
-          rules, including the 70% loss deduction (avdragsbegränsning).
+          {t("player.tax.howItWorksDesc")}
         </p>
       </div>
 
@@ -307,30 +305,30 @@ export default function TaxReport() {
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
-            label="Total Gains"
+            label={t("player.tax.totalGains")}
             value={`$${summary.totalGainsUSD.toFixed(2)}`}
-            sub="Capital gains from sales"
+            sub={t("player.tax.gainsSub")}
             color="green"
             icon={TrendingUp}
           />
           <StatCard
-            label="Total Losses"
+            label={t("player.tax.totalLosses")}
             value={`$${Math.abs(summary.totalLossesUSD).toFixed(2)}`}
-            sub="Capital losses from sales"
+            sub={t("player.tax.lossesSub")}
             color="pink"
             icon={TrendingDown}
           />
           <StatCard
-            label="Adjusted Losses (70%)"
+            label={t("player.tax.adjustedLosses")}
             value={`$${Math.abs(summary.adjustedLossesUSD).toFixed(2)}`}
-            sub="Swedish 70% deduction applied"
+            sub={t("player.tax.adjustedSub")}
             color="purple"
             icon={Scale}
           />
           <StatCard
-            label="Net Taxable Gain"
+            label={t("player.tax.netGain")}
             value={`$${summary.netTaxableGainUSD.toFixed(2)}`}
-            sub="Amount reported to Skatteverket"
+            sub={t("player.tax.netGainSub")}
             color="cyan"
             icon={Receipt}
           />
@@ -342,7 +340,7 @@ export default function TaxReport() {
         <div className="card mb-8">
           <p className="label mb-4 flex items-center gap-2">
             <Scale size={14} />
-            Swedish Tax Calculation
+            {t("player.tax.calcTitle")}
           </p>
 
           <div className="space-y-4">
@@ -353,7 +351,7 @@ export default function TaxReport() {
                   <TrendingUp size={14} className="text-neon-green" />
                 </div>
                 <span className="text-sm text-gray-300">
-                  Total capital gains
+                  {t("player.tax.totalCapGains")}
                 </span>
               </div>
               <span className="font-mono text-sm text-neon-green">
@@ -368,7 +366,7 @@ export default function TaxReport() {
                   <TrendingDown size={14} className="text-neon-pink" />
                 </div>
                 <span className="text-sm text-gray-300">
-                  Total capital losses
+                  {t("player.tax.totalCapLosses")}
                 </span>
               </div>
               <span className="font-mono text-sm text-neon-pink">
@@ -384,10 +382,10 @@ export default function TaxReport() {
                 </div>
                 <div>
                   <span className="text-sm text-gray-300">
-                    Adjusted losses (70% rule)
+                    {t("player.tax.adjLosses70")}
                   </span>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    In Sweden, only 70% of crypto losses are deductible
+                    {t("player.tax.adj70Desc")}
                   </p>
                 </div>
               </div>
@@ -407,10 +405,10 @@ export default function TaxReport() {
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-gray-200">
-                    Net taxable gain
+                    {t("player.tax.netTaxableGain")}
                   </span>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Report this amount to Skatteverket
+                    {t("player.tax.reportTo")}
                   </p>
                 </div>
               </div>
@@ -427,9 +425,7 @@ export default function TaxReport() {
 
             {/* USD disclaimer */}
             <p className="text-xs text-gray-600 italic mt-2">
-              Note: Values shown in USD equivalent (raw ETH amounts). Real SEK
-              conversion requires a price API integration, planned for a future
-              update.
+              {t("player.tax.usdNote")}
             </p>
           </div>
         </div>
@@ -439,11 +435,11 @@ export default function TaxReport() {
       {summary && !hasActivity && (
         <div className="card text-center py-8">
           <p className="text-gray-500 text-sm">
-            No taxable events yet. Buy and sell some TRI tokens on the{" "}
+            {t("player.tax.noActivity")}{" "}
             <a href="/player/trade" className="text-neon-cyan hover:underline">
-              Trade page
+              {t("player.tax.tradePage")}
             </a>{" "}
-            to see your tax impact here.
+            {t("player.tax.noActivityEnd")}
           </p>
         </div>
       )}

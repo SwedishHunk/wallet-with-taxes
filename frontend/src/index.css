@@ -234,27 +234,27 @@ input::placeholder, select::placeholder, textarea::placeholder {
 /* ===== Utility Animation Classes ===== */
 
 .animate-fadeInUp {
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fadeInUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fadeInDown {
-  animation: fadeInDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fadeInDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.5s ease both;
+  animation: fadeIn 0.2s ease both;
 }
 
 .animate-slideInLeft {
-  animation: slideInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-slideInRight {
-  animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-scaleIn {
-  animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-float {
@@ -265,12 +265,12 @@ input::placeholder, select::placeholder, textarea::placeholder {
   animation: pulseGlow 2s ease-in-out infinite;
 }
 
-/* Stagger delays */
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
+/* Stagger delays — max 0.18s total spread */
+.delay-100 { animation-delay: 0.06s; }
+.delay-200 { animation-delay: 0.12s; }
+.delay-300 { animation-delay: 0.18s; }
+.delay-400 { animation-delay: 0.18s; }
+.delay-500 { animation-delay: 0.18s; }
 
 /* Gaming heading font */
 .font-display {

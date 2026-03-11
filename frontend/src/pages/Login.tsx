@@ -124,7 +124,7 @@ export default function Login() {
             >
               <motion.input
                 type="email"
-                placeholder="Email"
+                placeholder={t("common.email")}
                 className="login-input"
                 value={studioEmail}
                 onChange={(e) => setStudioEmail(e.target.value)}
@@ -134,7 +134,7 @@ export default function Login() {
               />
               <motion.input
                 type="password"
-                placeholder="Password"
+                placeholder={t("common.password")}
                 className="login-input"
                 value={studioPassword}
                 onChange={(e) => setStudioPassword(e.target.value)}
@@ -160,7 +160,7 @@ export default function Login() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              Studio session already active. Continue to member login.
+              {t("login.studioActive")}
               <motion.button
                 type="button"
                 className="login-button"

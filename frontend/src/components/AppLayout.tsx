@@ -93,7 +93,7 @@ function Header() {
           <span style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: "0.04em" }}>
             {APP_SHORT_NAME}
           </span>
-          <span className="header-logo-sub">Studio</span>
+          <span className="header-logo-sub">{t("nav.logoSub")}</span>
         </Link>
 
         {/* ── Center: Nav links (only when member active) ── */}
@@ -119,7 +119,7 @@ function Header() {
             <>
               <div className="studio-info">
                 <span className="studio-name">{authContext.studioSession?.studioName}</span>
-                <span className="status-badge">Studio Only</span>
+                <span className="status-badge">{t("nav.studioOnly")}</span>
               </div>
               <button className="btn btn-outline" onClick={() => navigate(ROUTES.memberLogin)}>
                 <UserCheck size={15} /> {t("nav.selectMember")}
@@ -134,12 +134,12 @@ function Header() {
             <>
               {/* Compact info chip */}
               <div className="member-info-compact">
-                <span className="label">STUDIO:</span>
+                <span className="label">{t("nav.studioLabel")}:</span>
                 <span className="value">{authContext.studioSession?.studioName}</span>
-                <span className="divider">|</span>
-                <span className="label">MEMBER:</span>
+                <span className="divider">·</span>
+                <span className="label">{t("nav.memberLabel")}:</span>
                 <span className="value">{authContext.memberSession?.email}</span>
-                {authContext.memberSession?.isOwner && <span className="owner-badge">Owner</span>}
+                {authContext.memberSession?.isOwner && <span className="owner-badge">{t("common.owner")}</span>}
               </div>
               {/* Logout */}
               <button className="btn-ghost-danger" onClick={logoutStudio} title="Logout">

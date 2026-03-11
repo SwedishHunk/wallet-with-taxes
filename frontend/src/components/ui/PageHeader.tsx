@@ -29,7 +29,7 @@ export function PageHeader({
             className="ui-page-header-title"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30, delay: 0.05 }}
           >
             {title}
           </motion.h1>
@@ -38,7 +38,7 @@ export function PageHeader({
               className="ui-page-header-subtitle"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.25, duration: 0.4 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
             >
               {subtitle}
             </motion.p>

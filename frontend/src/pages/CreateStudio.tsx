@@ -27,19 +27,19 @@ export default function CreateStudio() {
 
     // Validation
     if (!studioName.trim()) {
-      setError("Studio name cannot be empty");
+      setError(t("studio.errNameEmpty"));
       return;
     }
     if (!email.trim() || !email.includes("@")) {
-      setError("Valid email is required");
+      setError(t("studio.errEmailInvalid"));
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("studio.errPasswordShort"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("studio.errPasswordMismatch"));
       return;
     }
 
@@ -75,7 +75,7 @@ export default function CreateStudio() {
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to create studio";
+          ?.message || t("studio.errFailed");
       setError(message);
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export default function CreateStudio() {
 
           <input
             type="text"
-            placeholder="Studio name"
+            placeholder={t("studio.namePlaceholder")}
             className="login-input"
             value={studioName}
             onChange={(e) => setStudioName(e.target.value)}
@@ -104,7 +104,7 @@ export default function CreateStudio() {
 
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t("common.email")}
             className="login-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +114,7 @@ export default function CreateStudio() {
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t("common.password")}
             className="login-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -124,7 +124,7 @@ export default function CreateStudio() {
 
           <input
             type="password"
-            placeholder="Confirm password"
+            placeholder={t("studio.confirmPassword")}
             className="login-input"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -138,9 +138,9 @@ export default function CreateStudio() {
         </form>
 
         <p className="login-footer">
-          Already have an account?{" "}
+          {t("studio.hasAccount")}{" "}
           <span className="signup-link" onClick={() => navigate(ROUTES.login)}>
-            Log in
+            {t("studio.loginLink")}
           </span>
         </p>
       </div>

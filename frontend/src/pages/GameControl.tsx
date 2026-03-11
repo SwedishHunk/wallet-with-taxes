@@ -339,7 +339,7 @@ export function GameControl() {
                           background: "#ff9800",
                           color: "white",
                           borderRadius: "4px",
-                          fontSize: "11px",
+                          fontSize: "12px",
                           fontWeight: "600",
                         }}>
                         ✓ EQUIPPED

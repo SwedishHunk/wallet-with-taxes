@@ -55,7 +55,7 @@ export default function Members() {
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to load members"
+          ?.message || t("members.errLoadFailed")
       );
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ export default function Members() {
     e.preventDefault();
 
     if (!formData.email.trim()) {
-      setError("Email is required");
+      setError(t("members.errEmailRequired"));
       return;
     }
 
@@ -110,7 +110,7 @@ export default function Members() {
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to create member"
+          ?.message || t("members.errCreateFailed")
       );
     }
   };
@@ -118,7 +118,7 @@ export default function Members() {
   if (!isAuthenticated) {
     return (
       <Page>
-        <Card>Not authenticated</Card>
+        <Card>{t("members.notAuth")}</Card>
       </Page>
     );
   }
@@ -127,7 +127,7 @@ export default function Members() {
     return (
       <Page>
         <Card>
-          <p>You don't have permission to manage members.</p>
+          <p>{t("members.noPermission")}</p>
         </Card>
       </Page>
     );
@@ -161,7 +161,7 @@ export default function Members() {
           <h3>{t("members.createNew")}</h3>
           <form onSubmit={handleSubmit} className="members-form">
             <div className="members-form-group">
-              <label>Email</label>
+              <label>{t("members.emailLabel")}</label>
               <input
                 type="email"
                 value={formData.email}
@@ -174,7 +174,7 @@ export default function Members() {
             </div>
 
             <div className="members-form-group">
-              <label>Password (optional, auto-generated if blank)</label>
+              <label>{t("members.passwordOptional")}</label>
               <input
                 type="password"
                 value={formData.password}
@@ -218,7 +218,7 @@ export default function Members() {
       )}
 
       {loading ? (
-        <Card>Loading members...</Card>
+        <Card>{t("members.loading")}</Card>
       ) : members.length === 0 ? (
         <Card>{t("members.noMembers")}</Card>
       ) : (
@@ -230,7 +230,7 @@ export default function Members() {
                   <p className="members-item-email">{member.email}</p>
                   <div className="members-item-badges">
                     {member.isOwner && (
-                      <Badge variant="owner">Owner</Badge>
+                      <Badge variant="owner">{t("common.owner")}</Badge>
                     )}
                     {!member.isOwner && member.permissions.length > 0 && (
                       member.permissions.map((p) => (

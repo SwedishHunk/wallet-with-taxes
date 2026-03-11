@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
+import { useLanguage } from "../../lib/LanguageContext";
 import { useContracts } from "../hooks/useContracts";
 import { useApiData } from "../hooks/useApi";
 import { formatTxError } from "../formatTxError";
@@ -65,6 +66,7 @@ function TxResult({ status, message }) {
 }
 
 export default function Admin() {
+  const { t } = useLanguage();
   const { isConnected, isAdmin } = useWallet();
   const { getShop, ready } = useContracts();
   const { data: config, refresh: refreshConfig } = useApiData("/shop/config");
@@ -102,8 +104,8 @@ export default function Admin() {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <Lock size={40} className="text-gray-500 mb-6" />
-        <h2 className="text-xl font-bold text-gray-300 mb-2">Admin Panel</h2>
-        <p className="text-gray-500 text-sm">Connect your admin wallet to access controls</p>
+        <h2 className="text-xl font-bold text-gray-300 mb-2">{t("player.admin.title")}</h2>
+        <p className="text-gray-500 text-sm">{t("player.admin.connectMsg")}</p>
       </div>
     );
   }
@@ -112,9 +114,9 @@ export default function Admin() {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <Shield size={40} className="text-neon-pink mb-6" />
-        <h2 className="text-xl font-bold text-gray-300 mb-2">Access Denied</h2>
+        <h2 className="text-xl font-bold text-gray-300 mb-2">{t("player.admin.accessDenied")}</h2>
         <p className="text-gray-500 text-sm">
-          This panel is only available to the shop admin wallet
+          {t("player.admin.adminOnly")}
         </p>
       </div>
     );
@@ -122,7 +124,7 @@ export default function Admin() {
 
   async function execTx(fn, setStatus, setMsg) {
     setStatus("pending");
-    setMsg("Confirm in wallet...");
+    setMsg(t("player.admin.confirmWallet"));
     try {
       const shop = getShop();
       if (!shop) {
@@ -131,10 +133,10 @@ export default function Admin() {
         );
       }
       const tx = await fn(shop);
-      setMsg("Waiting for confirmation...");
+      setMsg(t("player.admin.waitConfirm"));
       await tx.wait();
       setStatus("success");
-      setMsg("Transaction confirmed!");
+      setMsg(t("player.admin.txConfirmed"));
       refreshConfig();
     } catch (err) {
       setStatus("error");
@@ -149,10 +151,10 @@ export default function Admin() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <Shield size={28} className="text-neon-purple" />
-          <span className="glow-text-purple">Admin Panel</span>
+          <span className="glow-text-purple">{t("player.admin.title")}</span>
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Manage TokenShop configuration — all actions are on-chain transactions
+          {t("player.admin.subtitle")}
         </p>
       </div>
 
@@ -161,31 +163,31 @@ export default function Admin() {
         <div className="card mb-6 border border-dark-500">
           <p className="label mb-3 flex items-center gap-2">
             <Settings size={14} />
-            Current Configuration
+            {t("player.admin.currentConfig")}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-dark-700/50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Status</p>
+              <p className="text-xs text-gray-500">{t("player.admin.status")}</p>
               <p className={`text-sm font-bold ${config.paused ? "text-neon-pink" : "text-neon-green"}`}>
                 {config.paused ? "PAUSED" : "ACTIVE"}
               </p>
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Fee</p>
+              <p className="text-xs text-gray-500">{t("player.admin.fee")}</p>
               <p className="text-sm font-mono">{config.feeBps} bps ({config.feePercent}%)</p>
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">ETH Buy Rate</p>
+              <p className="text-xs text-gray-500">{t("player.admin.buyRate")}</p>
               <p className="text-sm font-mono">{config.rates?.eth?.buyRate}</p>
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Max ETH In</p>
+              <p className="text-xs text-gray-500">{t("player.admin.maxEthIn")}</p>
               <p className="text-sm font-mono">
                 {Number(config.maxEthIn) > 0 ? config.maxEthIn : "Unlimited"}
               </p>
             </div>
             <div className="bg-dark-700/50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Max TRI In</p>
+              <p className="text-xs text-gray-500">{t("player.admin.maxTriIn")}</p>
               <p className="text-sm font-mono">
                 {Number(config.maxGenIn) > 0 ? config.maxGenIn : "Unlimited"}
               </p>
@@ -198,7 +200,7 @@ export default function Admin() {
       {/* Row 1: Quick actions (Pause + Fee) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" style={{ position: "relative", zIndex: 2 }}>
         {/* Pause / Unpause */}
-        <AdminAction title="Pause Control" icon={Pause} color="pink">
+        <AdminAction title={t("player.admin.pause")} icon={Pause} color="pink">
           <div className="flex gap-2">
             <button
               onClick={() =>
@@ -207,7 +209,7 @@ export default function Admin() {
               className="btn-danger flex-1 flex items-center justify-center gap-2"
               disabled={pauseStatus === "pending" || !ready}
             >
-              <Pause size={14} /> Pause
+              <Pause size={14} /> {t("player.admin.pauseBtn")}
             </button>
             <button
               onClick={() =>
@@ -216,14 +218,14 @@ export default function Admin() {
               className="btn-success flex-1 flex items-center justify-center gap-2"
               disabled={pauseStatus === "pending" || !ready}
             >
-              <Play size={14} /> Unpause
+              <Play size={14} /> {t("player.admin.unpauseBtn")}
             </button>
           </div>
           <TxResult status={pauseStatus} message={pauseMsg} />
         </AdminAction>
 
         {/* Fee */}
-        <AdminAction title="Set Fee" icon={DollarSign} color="cyan">
+        <AdminAction title={t("player.admin.setFee")} icon={DollarSign} color="cyan">
           <div className="flex gap-2">
             <input
               type="number"
@@ -245,7 +247,7 @@ export default function Admin() {
               className="btn-primary"
               disabled={feeStatus === "pending" || !feeBps || !ready}
             >
-              Set
+              {t("player.admin.setBtn")}
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-1">
@@ -253,7 +255,7 @@ export default function Admin() {
           </p>
           {!ready && (
             <p className="text-xs text-neon-pink mt-1">
-              TokenShop contract not ready yet. Wait for wallet + config to load.
+              {t("player.admin.notReady")}
             </p>
           )}
           <TxResult status={feeStatus} message={feeMsg} />
@@ -263,7 +265,7 @@ export default function Admin() {
       {/* Row 2: Rates, Limits & Withdraw — 3-column row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4" style={{ position: "relative", zIndex: 2 }}>
         {/* Rates */}
-        <AdminAction title="Set Rates" icon={TrendingUp} color="green">
+        <AdminAction title={t("player.admin.setRates")} icon={TrendingUp} color="green">
           <div className="space-y-2">
             <select
               value={rateAsset}
@@ -304,13 +306,13 @@ export default function Admin() {
             style={{ marginTop: "auto" }}
             disabled={rateStatus === "pending" || !buyRate || !sellRate || !ready}
           >
-            Update Rates
+            {t("player.admin.updateRates")}
           </button>
           <TxResult status={rateStatus} message={rateMsg} />
         </AdminAction>
 
         {/* Limits */}
-        <AdminAction title="Transaction Limits" icon={Gauge} color="purple">
+        <AdminAction title={t("player.admin.limits")} icon={Gauge} color="purple">
           <div className="space-y-2">
             <input
               type="number"
@@ -332,7 +334,7 @@ export default function Admin() {
           <button
             onClick={async () => {
               setLimitStatus("pending");
-              setLimitMsg("Confirm in wallet...");
+              setLimitMsg(t("player.admin.confirmWallet"));
               try {
                 const shop = getShop();
                 if (!shop) {
@@ -349,7 +351,7 @@ export default function Admin() {
                   await tx.wait();
                 }
                 setLimitStatus("success");
-                setLimitMsg("Limits updated!");
+                setLimitMsg(t("player.admin.txConfirmed"));
                 refreshConfig();
               } catch (err) {
                 setLimitStatus("error");
@@ -360,13 +362,13 @@ export default function Admin() {
             style={{ marginTop: "auto" }}
             disabled={limitStatus === "pending" || (!maxEthIn && !maxGenIn) || !ready}
           >
-            Update Limits
+            {t("player.admin.updateLimits")}
           </button>
           <TxResult status={limitStatus} message={limitMsg} />
         </AdminAction>
 
         {/* Withdraw ETH */}
-        <AdminAction title="Withdraw ETH" icon={Download} color="pink">
+        <AdminAction title={t("player.admin.withdraw")} icon={Download} color="pink">
           <div className="space-y-2">
             <input
               type="text"
@@ -399,7 +401,7 @@ export default function Admin() {
               withdrawStatus === "pending" || !withdrawTo || !withdrawAmount || !ready
             }
           >
-            Withdraw
+            {t("player.admin.withdrawBtn")}
           </button>
           <TxResult status={withdrawStatus} message={withdrawMsg} />
         </AdminAction>

@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import { useWallet } from "../context/WalletContext";
 import { Wallet, LogOut, Shield } from "lucide-react";
+import { useLanguage } from "../../lib/LanguageContext";
 
 export default function ConnectWallet() {
   const { address, isConnected, isAdmin, connecting, connect, disconnect } =
     useWallet();
+  const { t } = useLanguage();
 
   if (isConnected) {
     return (
@@ -77,7 +79,7 @@ export default function ConnectWallet() {
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
     >
       <Wallet size={16} />
-      {connecting ? "Connecting..." : "Connect Wallet"}
+      {connecting ? t("player.wallet.connecting") : t("player.wallet.connect")}
     </motion.button>
   );
 }

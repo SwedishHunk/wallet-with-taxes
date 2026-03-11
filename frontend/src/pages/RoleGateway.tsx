@@ -40,7 +40,7 @@ export default function RoleGateway() {
         variants={staggerContainer}
       >
         <motion.div className="role-gateway__eyebrow" variants={fadeInUp}>
-          Triolith Access Point
+          {t("role.eyebrow")}
         </motion.div>
 
         <motion.h1

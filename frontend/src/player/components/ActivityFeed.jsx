@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { ethers } from "ethers";
+import { useLanguage } from "../../lib/LanguageContext";
 
 function formatAmount(raw, decimals = 18) {
   try {
@@ -47,10 +48,12 @@ const rowVariants = {
 };
 
 export default function ActivityFeed({ events = [], loading }) {
+  const { t } = useLanguage();
+
   if (loading) {
     return (
       <div className="card">
-        <p className="label mb-4">Recent Activity</p>
+        <p className="label mb-4">{t("player.activity.title")}</p>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <motion.div
@@ -68,7 +71,7 @@ export default function ActivityFeed({ events = [], loading }) {
 
   return (
     <div className="card">
-      <p className="label mb-4">Recent Activity</p>
+      <p className="label mb-4">{t("player.activity.title")}</p>
       {events.length === 0 ? (
         <motion.p
           className="text-gray-500 text-sm text-center py-8"
@@ -76,7 +79,7 @@ export default function ActivityFeed({ events = [], loading }) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          No activity yet
+          {t("player.activity.empty")}
         </motion.p>
       ) : (
         <motion.div

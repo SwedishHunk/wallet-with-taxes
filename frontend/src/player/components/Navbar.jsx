@@ -2,16 +2,18 @@ import { NavLink, Link } from "react-router-dom";
 import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
-
-const navItems = [
-  { to: "/player", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/player/trade", label: "Trade", icon: ArrowLeftRight },
-  { to: "/player/portfolio", label: "Portfolio", icon: Briefcase },
-  { to: "/player/tax", label: "Tax", icon: Receipt },
-];
+import { useLanguage } from "../../lib/LanguageContext";
 
 export default function Navbar() {
   const { isAdmin } = useWallet();
+  const { t } = useLanguage();
+
+  const navItems = [
+    { to: "/player", label: t("player.nav.dashboard"), icon: LayoutDashboard },
+    { to: "/player/trade", label: t("player.nav.trade"), icon: ArrowLeftRight },
+    { to: "/player/portfolio", label: t("player.nav.portfolio"), icon: Briefcase },
+    { to: "/player/tax", label: t("player.nav.tax"), icon: Receipt },
+  ];
 
   return (
     <nav
@@ -41,9 +43,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo — links to landing page */}
-          <Link to="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-            {/* Animated neon triangle — same as studio layout */}
-            <div style={{ flexShrink: 0, animation: 'triPulse 3s ease-in-out infinite, triSpin3D 9s ease-in-out infinite', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.55)) drop-shadow(0 0 8px rgba(168,85,247,0.35))' }}>
+          <Link to="/" className="player-logo-link">
+            <div className="logo-triangle-wrap">
               <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
                 <defs>
                   <linearGradient id="triStrokeP" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -62,8 +63,8 @@ export default function Navbar() {
               </svg>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="glow-text-cyan" style={{ fontFamily: '"Orbitron", "Inter", sans-serif', letterSpacing: '0.04em', fontWeight: 700, fontSize: '1.15rem' }}>Triolith</span>
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(255,255,255,0.32)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Player</span>
+              <span>Triolith</span>
+              <span className="header-logo-sub">{t("player.logo.sub")}</span>
             </div>
           </Link>
 
@@ -111,7 +112,7 @@ export default function Navbar() {
                 } : {}}
               >
                 <Settings size={16} />
-                Admin
+                {t("player.nav.admin")}
               </NavLink>
             )}
           </div>

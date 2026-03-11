@@ -5,16 +5,16 @@
 
 // === Page-level transitions ===
 export const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
+    transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] as const },
   },
   exit: {
     opacity: 0,
-    y: -10,
-    transition: { duration: 0.2 },
+    y: -6,
+    transition: { duration: 0.15 },
   },
 } as const;
 
@@ -24,8 +24,8 @@ export const staggerContainer = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
+      staggerChildren: 0.06,
+      delayChildren: 0.0,
     },
   },
 } as const;
@@ -47,11 +47,11 @@ export const cardVariants = {
 
 // === Fade in up (general purpose) ===
 export const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 14 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
+    transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
 

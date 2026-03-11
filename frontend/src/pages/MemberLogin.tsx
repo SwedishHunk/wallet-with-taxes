@@ -208,7 +208,7 @@ export default function MemberLogin() {
   if (isLoading || loadingMembers) {
     return (
       <Page>
-        <PageHeader title="Loading..." />
+        <PageHeader title={t("member.loadingTitle")} />
       </Page>
     );
   }
@@ -216,7 +216,7 @@ export default function MemberLogin() {
   return (
     <Page>
       <PageHeader
-        title="Log in as member"
+        title={t("member.loginAsTitle")}
         subtitle={`Studio: ${authContext.studioSession?.studioName ?? ""}`}
       />
 
@@ -244,7 +244,7 @@ export default function MemberLogin() {
 
         {/* Lista */}
         {normalizedMembers.length === 0 ? (
-          <p>No members available</p>
+          <p>{t("member.noMembersAvailable")}</p>
         ) : (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -286,7 +286,7 @@ export default function MemberLogin() {
                       ID: {member.memberId ?? member.id ?? t("member.idMissing")}
                     </div>
                   </div>
-                  {member.isOwner && <Badge variant="owner">Owner</Badge>}
+                  {member.isOwner && <Badge variant="owner">{t("common.owner")}</Badge>}
                 </button>
               );
             })}
