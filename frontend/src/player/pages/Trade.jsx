@@ -69,6 +69,8 @@ export default function Trade() {
   const [ethBalance, setEthBalance] = useState(null);
   const [selectedAssetBalance, setSelectedAssetBalance] = useState(null);
   const [gameSession, setGameSession] = useState(null);
+  const [gameSessionLoading, setGameSessionLoading] = useState(false);
+  const [gameSessionError, setGameSessionError] = useState("");
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
@@ -77,14 +79,25 @@ export default function Trade() {
   useEffect(() => {
     if (!gameId || !address) {
       setGameSession(null);
+      setGameSessionLoading(false);
+      setGameSessionError("");
       return;
     }
 
+    setGameSessionLoading(true);
+    setGameSessionError("");
     apiPost("/player/session", { gameId, walletAddress: address })
-      .then(setGameSession)
+      .then((session) => {
+        setGameSession(session);
+        setGameSessionError("");
+      })
       .catch((error) => {
         console.error("Failed to resolve player session:", error);
         setGameSession(null);
+        setGameSessionError("Game session could not be resolved yet.");
+      })
+      .finally(() => {
+        setGameSessionLoading(false);
       });
   }, [gameId, address]);
 
@@ -397,6 +410,7 @@ export default function Trade() {
   const estimatedNetOutput =
     grossOutput !== null ? grossOutput - (estimatedFeeAmount ?? 0) : null;
   const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
+  const scopeLabel = gameId ? "Game" : "Global";
 
   return (
     <div className="max-w-lg mx-auto">
@@ -422,6 +436,54 @@ export default function Trade() {
 
       {/* Trade Card */}
       <div className="card border-dark-500">
+        <div className="mb-6 rounded-lg border border-dark-500 bg-dark-700/40 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+            Trade Scope
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                gameId
+                  ? "border-neon-purple/40 bg-neon-purple/10 text-neon-purple"
+                  : "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan"
+              }`}
+            >
+              {scopeLabel}
+            </span>
+            {gameSession?.gameName && (
+              <span className="text-sm text-gray-200">
+                {gameSession.gameName}
+              </span>
+            )}
+            {gameSession?.studioName && (
+              <span className="text-xs text-gray-500">
+                via {gameSession.studioName}
+              </span>
+            )}
+          </div>
+          {gameId ? (
+            <div className="mt-2 space-y-1 text-xs text-gray-400">
+              <p>
+                {gameSession
+                  ? "Trades from this route are attributed to the selected game and studio."
+                  : gameSessionLoading
+                  ? "Resolving game session for this wallet..."
+                  : "This route is game-scoped, but the game session is not resolved yet."}
+              </p>
+              <p className="font-mono text-[11px] text-gray-500">
+                Game ID: {gameId}
+              </p>
+              {gameSessionError && (
+                <p className="text-neon-pink">{gameSessionError}</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">
+              Trades here are global and are not attributed to a specific game or studio.
+            </p>
+          )}
+        </div>
+
         {isConnected && (
           <div className="mb-6">
             <div className="mb-3">
