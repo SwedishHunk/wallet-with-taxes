@@ -1,0 +1,17 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Game } from "../platform/entities/game.entity";
+import { GamePlayer } from "../platform/entities/game-player.entity";
+import { User } from "../users/user.entity";
+import { EconomicsController } from "./economics.controller";
+import { EconomicEvent } from "./entities/economic-event.entity";
+import { EconomicsService } from "./economics.service";
+import { PlayerEconomicsService } from "./player-economics.service";
+
+@Module({
+  imports: [TypeOrmModule.forFeature([EconomicEvent, Game, GamePlayer, User])],
+  controllers: [EconomicsController],
+  providers: [EconomicsService, PlayerEconomicsService],
+  exports: [EconomicsService, TypeOrmModule],
+})
+export class EconomicsModule {}

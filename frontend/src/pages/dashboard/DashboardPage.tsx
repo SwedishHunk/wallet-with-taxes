@@ -13,7 +13,7 @@ import WalletInfo from "./WalletInfo";
 import EconomicEventsPanel from "./EconomicEventsPanel";
 import "../../style/Dashboard.css";
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const navigate = useNavigate();
   const { authContext, membersCount, activeGame } = useAuthState();
   const canManageMembers = useCanManageMembers();
@@ -21,7 +21,6 @@ export default function Dashboard() {
   const studio = authContext.studioSession;
   const member = authContext.memberSession;
 
-  // If no active game is selected, show message
   if (!activeGame) {
     return (
       <Page>
@@ -40,10 +39,7 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <PageHeader
-        title={activeGame.name}
-        subtitle={`Game ID: ${activeGame.gameId}`}
-      />
+      <PageHeader title={activeGame.name} subtitle={`Game ID: ${activeGame.gameId}`} />
 
       {!member &&
         membersCount !== null &&
@@ -54,12 +50,10 @@ export default function Dashboard() {
             <p>Logga in som medlem för att få åtkomst till admin-funktioner.</p>
             <Button
               onClick={() => {
-                console.log(
-                  "[Dashboard] Go to member-login",
-                  ROUTES.memberLogin,
-                );
+                console.log("[Dashboard] Go to member-login", ROUTES.memberLogin);
                 navigate(ROUTES.memberLogin);
-              }}>
+              }}
+            >
               Logga in som medlem
             </Button>
           </Card>
@@ -67,15 +61,6 @@ export default function Dashboard() {
 
       {member && (
         <Card>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold">{activeGame.name}</h3>
-            <p className="text-sm text-gray-500">
-              Active game for current studio monitoring
-            </p>
-            <p className="text-xs text-gray-500 font-mono mt-1">
-              Game ID: {activeGame.gameId}
-            </p>
-          </div>
           <div className="dashboard-member-section">
             <div className="dashboard-member-info">
               <h3>{member.email}</h3>
@@ -102,9 +87,7 @@ export default function Dashboard() {
 
             {canManageMembers && (
               <div className="dashboard-actions">
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate(ROUTES.members)}>
+                <Button variant="secondary" onClick={() => navigate(ROUTES.members)}>
                   Hantera medlemmar
                 </Button>
               </div>

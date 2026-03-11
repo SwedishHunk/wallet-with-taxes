@@ -6,9 +6,10 @@ const API_BASE = "/api";
  * Generic fetch wrapper for the backend API.
  */
 async function apiFetch(path, options = {}) {
+  const { headers, ...restOptions } = options;
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
+    ...restOptions,
+    headers: { "Content-Type": "application/json", ...headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

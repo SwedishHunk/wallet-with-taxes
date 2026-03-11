@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
-import { useApiData, apiGet, triggerSync } from "../hooks/useApi";
+import { useApiData, apiGet, apiPost, triggerSync } from "../hooks/useApi";
 import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
@@ -15,6 +16,7 @@ const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
   const { isConnected, address, provider } = useWallet();
+  const { gameId } = useParams();
   const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
     useContracts();
 
@@ -66,10 +68,42 @@ export default function Trade() {
   const [config, setConfig] = useState(null);
   const [ethBalance, setEthBalance] = useState(null);
   const [selectedAssetBalance, setSelectedAssetBalance] = useState(null);
+  const [gameSession, setGameSession] = useState(null);
+  const [gameSessionLoading, setGameSessionLoading] = useState(false);
+  const [gameSessionError, setGameSessionError] = useState("");
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!gameId || !address) {
+      setGameSession(null);
+      setGameSessionLoading(false);
+      setGameSessionError("");
+      return;
+    }
+
+    setGameSessionLoading(true);
+    setGameSessionError("");
+    apiGet(
+      `/player/session?gameId=${encodeURIComponent(
+        gameId
+      )}&walletAddress=${encodeURIComponent(address)}`
+    )
+      .then((session) => {
+        setGameSession(session);
+        setGameSessionError("");
+      })
+      .catch((error) => {
+        console.error("Failed to resolve player session:", error);
+        setGameSession(null);
+        setGameSessionError("Game session could not be resolved yet.");
+      })
+      .finally(() => {
+        setGameSessionLoading(false);
+      });
+  }, [gameId, address]);
 
   useEffect(() => {
     if (!isConnected || !address || !provider) {
@@ -314,6 +348,43 @@ export default function Trade() {
       } catch {
         // sync failed silently — not critical
       }
+
+      if (gameId && address) {
+        try {
+          await apiPost("/player/game-economic-event", {
+            gameId,
+            walletAddress: address,
+            txHash: tx.hash,
+            eventType: isBuy ? "buy_tri" : "sell_tri",
+            assetKey: "tri",
+            assetSymbol: "TRI",
+            amount: isBuy
+              ? String(estimatedNetOutput ?? 0)
+              : amount,
+            direction: isBuy ? "in" : "out",
+            metadata: {
+              tradeMode: mode,
+              tradeAssetAddress: selectedAsset.address,
+              tradeAssetSymbol: selectedAsset.symbol,
+              tradeAmountInput: amount,
+              tradeNetOutput: estimatedNetOutput,
+              playerScope: "game",
+            },
+          });
+        } catch (eventError) {
+          console.error("Failed to log game-scoped economic event:", eventError);
+          const attributionError =
+            eventError instanceof Error
+              ? eventError.message
+              : "Unknown attribution error";
+          setTxMessage(
+            `Transaction confirmed, but game attribution failed: ${attributionError}`.slice(
+              0,
+              180
+            )
+          );
+        }
+      }
     } catch (err) {
       setTxStatus("error");
       const reason = formatTxError(err, "Transaction failed");
@@ -353,6 +424,7 @@ export default function Trade() {
   const estimatedNetOutput =
     grossOutput !== null ? grossOutput - (estimatedFeeAmount ?? 0) : null;
   const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
+  const scopeLabel = gameId ? "Game" : "Global";
 
   return (
     <div className="max-w-lg mx-auto">
@@ -361,7 +433,9 @@ export default function Trade() {
         <h1 className="text-3xl font-bold">
           <span className="glow-text-cyan">Trade</span>
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
+        {!gameSession && (
+          <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
+        )}
       </div>
 
       {/* Error Banner — shows if asset loading failed */}
@@ -369,6 +443,54 @@ export default function Trade() {
 
       {/* Trade Card */}
       <div className="card border-dark-500">
+        <div className="mb-6 rounded-lg border border-dark-500 bg-dark-700/40 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+            Trade Scope
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                gameId
+                  ? "border-neon-purple/40 bg-neon-purple/10 text-neon-purple"
+                  : "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan"
+              }`}
+            >
+              {scopeLabel}
+            </span>
+            {gameSession?.gameName && (
+              <span className="text-sm text-gray-200">
+                {gameSession.gameName}
+              </span>
+            )}
+            {gameSession?.studioName && (
+              <span className="text-xs text-gray-500">
+                via {gameSession.studioName}
+              </span>
+            )}
+          </div>
+          {gameId ? (
+            <div className="mt-2 space-y-1 text-xs text-gray-400">
+              <p>
+                {gameSession
+                  ? "Trades from this route are attributed to the selected game and studio."
+                  : gameSessionLoading
+                  ? "Resolving game session for this wallet..."
+                  : "This route is game-scoped, but the game session is not resolved yet."}
+              </p>
+              <p className="font-mono text-[11px] text-gray-500">
+                Game ID: {gameId}
+              </p>
+              {gameSessionError && (
+                <p className="text-neon-pink">{gameSessionError}</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">
+              Trades here are global and are not attributed to a specific game or studio.
+            </p>
+          )}
+        </div>
+
         {isConnected && (
           <div className="mb-6">
             <div className="mb-3">
