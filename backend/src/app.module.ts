@@ -15,11 +15,15 @@ import { PlatformModule } from "./platform/platform.module";
 import { TokenShopModule } from "./tokenshop/tokenshop.module";
 import { EconomicsModule } from "./economics/economics.module";
 
+const isTestEnv = process.env.NODE_ENV === "test";
+const shouldSynchronizeSchema =
+  isTestEnv || process.env.TYPEORM_SYNCHRONIZE === "true";
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV === "test" ? ".env.test" : ".env",
+      envFilePath: isTestEnv ? ".env.test" : ".env",
     }),
     ThrottlerModule.forRoot([
       {
@@ -31,29 +35,29 @@ import { EconomicsModule } from "./economics/economics.module";
     TypeOrmModule.forRoot({
       type: "postgres",
       host:
-        process.env.NODE_ENV === "test"
+        isTestEnv
           ? process.env.TEST_DATABASE_HOST
           : process.env.DATABASE_HOST,
       port: Number(
-        process.env.NODE_ENV === "test"
+        isTestEnv
           ? process.env.TEST_DATABASE_PORT
           : process.env.DATABASE_PORT,
       ),
       username:
-        process.env.NODE_ENV === "test"
+        isTestEnv
           ? process.env.TEST_DATABASE_USER
           : process.env.DATABASE_USER,
       password:
-        process.env.NODE_ENV === "test"
+        isTestEnv
           ? process.env.TEST_DATABASE_PASSWORD
           : process.env.DATABASE_PASSWORD,
       database:
-        process.env.NODE_ENV === "test"
+        isTestEnv
           ? process.env.TEST_DATABASE_NAME
           : process.env.DATABASE_NAME,
-      synchronize: true,
+      synchronize: shouldSynchronizeSchema,
       autoLoadEntities: true,
-      dropSchema: process.env.NODE_ENV === "test" ? true : false,
+      dropSchema: isTestEnv ? true : false,
     }),
     UsersModule,
     WalletsModule,
