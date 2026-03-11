@@ -86,9 +86,9 @@ export class EconomicsService {
     return saved;
   }
 
-  getEventsForStudio(studioId: string) {
+  getEventsForStudio(studioId: string, gameId?: string) {
     return this.repo.find({
-      where: { studioId },
+      where: gameId ? { studioId, gameId } : { studioId },
       order: { timestamp: "DESC", createdAt: "DESC" },
     });
   }

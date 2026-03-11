@@ -11,6 +11,7 @@ import {
 } from "../../components/ui/index";
 import WalletInfo from "./WalletInfo";
 import EconomicEventsPanel from "./EconomicEventsPanel";
+import StudioEconomicEventsPanel from "./StudioEconomicEventsPanel";
 import { useLanguage } from "../../lib/LanguageContext";
 import "../../style/Dashboard.css";
 
@@ -100,6 +101,10 @@ export default function DashboardPage() {
 
       <Card>
         <EconomicEventsPanel />
+      </Card>
+
+      <Card>
+        <StudioEconomicEventsPanel />
       </Card>
 
       <Card>

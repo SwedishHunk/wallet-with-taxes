@@ -135,6 +135,19 @@ export class EconomicsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get("economics/studio")
+  getEventsForCurrentStudio(
+    @Req() req: Request,
+    @Query("gameId") gameId?: string,
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.economicsService.getEventsForStudio(
+      jwtUser.studioId,
+      gameId?.trim() || undefined,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get("economics/game/:gameId")
   getEventsForCurrentStudioGame(
     @Req() req: Request,
