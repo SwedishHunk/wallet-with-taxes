@@ -118,29 +118,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const savedMember = localStorage.getItem(MEMBER_SESSION_KEY);
 
       if (savedStudio) {
-        const parsedStudio = JSON.parse(savedStudio);
-        if (parsedStudio?.studioId) {
-          setStudioSessionState(parsedStudio);
-        } else {
+        try {
+          const parsedStudio = JSON.parse(savedStudio);
+          if (parsedStudio?.studioId) {
+            setStudioSessionState(parsedStudio);
+          } else {
+            localStorage.removeItem(STUDIO_SESSION_KEY);
+          }
+        } catch {
+          console.warn("[AuthContext] Corrupted studio_session — clearing");
           localStorage.removeItem(STUDIO_SESSION_KEY);
         }
       }
 
       if (savedMember) {
-        const parsedMember = JSON.parse(savedMember);
-        if (parsedMember?.memberId && parsedMember?.studioId) {
-          setMemberSessionState(parsedMember);
-        } else {
+        try {
+          const parsedMember = JSON.parse(savedMember);
+          if (parsedMember?.memberId && parsedMember?.studioId) {
+            setMemberSessionState(parsedMember);
+          } else {
+            localStorage.removeItem(MEMBER_SESSION_KEY);
+          }
+        } catch {
+          console.warn("[AuthContext] Corrupted member_session — clearing");
           localStorage.removeItem(MEMBER_SESSION_KEY);
         }
       }
 
       const savedGame = localStorage.getItem(ACTIVE_GAME_KEY);
       if (savedGame) {
-        const parsedGame = JSON.parse(savedGame);
-        if (parsedGame?.gameId && parsedGame?.name && parsedGame?.slug) {
-          setActiveGameState(parsedGame);
-        } else {
+        try {
+          const parsedGame = JSON.parse(savedGame);
+          if (parsedGame?.gameId && parsedGame?.name && parsedGame?.slug) {
+            setActiveGameState(parsedGame);
+          } else {
+            localStorage.removeItem(ACTIVE_GAME_KEY);
+          }
+        } catch {
+          console.warn("[AuthContext] Corrupted activeGame — clearing");
           localStorage.removeItem(ACTIVE_GAME_KEY);
         }
       }

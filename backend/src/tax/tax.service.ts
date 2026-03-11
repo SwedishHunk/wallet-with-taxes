@@ -91,7 +91,10 @@ export class TaxService {
       }
     }
 
-    const adjustedLossesUSD = totalLossesUSD * 0.7;
+    // Swedish tax law: capital losses on financial assets are 70% deductible
+    // (Inkomstskattelagen 48 kap. 20-24 §§)
+    const SWEDISH_LOSS_DEDUCTION_RATE = 0.70;
+    const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
     const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
 
     return {
