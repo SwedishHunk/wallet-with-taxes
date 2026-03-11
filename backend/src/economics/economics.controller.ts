@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -38,6 +39,20 @@ export class EconomicsController {
     private readonly economicsService: EconomicsService,
     private readonly playerEconomicsService: PlayerEconomicsService,
   ) {}
+
+  @Get("api/player/session")
+  getPlayerSession(
+    @Query("gameId") gameId?: string,
+    @Query("walletAddress") walletAddress?: string,
+  ) {
+    if (!gameId || !walletAddress) {
+      throw new BadRequestException(
+        "gameId and walletAddress are required",
+      );
+    }
+
+    return this.playerEconomicsService.resolveSession(gameId, walletAddress);
+  }
 
   @Post("api/player/session")
   createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {

@@ -86,7 +86,11 @@ export default function Trade() {
 
     setGameSessionLoading(true);
     setGameSessionError("");
-    apiPost("/player/session", { gameId, walletAddress: address })
+    apiGet(
+      `/player/session?gameId=${encodeURIComponent(
+        gameId
+      )}&walletAddress=${encodeURIComponent(address)}`
+    )
       .then((session) => {
         setGameSession(session);
         setGameSessionError("");
