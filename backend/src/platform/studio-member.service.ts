@@ -20,7 +20,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, EntityManager } from "typeorm";
 import {
   StudioMember,
   PermissionBitMask,
@@ -388,8 +388,13 @@ export class StudioMemberService {
   async createBootstrapOwner(
     studio: Studio,
     user: User,
+    manager?: EntityManager,
   ): Promise<StudioMember> {
-    const owner = this.memberRepository.create({
+    const repo = manager
+      ? manager.getRepository(StudioMember)
+      : this.memberRepository;
+
+    const owner = repo.create({
       studio,
       user,
       isOwner: true,
@@ -400,10 +405,10 @@ export class StudioMemberService {
         PermissionBitMask.ManageSettings |
         PermissionBitMask.MintNFT |
         PermissionBitMask.MakeTransactions,
-      gameAccessIds: [], // Games läggs till senare
+      gameAccessIds: [],
     });
 
-    return this.memberRepository.save(owner);
+    return repo.save(owner);
   }
 
   // ============ CONVERSION HELPERS ============
