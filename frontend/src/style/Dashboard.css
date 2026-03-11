@@ -1,40 +1,51 @@
-/* Layout & spacing (tokens-based colors applied via components) */
+/* ========================================
+   Dashboard — Gaming Studio Theme
+   ======================================== */
 
 .dashboard-member-section {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  animation: fadeInUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .dashboard-member-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 .dashboard-member-info h3 {
   margin: 0;
+  font-family: "Orbitron", "Inter", sans-serif;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: 0.01em;
 }
 
 .dashboard-member-ids {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
+  font-family: "JetBrains Mono", monospace;
   color: var(--muted);
+  letter-spacing: 0.02em;
 }
 
 .dashboard-permissions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .dashboard-permissions h4 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .dashboard-badge-row {
@@ -46,6 +57,6 @@
 .dashboard-actions {
   display: flex;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--primary-rgb), 0.1);
 }

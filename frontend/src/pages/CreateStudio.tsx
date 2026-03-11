@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../lib/LanguageContext";
 import { ROUTES } from "../routes";
 import { signup } from "../lib/users";
 import { setAuthToken } from "../lib/api";
@@ -11,6 +12,7 @@ export default function CreateStudio() {
   const navigate = useNavigate();
   const { loginStudio } = useLoginStudio();
   const { loginMember } = useLoginMember();
+  const { t } = useLanguage();
 
   const [studioName, setStudioName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,19 +27,19 @@ export default function CreateStudio() {
 
     // Validation
     if (!studioName.trim()) {
-      setError("Studio name cannot be empty");
+      setError(t("studio.errNameEmpty"));
       return;
     }
     if (!email.trim() || !email.includes("@")) {
-      setError("Valid email is required");
+      setError(t("studio.errEmailInvalid"));
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("studio.errPasswordShort"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("studio.errPasswordMismatch"));
       return;
     }
 
@@ -73,7 +75,7 @@ export default function CreateStudio() {
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to create studio";
+          ?.message || t("studio.errFailed");
       setError(message);
     } finally {
       setLoading(false);
@@ -83,7 +85,7 @@ export default function CreateStudio() {
   return (
     <div className="login-page">
       <div className="login-box" style={{ maxWidth: "500px" }}>
-        <h1 className="login-title">Skapa studio</h1>
+        <h1 className="login-title">{t("studio.create")}</h1>
 
         <form className="login-fields" onSubmit={handleSubmit}>
           {error && (
@@ -92,7 +94,7 @@ export default function CreateStudio() {
 
           <input
             type="text"
-            placeholder="Studio name"
+            placeholder={t("studio.namePlaceholder")}
             className="login-input"
             value={studioName}
             onChange={(e) => setStudioName(e.target.value)}
@@ -102,7 +104,7 @@ export default function CreateStudio() {
 
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t("common.email")}
             className="login-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -112,7 +114,7 @@ export default function CreateStudio() {
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t("common.password")}
             className="login-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -122,7 +124,7 @@ export default function CreateStudio() {
 
           <input
             type="password"
-            placeholder="Confirm password"
+            placeholder={t("studio.confirmPassword")}
             className="login-input"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -131,14 +133,14 @@ export default function CreateStudio() {
           />
 
           <button type="submit" className="login-button" disabled={loading}>
-            {loading ? "Skapar studio..." : "Skapa studio"}
+            {loading ? t("studio.creating") : t("studio.create")}
           </button>
         </form>
 
         <p className="login-footer">
-          Har du redan ett konto?{" "}
+          {t("studio.hasAccount")}{" "}
           <span className="signup-link" onClick={() => navigate(ROUTES.login)}>
-            Logga in
+            {t("studio.loginLink")}
           </span>
         </p>
       </div>

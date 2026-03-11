@@ -7,6 +7,7 @@ import { useApiData, apiGet, apiPost, triggerSync } from "../hooks/useApi";
 import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { useLanguage } from "../../lib/LanguageContext";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -15,6 +16,7 @@ import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
+  const { t } = useLanguage();
   const { isConnected, address, provider } = useWallet();
   const { gameId } = useParams();
   const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
@@ -431,10 +433,10 @@ export default function Trade() {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold">
-          <span className="glow-text-cyan">Trade</span>
+          <span className="glow-text-cyan">{t("player.trade.title")}</span>
         </h1>
         {!gameSession && (
-          <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
+          <p className="text-gray-500 text-sm mt-1">{t("player.trade.subtitle")}</p>
         )}
       </div>
 
@@ -495,10 +497,10 @@ export default function Trade() {
           <div className="mb-6">
             <div className="mb-3">
               <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
-                Current Wallet Balances
+                {t("player.trade.balances")}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Live balances from the connected wallet for trade-compatible assets.
+                {t("player.trade.balancesDesc")}
               </p>
             </div>
             <div
@@ -508,7 +510,7 @@ export default function Trade() {
             >
               <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                  ETH Balance
+                  {t("player.trade.ethBalance")}
                 </p>
                 <p className="mt-1 font-mono text-sm text-gray-100">
                   {formatBalance(ethBalance)}
@@ -516,7 +518,7 @@ export default function Trade() {
               </div>
               <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                  TRI Balance
+                  {t("player.trade.triBalance")}
                 </p>
                 <p className="mt-1 font-mono text-sm text-gray-100">
                   {tokenBalance?.genBalance ?? "—"}
@@ -525,7 +527,7 @@ export default function Trade() {
               {!isEth && (
                 <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                    {selectedAsset ? `${selectedAsset.symbol} Balance` : "Asset Balance"}
+                    {selectedAsset ? `${selectedAsset.symbol} ${t("player.trade.assetBalance")}` : t("player.trade.assetBalance")}
                   </p>
                   <p className="mt-1 font-mono text-sm text-gray-100">
                     {selectedAsset ? formatBalance(selectedAssetBalance) : "—"}
@@ -546,7 +548,7 @@ export default function Trade() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Buy TRI
+            {t("player.trade.buyTri")}
           </button>
           <button
             onClick={() => setMode("sell")}
@@ -556,7 +558,7 @@ export default function Trade() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Sell TRI
+            {t("player.trade.sellTri")}
           </button>
         </div>
 
@@ -570,7 +572,7 @@ export default function Trade() {
             ------------------------------------------------------- */}
         <div className="mb-4">
           <label className="label">
-            {isBuy ? "Pay with" : "Receive"}
+            {isBuy ? t("player.trade.payWith") : t("player.trade.receive")}
           </label>
 
           {assetsLoading ? (
@@ -600,7 +602,7 @@ export default function Trade() {
           <label className="label">
             {isBuy
               ? `Amount (${selectedAsset?.symbol || "..."})`
-              : "Amount (TRI)"}
+              : t("player.trade.amountTri")}
           </label>
           <input
             type="number"
@@ -617,12 +619,12 @@ export default function Trade() {
         <div className="mb-6">
           <label className="label">
             {isBuy
-              ? "Estimated receive after fee (TRI)"
-              : `Estimated receive after fee (${selectedAsset?.symbol || "..."})`}
+              ? t("player.trade.estReceiveTri")
+              : `${t("player.trade.estReceiveAsset")} (${selectedAsset?.symbol || "..."})`}
           </label>
           <div className="input-field bg-dark-900 text-lg flex items-center justify-between">
             {quoteLoading ? (
-              <span className="text-gray-500 animate-pulse">Fetching quote...</span>
+              <span className="text-gray-500 animate-pulse">{t("player.trade.fetchingQuote")}</span>
             ) : estimatedNetOutput !== null ? (
               <span className={isBuy ? "glow-text-green" : "glow-text-pink"}>
                 {formatTradeNumber(estimatedNetOutput)}
@@ -634,19 +636,19 @@ export default function Trade() {
           {quote && (
             <div className="mt-2 space-y-1 text-xs text-gray-500">
               <div className="flex justify-between">
-                <span>Gross quote</span>
+                <span>{t("player.trade.grossQuote")}</span>
                 <span className="font-mono">
                   {formatTradeNumber(grossOutput)} {outputSymbol}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Estimated fee</span>
+                <span>{t("player.trade.estFee")}</span>
                 <span className="font-mono">
                   {formatTradeNumber(estimatedFeeAmount)} {outputSymbol}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Net after fee</span>
+                <span>{t("player.trade.netAfterFee")}</span>
                 <span className="font-mono">
                   {formatTradeNumber(estimatedNetOutput)} {outputSymbol}
                 </span>
@@ -659,32 +661,32 @@ export default function Trade() {
         {selectedAsset && (
           <div className="bg-dark-700/50 rounded-lg p-3 mb-6">
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Rate</span>
+              <span>{t("player.trade.rate")}</span>
               <span className="font-mono">
                 1 {selectedAsset.symbol} = {isBuy ? selectedAsset.buyRate : selectedAsset.sellRate} TRI
               </span>
             </div>
             {config && config.feePercent > 0 && (
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Fee</span>
+                <span>{t("player.trade.feeLabel")}</span>
                 <span className="font-mono">{config.feePercent}%</span>
               </div>
             )}
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>{isBuy ? "Max buy" : "Max sell"}</span>
+              <span>{isBuy ? t("player.trade.maxBuy") : t("player.trade.maxSell")}</span>
               <span className="font-mono">
                 {isBuy
                   ? maxEthIn && maxEthIn > 0
                     ? `${config.maxEthIn} ETH`
-                    : "Unlimited"
+                    : t("player.trade.unlimited")
                   : maxTriIn && maxTriIn > 0
                   ? `${config.maxGenIn} TRI`
-                  : "Unlimited"}
+                  : t("player.trade.unlimited")}
               </span>
             </div>
             {!isEth && (
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Decimals</span>
+                <span>{t("player.trade.decimals")}</span>
                 <span className="font-mono">{selectedAsset.decimals}</span>
               </div>
             )}
@@ -694,7 +696,7 @@ export default function Trade() {
         {/* Action Button */}
         {!isConnected ? (
           <p className="text-center text-gray-500 text-sm py-3">
-            Connect your wallet to trade
+            {t("player.trade.connectToTrade")}
           </p>
         ) : (
           <>
@@ -716,14 +718,14 @@ export default function Trade() {
             >
               <Zap size={14} className="inline mr-1" />
               {txStatus === "pending"
-                ? "Processing..."
+                ? t("player.trade.processing")
                 : isBuy
-                ? `Buy TRI with ${selectedAsset?.symbol || "..."}`
-                : `Sell TRI for ${selectedAsset?.symbol || "..."}`}
+                ? `${t("player.trade.buyWith")} ${selectedAsset?.symbol || "..."}`
+                : `${t("player.trade.sellFor")} ${selectedAsset?.symbol || "..."}`}
             </button>
             {!ready && configLoaded && (
               <p className="text-xs text-neon-pink mt-2 text-center">
-                TokenShop contract not ready yet. Verify wallet connection and config.
+                {t("player.trade.notReady")}
               </p>
             )}
             {preflightError && (

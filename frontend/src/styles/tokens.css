@@ -1,15 +1,51 @@
 :root {
-  --bg: #0c111b;
-  --surface: #111827;
-  --surface2: #1f2937;
-  --text: #e5e7eb;
-  --muted: #9ca3af;
-  --border: #273248;
-  --primary: #60a5fa;
-  --danger: #ef4444;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --focus: #93c5fd;
-  --radius: 10px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  /* === Deep Dark Backgrounds === */
+  --bg: #050810;
+  --bg-gradient: linear-gradient(135deg, #050810 0%, #0a0e1a 40%, #0d1225 100%);
+  --surface: rgba(15, 20, 35, 0.85);
+  --surface2: rgba(22, 28, 50, 0.75);
+  --surface-glass: rgba(15, 20, 40, 0.6);
+
+  /* === Text Colors === */
+  --text: #e8ecf4;
+  --text-bright: #ffffff;
+  --muted: #6b7a99;
+
+  /* === Neon Accent Colors === */
+  --primary: #00d4ff;
+  --primary-rgb: 0, 212, 255;
+  --primary-dim: rgba(0, 212, 255, 0.15);
+  --secondary: #a855f7;
+  --secondary-rgb: 168, 85, 247;
+  --accent: #00ff88;
+  --accent-rgb: 0, 255, 136;
+
+  /* === Status Colors === */
+  --danger: #ff3366;
+  --danger-rgb: 255, 51, 102;
+  --success: #00ff88;
+  --success-rgb: 0, 255, 136;
+  --warning: #ffaa00;
+  --warning-rgb: 255, 170, 0;
+
+  /* === Borders & Effects === */
+  --border: rgba(100, 120, 180, 0.15);
+  --border-glow: rgba(0, 212, 255, 0.25);
+  --focus: #00d4ff;
+
+  /* === Shadows === */
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-neon: 0 0 20px rgba(0, 212, 255, 0.15), 0 0 60px rgba(0, 212, 255, 0.05);
+  --shadow-purple: 0 0 20px rgba(168, 85, 247, 0.15), 0 0 60px rgba(168, 85, 247, 0.05);
+  --shadow-green: 0 0 20px rgba(0, 255, 136, 0.15);
+
+  /* === Glass Effect === */
+  --glass-bg: rgba(15, 20, 40, 0.55);
+  --glass-border: rgba(100, 140, 255, 0.12);
+  --glass-blur: 16px;
+
+  /* === Geometry === */
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 }

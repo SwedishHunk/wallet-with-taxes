@@ -1,5 +1,6 @@
 import { useWallet } from "../context/WalletContext";
 import { useApiData, triggerSync } from "../hooks/useApi";
+import { useLanguage } from "../../lib/LanguageContext";
 import StatCard from "../components/StatCard";
 import ErrorBanner from "../components/ErrorBanner";
 import {
@@ -116,6 +117,7 @@ function calculateEventFee(event, feeBps) {
 }
 
 export default function Portfolio() {
+  const { t } = useLanguage();
   const { isConnected, address, provider } = useWallet();
   const [syncing, setSyncing] = useState(false);
   const [ethBalance, setEthBalance] = useState(null);
@@ -249,8 +251,8 @@ export default function Portfolio() {
         <div className="p-6 rounded-full bg-dark-800 border border-dark-600 mb-6">
           <Wallet size={40} className="text-gray-500" />
         </div>
-        <h2 className="text-xl font-bold text-gray-300 mb-2">Connect Your Wallet</h2>
-        <p className="text-gray-500 text-sm">Connect your wallet to view your portfolio</p>
+        <h2 className="text-xl font-bold text-gray-300 mb-2">{t("player.portfolio.connectWallet")}</h2>
+        <p className="text-gray-500 text-sm">{t("player.portfolio.connectDesc")}</p>
       </div>
     );
   }
@@ -330,7 +332,7 @@ export default function Portfolio() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">
-            <span className="glow-text-purple">Portfolio</span>
+            <span className="glow-text-purple">{t("player.portfolio.title")}</span>
           </h1>
           <p className="text-gray-500 text-sm mt-1 font-mono">
             {address?.slice(0, 6)}...{address?.slice(-4)}
@@ -342,7 +344,7 @@ export default function Portfolio() {
           className="btn-secondary flex items-center gap-2"
         >
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-          Refresh
+          {t("player.portfolio.refresh")}
         </button>
       </div>
 
@@ -351,40 +353,39 @@ export default function Portfolio() {
 
       <div className="mb-8">
         <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
-          Current Holdings
+          {t("player.portfolio.holdings")}
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          Live balances from the connected wallet and supported trading assets.
+          {t("player.portfolio.holdingsDesc")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard
-          label="ETH Balance"
+          label={t("player.portfolio.ethBalance")}
           value={formatDisplayNumber(ethBalance)}
-          sub="Native wallet balance"
+          sub={t("player.portfolio.ethBalanceSub")}
           color="purple"
           icon={Landmark}
         />
         <StatCard
-          label="TRI Balance"
+          label={t("player.portfolio.triBalance")}
           value={balance?.genBalance || "0"}
-          sub="Current wallet holdings"
-          meta="Full wallet balance, regardless of source"
+          sub={t("player.portfolio.triBalanceSub")}
           color="cyan"
           icon={Coins}
         />
         <StatCard
-          label="Tracked TRI Position"
+          label={t("player.portfolio.trackedPos")}
           value={formatDisplayNumber(trackedTriPosition)}
-          sub="Net TRI from TokenShop history"
+          sub={t("player.portfolio.trackedPosSub")}
           color="green"
           icon={Activity}
         />
         <StatCard
-          label="Total Buys / Sells"
+          label={t("player.portfolio.buySell")}
           value={`${totalBuys} / ${totalSells}`}
-          sub="Tracked TokenShop trade count"
+          sub={t("player.portfolio.buySellSub")}
           color="pink"
           icon={ArrowUpRight}
         />
@@ -392,7 +393,7 @@ export default function Portfolio() {
 
       <div className="mb-8">
         <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
-          Performance Snapshot
+          {t("player.portfolio.perf")}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           ETH-based valuation for the tracked TokenShop position, with optional USD/SEK snapshots from backend config.
@@ -415,7 +416,7 @@ export default function Portfolio() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard
-          label="Current TRI Price"
+          label={t("player.portfolio.currentTri")}
           value={
             currentTriPriceEth !== null
               ? `${formatDisplayNumber(currentTriPriceEth)} ETH`
@@ -439,7 +440,7 @@ export default function Portfolio() {
           icon={Activity}
         />
         <StatCard
-          label="Average Entry"
+          label={t("player.portfolio.avgEntry")}
           value={
             averageEntryPriceEth !== null
               ? `${formatDisplayNumber(averageEntryPriceEth)} ETH`
@@ -457,7 +458,7 @@ export default function Portfolio() {
           icon={ChartNoAxesCombined}
         />
         <StatCard
-          label="Est. Current Value"
+          label={t("player.portfolio.estValue")}
           value={
             estimatedCurrentValueEth !== null
               ? `${formatDisplayNumber(estimatedCurrentValueEth)} ETH`
@@ -475,7 +476,7 @@ export default function Portfolio() {
           icon={Coins}
         />
         <StatCard
-          label="Tracked Position PnL"
+          label={t("player.portfolio.pnl")}
           value={
             unrealizedPnlEth !== null
               ? `${unrealizedPnlEth >= 0 ? "+" : ""}${formatDisplayNumber(
@@ -483,7 +484,7 @@ export default function Portfolio() {
                 )} ETH`
               : "—"
           }
-          sub={pnlStatus}
+          sub={t(pnlStatus)}
           meta={
             hasFiatValuation
               ? `${formatCurrency(unrealizedPnlUsd, "USD")} vs ETH cost basis`
@@ -495,13 +496,13 @@ export default function Portfolio() {
       </div>
 
       <div className="card mb-8">
-        <p className="label mb-1">Wallet vs Tracked Position</p>
+        <p className="label mb-1">{t("player.portfolio.walletVsTracked")}</p>
         <p className="text-xs text-gray-500 mb-4">
           Wallet balance can include TRI from minting, transfers, or sources outside TokenShop. Performance metrics above only use tracked TokenShop activity.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="p-3 bg-dark-700/50 rounded-lg">
-            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Wallet TRI</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{t("player.portfolio.walletTri")}</p>
             <p className="text-lg font-mono text-gray-100 mt-1">
               {formatDisplayNumber(triBalance)} TRI
             </p>
@@ -513,7 +514,7 @@ export default function Portfolio() {
           </div>
           <div className="p-3 bg-dark-700/50 rounded-lg">
             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-              Tracked TokenShop TRI
+              {t("player.portfolio.trackedTri")}
             </p>
             <p className="text-lg font-mono text-gray-100 mt-1">
               {formatDisplayNumber(trackedTriPosition)} TRI
@@ -529,11 +530,11 @@ export default function Portfolio() {
         <div className="card mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Layers size={16} className="text-gray-400" />
-            <p className="label">Compatible Asset Balances</p>
+            <p className="label">{t("player.portfolio.compatibleAssets")}</p>
           </div>
           {compatibleBalances.length === 0 ? (
             <p className="text-sm text-gray-500">
-              No supported ERC-20 balances detected in this wallet yet.
+              {t("player.portfolio.noErc20")}
             </p>
           ) : (
             <div className="space-y-3">
@@ -547,7 +548,7 @@ export default function Portfolio() {
                       {asset.symbol}
                     </span>
                     <span className="text-xs text-gray-500 ml-2">
-                      Trade-compatible wallet asset
+                      {t("player.portfolio.compatibleLabel")}
                     </span>
                   </div>
                   <div className="text-right">
@@ -565,7 +566,7 @@ export default function Portfolio() {
       {/* Trading Breakdown */}
       {positions.length > 0 && (
         <div className="card mb-8">
-          <p className="label mb-1">Trading Breakdown by Payment Asset</p>
+          <p className="label mb-1">{t("player.portfolio.tradingBreakdown")}</p>
           <p className="text-xs text-gray-500 mb-4">
             Shows how your TRI position was built or reduced through each payment asset.
           </p>
@@ -578,7 +579,7 @@ export default function Portfolio() {
                 <div>
                   <span className="text-sm font-semibold text-gray-200">{p.symbol}</span>
                   <div className="text-xs text-gray-500 mt-1">
-                    {p.buys} buys · {p.sells} sells
+                    {p.buys} {t("player.portfolio.buysLabel")} · {p.sells} {t("player.portfolio.sellsLabel")}
                   </div>
                 </div>
                 <div className="text-right">
@@ -600,9 +601,9 @@ export default function Portfolio() {
 
       {/* Transaction History */}
       <div className="card">
-        <p className="label mb-1">Transaction History</p>
+        <p className="label mb-1">{t("player.portfolio.txHistory")}</p>
         <p className="text-xs text-gray-500 mb-4">
-          Recent buy and sell activity for the connected wallet.
+          {t("player.portfolio.txHistoryDesc")}
         </p>
         {histLoading ? (
           <div className="space-y-3">
@@ -611,7 +612,7 @@ export default function Portfolio() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <p className="text-gray-500 text-sm text-center py-8">No transactions yet</p>
+          <p className="text-gray-500 text-sm text-center py-8">{t("player.portfolio.noTransactions")}</p>
         ) : (
           <div className="space-y-2">
             {events.map((e, i) => {
@@ -754,18 +755,18 @@ function syncStatusKey(syncing) {
 
 function getPnlStatus(unrealizedPnlEth) {
   if (unrealizedPnlEth === null || unrealizedPnlEth === undefined) {
-    return "Need ETH trade history to calculate";
+    return "player.portfolio.needEthHistory";
   }
 
   if (Math.abs(unrealizedPnlEth) < 0.000001) {
-    return "Roughly break-even";
+    return "player.portfolio.breakEven";
   }
 
   if (unrealizedPnlEth > 0) {
-    return "Currently in profit";
+    return "player.portfolio.inProfit";
   }
 
-  return "Currently at a loss";
+  return "player.portfolio.atLoss";
 }
 
 function formatValuationSource(source) {

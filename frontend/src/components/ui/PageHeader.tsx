@@ -1,4 +1,6 @@
 import { ReactNode } from "react";
+import { motion } from "framer-motion";
+import { fadeInUp, slideInRight } from "../../lib/motionPresets";
 import "./ui.css";
 
 type PageHeaderProps = {
@@ -15,14 +17,44 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={["ui-page-header", className].filter(Boolean).join(" ")}>
+    <motion.div
+      className={["ui-page-header", className].filter(Boolean).join(" ")}
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
+    >
       <div className="ui-page-header-content">
         <div>
-          <h1 className="ui-page-header-title">{title}</h1>
-          {subtitle && <p className="ui-page-header-subtitle">{subtitle}</p>}
+          <motion.h1
+            className="ui-page-header-title"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30, delay: 0.05 }}
+          >
+            {title}
+          </motion.h1>
+          {subtitle && (
+            <motion.p
+              className="ui-page-header-subtitle"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
+            >
+              {subtitle}
+            </motion.p>
+          )}
         </div>
       </div>
-      {children && <div className="ui-page-header-actions">{children}</div>}
-    </div>
+      {children && (
+        <motion.div
+          className="ui-page-header-actions"
+          variants={slideInRight}
+          initial="hidden"
+          animate="visible"
+        >
+          {children}
+        </motion.div>
+      )}
+    </motion.div>
   );
 }
