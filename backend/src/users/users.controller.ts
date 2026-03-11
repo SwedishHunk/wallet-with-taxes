@@ -7,6 +7,7 @@ import {
   UseGuards,
   Param,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Request } from "express";
@@ -17,17 +18,20 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post("signup")
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   async signup(@Body() body: SignupDto) {
     const { email, password, studioName } = body;
     return this.usersService.signup(email, password, studioName);
   }
 
   @Post("login")
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   async login(@Body() body: LoginDto) {
     return this.usersService.login(body.email, body.password, body.studioId);
   }
 
   @Post("link-wallet")
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   async linkWallet(@Body() body: LinkWalletDto) {
     return this.usersService.linkWallet(body.email, body.walletAddress);
   }
