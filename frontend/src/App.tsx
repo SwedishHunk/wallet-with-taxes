@@ -24,7 +24,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import StudioSelector from "./pages/StudioSelector";
 import CreateStudio from "./pages/CreateStudio";
-import Dashboard from "./pages/dashboard/index_dash";
+import Dashboard from "./pages/dashboard/DashboardPage";
 import MemberLogin from "./pages/MemberLogin";
 import Members from "./pages/Members";
 import PersonalAccounts from "./pages/PersonalAccounts";
