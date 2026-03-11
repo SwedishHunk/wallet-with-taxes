@@ -433,15 +433,8 @@ export default function Trade() {
         <h1 className="text-3xl font-bold">
           <span className="glow-text-cyan">Trade</span>
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {gameSession
-            ? `Game-scoped trade for ${gameSession.gameName}`
-            : "Buy or sell TRI tokens"}
-        </p>
-        {gameSession && (
-          <p className="text-[11px] text-neon-purple mt-2">
-            Trades from this route are attributed to studio and game monitoring.
-          </p>
+        {!gameSession && (
+          <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
         )}
       </div>
 

@@ -50,11 +50,6 @@ export default function EconomicEventsPanel() {
           <p className="text-sm text-gray-600">
             Latest game-attributed player trades for the currently selected game.
           </p>
-          {activeGame && (
-            <p className="mt-1 text-xs text-gray-500">
-              Active game: <span className="font-semibold">{activeGame.name}</span>
-            </p>
-          )}
         </div>
         <button
           type="button"
