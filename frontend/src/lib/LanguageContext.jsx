@@ -1,0 +1,387 @@
+import React, { createContext, useContext, useState, useCallback } from "react";
+
+const LanguageContext = createContext({
+  lang: "en",
+  t: (key) => key,
+  toggle: () => {},
+});
+
+/** All UI strings — English is the source of truth */
+const translations = {
+  // ── RoleGateway ──
+  "role.eyebrow":              { en: "Triolith Access Point", sv: "Triolith Access Point" },
+  "role.title":                { en: "Choose how you want to enter the system", sv: "Välj hur du vill gå in i systemet" },
+  "role.intro":                { en: "The Player flow takes you to TokenShop, trading and portfolio. Game Owner goes to studio, member and platform management.", sv: "Player-flödet går till TokenShop, trading och portfolio. Spelägare går till studio-, medlem- och plattformsdelen." },
+  "role.player":               { en: "Player", sv: "Spelare" },
+  "role.player.headline":      { en: "Enter the Player Portal", sv: "Gå till spelarportalen" },
+  "role.player.body":          { en: "TokenShop, buy/sell tokens, portfolio and tax overview.", sv: "TokenShop, köp/sälj tokens, portfolio och skatteöversikt." },
+  "role.owner":                { en: "Game Owner", sv: "Spelägare" },
+  "role.owner.headline":       { en: "Log in to the studio and control panel", sv: "Logga in till studio- och kontrollpanelen" },
+  "role.owner.body":           { en: "Studio login, members, games, settings and owner controls.", sv: "Studio-login, members, games, settings och owner-styrning." },
+
+  // ── Login ──
+  "login.title":               { en: "Studio login", sv: "Studio-inloggning" },
+  "login.close":               { en: "Close", sv: "Stäng" },
+  "login.email":               { en: "Email", sv: "E-post" },
+  "login.password":            { en: "Password", sv: "Lösenord" },
+  "login.submit":              { en: "Login", sv: "Logga in" },
+  "login.loggingIn":           { en: "Logging in...", sv: "Loggar in..." },
+  "login.noAccount":           { en: "No account?", sv: "Inget konto?" },
+  "login.createStudio":        { en: "Create a studio", sv: "Skapa en studio" },
+  "login.studioActive":        { en: "Studio session already active. Continue to member login.", sv: "Studiosession är redan aktiv. Fortsätt till medlesinloggning." },
+
+  // ── MemberLogin ──
+  "member.title":              { en: "Select Member", sv: "Välj medlem" },
+  "member.subtitle":           { en: "Choose who to log in as", sv: "Välj vem du vill logga in som" },
+  "member.selectFirst":        { en: "Please select a member first.", sv: "Välj en medlem först." },
+  "member.enterPassword":      { en: "Please enter a password.", sv: "Ange lösenord." },
+  "member.missingToken":       { en: "Login response is missing token.", sv: "Login saknar token i response." },
+  "member.loginFailed":        { en: "Login failed", sv: "Inloggning misslyckades" },
+  "member.idMissing":          { en: "(missing)", sv: "(saknas)" },
+  "member.selectedMember":     { en: "Selected member", sv: "Vald medlem" },
+  "member.selectFromList":     { en: "Select a member from the list.", sv: "Välj en medlem i listan." },
+  "member.password":           { en: "Password", sv: "Lösenord" },
+  "member.enterPw":            { en: "Enter password", sv: "Ange lösenord" },
+  "member.selectMemberFirst":  { en: "Select a member first", sv: "Välj medlem först" },
+  "member.loginBtn":           { en: "Login as member", sv: "Logga in som medlem" },
+  "member.loggingIn":          { en: "Logging in...", sv: "Loggar in..." },
+  "member.loadingTitle":       { en: "Loading...", sv: "Laddar..." },
+  "member.loginAsTitle":       { en: "Log in as member", sv: "Logga in som medlem" },
+  "member.noMembersAvailable": { en: "No members available", sv: "Inga tillgängliga medlemmar" },
+
+  // ── Games ──
+  "games.title":               { en: "Games", sv: "Spel" },
+  "games.subtitle":            { en: "Select a game to work with or create a new one", sv: "Välj ett game att arbeta med eller skapa ett nytt" },
+  "games.activeGame":          { en: "Active game", sv: "Aktivt spel" },
+  "games.changeGame":          { en: "Change game", sv: "Byt spel" },
+  "games.openControl":         { en: "Open Game Control", sv: "Öppna spelkontroll" },
+  "games.createNew":           { en: "Create New Game", sv: "Skapa nytt spel" },
+  "games.creating":            { en: "Creating...", sv: "Skapar..." },
+  "games.noGames":             { en: "No games yet. Create one above!", sv: "Inga spel ännu. Skapa ett ovan!" },
+  "games.clearActive":         { en: "Clear active game", sv: "Rensa aktivt spel" },
+  "games.loading":             { en: "Loading games...", sv: "Laddar spel..." },
+  "games.noGamesYet":          { en: "No games found. Create your first game below.", sv: "Inga spel hittades. Skapa ditt första spel nedan." },
+  "games.available":           { en: "Available games", sv: "Tillgängliga spel" },
+  "games.active":              { en: "Active", sv: "Aktiv" },
+  "games.setActive":           { en: "Set active", sv: "Sätt aktiv" },
+  "games.createNewBtn":        { en: "+ Create new game", sv: "+ Skapa nytt spel" },
+  "games.createNewTitle":      { en: "Create new game", sv: "Skapa nytt spel" },
+  "games.nameLabel":           { en: "Game Name:", sv: "Spelnamn:" },
+  "games.slugLabel":           { en: "Slug (optional):", sv: "Slug (valfritt):" },
+  "games.slugPlaceholder":     { en: "Leave blank for auto-generation", sv: "Lämna tomt för autogenerering" },
+  "games.slugAuto":            { en: "Auto-generated slug:", sv: "Autogenererad slug:" },
+  "games.createBtn":           { en: "Create", sv: "Skapa" },
+  "games.errNameAlphanumeric": { en: "Game name must contain at least one alphanumeric character", sv: "Spelnamnet måste innehålla minst ett alfanumeriskt tecken" },
+  "games.errDupNamePre":       { en: "A game with the name", sv: "Ett spel med namnet" },
+  "games.errDupSlugPre":       { en: "A game with the slug", sv: "Ett spel med slugen" },
+  "games.errAlreadyExists":    { en: "already exists", sv: "finns redan" },
+  "games.errLoadFailed":       { en: "Failed to load games", sv: "Det gick inte att ladda spel" },
+  "games.errCreateFailed":     { en: "Failed to create game", sv: "Det gick inte att skapa spelet" },
+
+  // ── CreateStudio ──
+  "studio.create":             { en: "Create Studio", sv: "Skapa studio" },
+  "studio.creating":           { en: "Creating studio...", sv: "Skapar studio..." },
+  "studio.namePlaceholder":    { en: "Studio name", sv: "Studionamn" },
+  "studio.confirmPassword":    { en: "Confirm password", sv: "Bekräfta lösenord" },
+  "studio.hasAccount":         { en: "Already have an account?", sv: "Har du redan ett konto?" },
+  "studio.loginLink":          { en: "Log in", sv: "Logga in" },
+  "studio.errNameEmpty":       { en: "Studio name cannot be empty", sv: "Studionamnet kan inte vara tomt" },
+  "studio.errEmailInvalid":    { en: "Valid email is required", sv: "Giltig e-post krävs" },
+  "studio.errPasswordShort":   { en: "Password must be at least 6 characters", sv: "Lösenordet måste vara minst 6 tecken" },
+  "studio.errPasswordMismatch":{ en: "Passwords do not match", sv: "Lösenorden stämmer inte överens" },
+  "studio.errFailed":          { en: "Failed to create studio", sv: "Det gick inte att skapa studion" },
+
+  // ── Members ──
+  "members.readOnly":          { en: "Read Only", sv: "Läsåtkomst" },
+  "members.manage":            { en: "Manage members", sv: "Hantera medlemmar" },
+  "members.addMember":         { en: "+ Add member", sv: "+ Lägg till medlem" },
+  "members.createNew":         { en: "Create new member", sv: "Skapa ny medlem" },
+  "members.createBtn":         { en: "Create member", sv: "Skapa medlem" },
+  "members.permissions":       { en: "Permissions", sv: "Behörigheter" },
+  "members.noMembers":         { en: "No members yet", sv: "Inga medlemmar ännu" },
+  "members.notAuth":           { en: "Not authenticated", sv: "Inte autentiserad" },
+  "members.noPermission":      { en: "You don't have permission to manage members.", sv: "Du har inte behörighet att hantera medlemmar." },
+  "members.emailLabel":        { en: "Email", sv: "E-post" },
+  "members.passwordOptional":  { en: "Password (optional, auto-generated if blank)", sv: "Lösenord (valfritt, autogenereras om tomt)" },
+  "members.loading":           { en: "Loading members...", sv: "Laddar medlemmar..." },
+  "members.errEmailRequired":  { en: "Email is required", sv: "E-post krävs" },
+  "members.errCreateFailed":   { en: "Failed to create member", sv: "Det gick inte att skapa medlemmen" },
+  "members.errLoadFailed":     { en: "Failed to load members", sv: "Det gick inte att ladda medlemmar" },
+
+  // ── Nav / Header ──
+  "nav.members":               { en: "Members", sv: "Medlemmar" },
+  "nav.games":                 { en: "Games", sv: "Spel" },
+  "nav.settings":              { en: "Settings", sv: "Inställningar" },
+  "nav.dashboard":             { en: "Dashboard", sv: "Översikt" },
+  "nav.selectMember":          { en: "Select Member", sv: "Välj medlem" },
+  "nav.logoSub":               { en: "Studio", sv: "Studio" },
+  "nav.studioOnly":            { en: "Studio Only", sv: "Endast studio" },
+  "nav.studioLabel":           { en: "STUDIO", sv: "STUDIO" },
+  "nav.memberLabel":           { en: "MEMBER", sv: "MEDLEM" },
+
+  // ── Settings ──
+  "settings.title":            { en: "Settings", sv: "Inställningar" },
+  "settings.comingSoon":       { en: "Settings coming soon.", sv: "Inställningar kommer snart." },
+
+  // ── Studio Dashboard ──
+  "dash.noGame":               { en: "No active game selected", sv: "Inget aktivt spel valt" },
+  "dash.noGameDesc":           { en: "You must select a game to continue.", sv: "Du måste välja ett spel för att fortsätta." },
+  "dash.goToGames":            { en: "Go to Games", sv: "Gå till Spel" },
+  "dash.noMember":             { en: "No active member", sv: "Ingen aktiv medlem" },
+  "dash.noMemberDesc":         { en: "Log in as a member to access admin features.", sv: "Logga in som medlem för att nå adminfunktioner." },
+  "dash.loginAsMember":        { en: "Log in as member", sv: "Logga in som medlem" },
+  "dash.permissions":          { en: "Permissions", sv: "Behörigheter" },
+  "dash.noPermissions":        { en: "None", sv: "Inga" },
+  "dash.memberId":             { en: "Member ID:", sv: "Medlems-ID:" },
+  "dash.userId":               { en: "User ID:", sv: "Användar-ID:" },
+  "dash.walletSummary":        { en: "Wallet Summary", sv: "Plånboksöversikt" },
+  "dash.loadingWallet":        { en: "Loading wallet…", sv: "Laddar plånbok…" },
+  "dash.balance":              { en: "Balance", sv: "Saldo" },
+  "dash.totalDeposited":       { en: "Total Deposited", sv: "Totalt insatt" },
+  "dash.totalWithdrawn":       { en: "Total Withdrawn", sv: "Totalt uttaget" },
+  "dash.deposit":              { en: "Deposit", sv: "Insättning" },
+  "dash.depositing":           { en: "Depositing…", sv: "Sätter in…" },
+  "dash.withdraw":             { en: "Withdraw", sv: "Uttag" },
+  "dash.withdrawing":          { en: "Withdrawing…", sv: "Tar ut…" },
+  "dash.transfer":             { en: "Transfer", sv: "Överföring" },
+  "dash.transferring":         { en: "Transferring…", sv: "Överför…" },
+  "dash.amount":               { en: "Amount", sv: "Belopp" },
+  "dash.descriptionOptional":  { en: "Description (optional)", sv: "Beskrivning (valfritt)" },
+  "dash.recipient":            { en: "Recipient", sv: "Mottagare" },
+  "dash.selectMember":         { en: "Select member…", sv: "Välj medlem…" },
+  "dash.txHistory":            { en: "Transaction History", sv: "Transaktionshistorik" },
+  "dash.noTransactions":       { en: "No transactions yet", sv: "Inga transaktioner ännu" },
+  "dash.txGroup":              { en: "TX Group:", sv: "TX-grupp:" },
+  "dash.notAuth":              { en: "Not authenticated", sv: "Inte autentiserad" },
+  "dash.selectGameFirst":      { en: "Select a game first", sv: "Välj ett spel först" },
+  "dash.errLoadWallet":        { en: "Failed to load wallet data", sv: "Det gick inte att ladda plånboksdata" },
+  "dash.errAmountPositive":    { en: "Amount must be > 0", sv: "Beloppet måste vara > 0" },
+  "dash.errSelectRecipient":   { en: "Select a recipient", sv: "Välj en mottagare" },
+  "dash.successDeposit":       { en: "Deposit successful!", sv: "Insättningen lyckades!" },
+  "dash.successWithdraw":      { en: "Withdrawal successful!", sv: "Uttaget lyckades!" },
+  "dash.successTransfer":      { en: "Transfer successful!", sv: "Överföringen lyckades!" },
+  "dash.errDepositFailed":     { en: "Deposit failed", sv: "Insättning misslyckades" },
+  "dash.errWithdrawFailed":    { en: "Withdrawal failed", sv: "Uttag misslyckades" },
+  "dash.errTransferFailed":    { en: "Transfer failed", sv: "Överföring misslyckades" },
+  "dash.party":                { en: "Party:", sv: "Part:" },
+
+  // ── Common ──
+  "common.login":              { en: "Login", sv: "Logga in" },
+  "common.signup":             { en: "Sign Up", sv: "Registrera" },
+  "common.logout":             { en: "Logout", sv: "Logga ut" },
+  "common.cancel":             { en: "Cancel", sv: "Avbryt" },
+  "common.save":               { en: "Save", sv: "Spara" },
+  "common.loading":            { en: "Loading...", sv: "Laddar..." },
+  "common.email":              { en: "Email", sv: "E-post" },
+  "common.password":           { en: "Password", sv: "Lösenord" },
+  "common.owner":              { en: "Owner", sv: "Ägare" },
+
+  // ── Player Navbar ──
+  "player.nav.dashboard":      { en: "Dashboard", sv: "Översikt" },
+  "player.nav.trade":          { en: "Trade", sv: "Handel" },
+  "player.nav.portfolio":      { en: "Portfolio", sv: "Portfölj" },
+  "player.nav.tax":            { en: "Tax", sv: "Skatt" },
+  "player.nav.admin":          { en: "Admin", sv: "Admin" },
+  "player.logo.sub":           { en: "Player", sv: "Spelare" },
+
+  // ── ConnectWallet ──
+  "player.wallet.connecting":  { en: "Connecting...", sv: "Ansluter..." },
+  "player.wallet.connect":     { en: "Connect Wallet", sv: "Anslut plånbok" },
+
+  // ── ActivityFeed ──
+  "player.activity.title":     { en: "Recent Activity", sv: "Senaste aktivitet" },
+  "player.activity.empty":     { en: "No activity yet", sv: "Ingen aktivitet ännu" },
+
+  // ── Player Dashboard ──
+  "player.dash.title":         { en: "Dashboard", sv: "Översikt" },
+  "player.dash.subtitle":      { en: "Token economy overview", sv: "Tokenekonomins översikt" },
+  "player.dash.syncing":       { en: "Syncing...", sv: "Synkroniserar..." },
+  "player.dash.syncNow":       { en: "Sync Now", sv: "Synka nu" },
+  "player.dash.triSupply":     { en: "TRI Total Supply", sv: "TRI total tillgång" },
+  "player.dash.circulating":   { en: "Circulating tokens", sv: "Cirkulerande tokens" },
+  "player.dash.totalBuys":     { en: "Total Buys", sv: "Totala köp" },
+  "player.dash.triMinted":     { en: "TRI minted", sv: "TRI präglade" },
+  "player.dash.totalSells":    { en: "Total Sells", sv: "Totala sälj" },
+  "player.dash.triBurned":     { en: "TRI burned", sv: "TRI brända" },
+  "player.dash.uniqueUsers":   { en: "Unique Users", sv: "Unika användare" },
+  "player.dash.buyers":        { en: "buyers", sv: "köpare" },
+  "player.dash.sellers":       { en: "sellers", sv: "säljare" },
+  "player.dash.liquidity":     { en: "Shop Liquidity", sv: "Shoppens likviditet" },
+  "player.dash.liqError":      { en: "Failed to load liquidity", sv: "Kunde inte ladda likviditet" },
+  "player.dash.config":        { en: "Shop Config", sv: "Shopkonfiguration" },
+  "player.dash.configError":   { en: "Failed to load config", sv: "Kunde inte ladda konfiguration" },
+  "player.dash.status":        { en: "Status", sv: "Status" },
+  "player.dash.fee":           { en: "Fee", sv: "Avgift" },
+  "player.dash.buyRate":       { en: "Buy Rate (ETH)", sv: "Köpkurs (ETH)" },
+  "player.dash.maxEthIn":      { en: "Max ETH In", sv: "Max ETH in" },
+
+  // ── Player Trade ──
+  "player.trade.title":        { en: "Trade", sv: "Handel" },
+  "player.trade.subtitle":     { en: "Buy or sell TRI tokens", sv: "Köp eller sälj TRI-tokens" },
+  "player.trade.balances":     { en: "Current Wallet Balances", sv: "Aktuella plånbokssaldon" },
+  "player.trade.balancesDesc": { en: "Live balances from the connected wallet for trade-compatible assets.", sv: "Livesaldon från den anslutna plånboken för handelskompatibla tillgångar." },
+  "player.trade.ethBalance":   { en: "ETH Balance", sv: "ETH-saldo" },
+  "player.trade.triBalance":   { en: "TRI Balance", sv: "TRI-saldo" },
+  "player.trade.assetBalance": { en: "Asset Balance", sv: "Tillgångssaldo" },
+  "player.trade.buyTri":       { en: "Buy TRI", sv: "Köp TRI" },
+  "player.trade.sellTri":      { en: "Sell TRI", sv: "Sälj TRI" },
+  "player.trade.payWith":      { en: "Pay with", sv: "Betala med" },
+  "player.trade.receive":      { en: "Receive", sv: "Ta emot" },
+  "player.trade.amountTri":    { en: "Amount (TRI)", sv: "Belopp (TRI)" },
+  "player.trade.estReceiveTri":{ en: "Estimated receive after fee (TRI)", sv: "Uppskattad mottagning efter avgift (TRI)" },
+  "player.trade.estReceiveAsset":{ en: "Estimated receive after fee", sv: "Uppskattad mottagning efter avgift" },
+  "player.trade.fetchingQuote":{ en: "Fetching quote...", sv: "Hämtar offert..." },
+  "player.trade.grossQuote":   { en: "Gross quote", sv: "Bruttooffert" },
+  "player.trade.estFee":       { en: "Estimated fee", sv: "Uppskattad avgift" },
+  "player.trade.netAfterFee":  { en: "Net after fee", sv: "Netto efter avgift" },
+  "player.trade.rate":         { en: "Rate", sv: "Kurs" },
+  "player.trade.feeLabel":     { en: "Fee", sv: "Avgift" },
+  "player.trade.maxBuy":       { en: "Max buy", sv: "Max köp" },
+  "player.trade.maxSell":      { en: "Max sell", sv: "Max sälj" },
+  "player.trade.unlimited":    { en: "Unlimited", sv: "Obegränsat" },
+  "player.trade.decimals":     { en: "Decimals", sv: "Decimaler" },
+  "player.trade.connectToTrade":{ en: "Connect your wallet to trade", sv: "Anslut plånboken för att handla" },
+  "player.trade.processing":   { en: "Processing...", sv: "Bearbetar..." },
+  "player.trade.buyWith":      { en: "Buy TRI with", sv: "Köp TRI med" },
+  "player.trade.sellFor":      { en: "Sell TRI for", sv: "Sälj TRI för" },
+  "player.trade.notReady":     { en: "TokenShop contract not ready yet. Verify wallet connection and config.", sv: "TokenShop-kontraktet är inte redo. Kontrollera plånboksanslutning och konfiguration." },
+
+  // ── Player Portfolio ──
+  "player.portfolio.title":          { en: "Portfolio", sv: "Portfölj" },
+  "player.portfolio.refresh":        { en: "Refresh", sv: "Uppdatera" },
+  "player.portfolio.connectWallet":  { en: "Connect Your Wallet", sv: "Anslut din plånbok" },
+  "player.portfolio.connectDesc":    { en: "Connect your wallet to view your portfolio", sv: "Anslut plånboken för att se din portfölj" },
+  "player.portfolio.holdings":       { en: "Current Holdings", sv: "Nuvarande innehav" },
+  "player.portfolio.holdingsDesc":   { en: "Live balances from the connected wallet and supported trading assets.", sv: "Livesaldon från den anslutna plånboken och stödda handelstillgångar." },
+  "player.portfolio.ethBalance":     { en: "ETH Balance", sv: "ETH-saldo" },
+  "player.portfolio.ethBalanceSub":  { en: "Native wallet balance", sv: "Inbyggt plånbokssaldo" },
+  "player.portfolio.triBalance":     { en: "TRI Balance", sv: "TRI-saldo" },
+  "player.portfolio.triBalanceSub":  { en: "Current wallet holdings", sv: "Nuvarande plånboksinnehav" },
+  "player.portfolio.trackedPos":     { en: "Tracked TRI Position", sv: "Spårad TRI-position" },
+  "player.portfolio.trackedPosSub":  { en: "Net TRI from TokenShop history", sv: "Netto TRI från TokenShop-historik" },
+  "player.portfolio.buySell":        { en: "Total Buys / Sells", sv: "Totala köp / sälj" },
+  "player.portfolio.buySellSub":     { en: "Tracked TokenShop trade count", sv: "Spårat antal affärer i TokenShop" },
+  "player.portfolio.perf":           { en: "Performance Snapshot", sv: "Prestandaöversikt" },
+  "player.portfolio.noTransactions": { en: "No transactions yet", sv: "Inga transaktioner ännu" },
+  "player.portfolio.walletVsTracked":{ en: "Wallet vs Tracked Position", sv: "Plånbok vs spårad position" },
+  "player.portfolio.walletTri":      { en: "Wallet TRI", sv: "Plånbok TRI" },
+  "player.portfolio.trackedTri":     { en: "Tracked TokenShop TRI", sv: "Spårad TokenShop TRI" },
+  "player.portfolio.tradingBreakdown":{ en: "Trading Breakdown by Payment Asset", sv: "Handelsuppdelning per betalningsmedel" },
+  "player.portfolio.compatibleAssets":{ en: "Compatible Asset Balances", sv: "Kompatibla tillgångssaldon" },
+  "player.portfolio.noErc20":        { en: "No supported ERC-20 balances detected in this wallet yet.", sv: "Inga stödda ERC-20-saldon hittades i den här plånboken ännu." },
+  "player.portfolio.txHistory":      { en: "Transaction History", sv: "Transaktionshistorik" },
+  "player.portfolio.txHistoryDesc":  { en: "Recent buy and sell activity for the connected wallet.", sv: "Senaste köp- och säljaktivitet för den anslutna plånboken." },
+  "player.portfolio.compatibleLabel":{ en: "Trade-compatible wallet asset", sv: "Handelskompatibel plånbokstillgång" },
+  "player.portfolio.currentTri":     { en: "Current TRI Price", sv: "Aktuellt TRI-pris" },
+  "player.portfolio.avgEntry":       { en: "Average Entry", sv: "Genomsnittlig ingångspunkt" },
+  "player.portfolio.estValue":       { en: "Est. Current Value", sv: "Uppskattat nuv. värde" },
+  "player.portfolio.pnl":            { en: "Tracked Position PnL", sv: "Spårad positions PnL" },
+  "player.portfolio.needEthHistory": { en: "Need ETH trade history to calculate", sv: "Behöver ETH-handelshistorik för att beräkna" },
+  "player.portfolio.breakEven":      { en: "Roughly break-even", sv: "Ungefär break-even" },
+  "player.portfolio.inProfit":       { en: "Currently in profit", sv: "Vinst för tillfället" },
+  "player.portfolio.atLoss":         { en: "Currently at a loss", sv: "Förlust för tillfället" },
+  "player.portfolio.buysLabel":      { en: "buys", sv: "köp" },
+  "player.portfolio.sellsLabel":     { en: "sells", sv: "sälj" },
+
+  // ── Player Tax ──
+  "player.tax.title":          { en: "Tax Report", sv: "Skatterapport" },
+  "player.tax.subtitle":       { en: "Swedish crypto tax summary (Skatteverket)", sv: "Svensk kryptoskattesummering (Skatteverket)" },
+  "player.tax.retryConn":      { en: "Retry Connection", sv: "Försök igen" },
+  "player.tax.refresh":        { en: "Refresh", sv: "Uppdatera" },
+  "player.tax.exportCsv":      { en: "Export CSV", sv: "Exportera CSV" },
+  "player.tax.connectWallet":  { en: "Connect Your Wallet", sv: "Anslut din plånbok" },
+  "player.tax.connectDesc":    { en: "Connect your wallet to view your tax report", sv: "Anslut plånboken för att se din skatterapport" },
+  "player.tax.unavailable":    { en: "Tax Service Unavailable", sv: "Skattetjänsten otillgänglig" },
+  "player.tax.couldNotConnect":{ en: "Could not connect to the tax backend at", sv: "Kunde inte ansluta till skattebackenden på" },
+  "player.tax.toFix":          { en: "To fix this:", sv: "För att åtgärda detta:" },
+  "player.tax.step1":          { en: "1. Make sure the wallet-with-taxes backend is running", sv: "1. Se till att wallet-with-taxes-backenden körs" },
+  "player.tax.step2":          { en: "2. Check that it is on port 3001 (or set VITE_TAX_API_URL in frontend/.env)", sv: "2. Kontrollera att den körs på port 3001 (eller ange VITE_TAX_API_URL i frontend/.env)" },
+  "player.tax.step3":          { en: "3. Run: cd wallet-with-taxes/backend && npm run start:dev", sv: "3. Kör: cd wallet-with-taxes/backend && npm run start:dev" },
+  "player.tax.connected":      { en: "Connected", sv: "Ansluten" },
+  "player.tax.offline":        { en: "Offline", sv: "Offline" },
+  "player.tax.totalGains":     { en: "Total Gains", sv: "Totala vinster" },
+  "player.tax.gainsSub":       { en: "Capital gains from sales", sv: "Kapitalvinster från försäljningar" },
+  "player.tax.totalLosses":    { en: "Total Losses", sv: "Totala förluster" },
+  "player.tax.lossesSub":      { en: "Capital losses from sales", sv: "Kapitalförluster från försäljningar" },
+  "player.tax.adjustedLosses": { en: "Adjusted Losses (70%)", sv: "Justerade förluster (70%)" },
+  "player.tax.adjustedSub":    { en: "Swedish 70% deduction applied", sv: "Svensk 70%-avdrag tillämpad" },
+  "player.tax.netGain":        { en: "Net Taxable Gain", sv: "Netto skattepliktig vinst" },
+  "player.tax.netGainSub":     { en: "Amount reported to Skatteverket", sv: "Belopp som rapporteras till Skatteverket" },
+  "player.tax.calcTitle":      { en: "Swedish Tax Calculation", sv: "Svensk skatteberäkning" },
+  "player.tax.totalCapGains":  { en: "Total capital gains", sv: "Totala kapitalvinster" },
+  "player.tax.totalCapLosses": { en: "Total capital losses", sv: "Totala kapitalförluster" },
+  "player.tax.adjLosses70":    { en: "Adjusted losses (70% rule)", sv: "Justerade förluster (70%-regeln)" },
+  "player.tax.adj70Desc":      { en: "In Sweden, only 70% of crypto losses are deductible", sv: "I Sverige är bara 70% av kryptovalutaförluster avdragsgilla" },
+  "player.tax.netTaxableGain": { en: "Net taxable gain", sv: "Netto skattepliktig vinst" },
+  "player.tax.reportTo":       { en: "Report this amount to Skatteverket", sv: "Rapportera detta belopp till Skatteverket" },
+  "player.tax.usdNote":        { en: "Note: Values shown in USD equivalent (raw ETH amounts). Real SEK conversion requires a price API integration, planned for a future update.", sv: "Obs: Värden visas i USD-ekvivalent (råa ETH-belopp). Verklig SEK-konvertering kräver en pris-API-integration, planerad för en framtida uppdatering." },
+  "player.tax.noActivity":     { en: "No taxable events yet. Buy and sell some TRI tokens on the", sv: "Inga skattepliktiga händelser ännu. Köp och sälj TRI-tokens på" },
+  "player.tax.tradePage":      { en: "Trade page", sv: "handelssidan" },
+  "player.tax.noActivityEnd":  { en: "to see your tax impact here.", sv: "för att se din skatteeffekt här." },
+  "player.tax.connLost":       { en: "Connection lost:", sv: "Anslutning förlorad:" },
+  "player.tax.connLostDesc":   { en: "The tax backend is no longer responding. The data shown below may be outdated. Click Refresh to reconnect.", sv: "Skattebackenden svarar inte längre. Data nedan kan vara inaktuella. Klicka på Uppdatera för att återansluta." },
+  "player.tax.howItWorks":     { en: "How this works:", sv: "Så här fungerar det:" },
+  "player.tax.howItWorksDesc": { en: "Every time you buy or sell TRI tokens through the TokenShop, the transaction is automatically recorded in the tax system. This page shows your capital gains and losses calculated using Swedish tax rules, including the 70% loss deduction (avdragsbegränsning).", sv: "Varje gång du köper eller säljer TRI-tokens via TokenShop registreras transaktionen automatiskt i skattesystemet. Denna sida visar dina kapitalvinster och förluster beräknade enligt svenska skatteregler, inklusive 70% förlustbegränsning (avdragsbegränsning)." },
+
+  // ── Player Admin ──
+  "player.admin.title":        { en: "Admin Panel", sv: "Adminpanel" },
+  "player.admin.subtitle":     { en: "Manage TokenShop configuration — all actions are on-chain transactions", sv: "Hantera TokenShop-konfiguration — alla åtgärder är on-chain-transaktioner" },
+  "player.admin.connectMsg":   { en: "Connect your admin wallet to access controls", sv: "Anslut din adminplånbok för att komma åt kontrollerna" },
+  "player.admin.accessDenied": { en: "Access Denied", sv: "Åtkomst nekad" },
+  "player.admin.adminOnly":    { en: "This panel is only available to the shop admin wallet", sv: "Denna panel är bara tillgänglig för shopens adminplånbok" },
+  "player.admin.currentConfig":{ en: "Current Configuration", sv: "Aktuell konfiguration" },
+  "player.admin.status":       { en: "Status", sv: "Status" },
+  "player.admin.fee":          { en: "Fee", sv: "Avgift" },
+  "player.admin.buyRate":      { en: "ETH Buy Rate", sv: "ETH köpkurs" },
+  "player.admin.maxEthIn":     { en: "Max ETH In", sv: "Max ETH in" },
+  "player.admin.maxTriIn":     { en: "Max TRI In", sv: "Max TRI in" },
+  "player.admin.pause":        { en: "Pause Control", sv: "Paus-kontroll" },
+  "player.admin.pauseBtn":     { en: "Pause", sv: "Pausa" },
+  "player.admin.unpauseBtn":   { en: "Unpause", sv: "Återuppta" },
+  "player.admin.setFee":       { en: "Set Fee", sv: "Ange avgift" },
+  "player.admin.setBtn":       { en: "Set", sv: "Ange" },
+  "player.admin.setRates":     { en: "Set Rates", sv: "Ange kurser" },
+  "player.admin.updateRates":  { en: "Update Rates", sv: "Uppdatera kurser" },
+  "player.admin.limits":       { en: "Transaction Limits", sv: "Transaktionsgränser" },
+  "player.admin.updateLimits": { en: "Update Limits", sv: "Uppdatera gränser" },
+  "player.admin.withdraw":     { en: "Withdraw ETH", sv: "Ta ut ETH" },
+  "player.admin.withdrawBtn":  { en: "Withdraw", sv: "Ta ut" },
+  "player.admin.confirmWallet":{ en: "Confirm in wallet...", sv: "Bekräfta i plånboken..." },
+  "player.admin.waitConfirm":  { en: "Waiting for confirmation...", sv: "Väntar på bekräftelse..." },
+  "player.admin.txConfirmed":  { en: "Transaction confirmed!", sv: "Transaktionen bekräftad!" },
+  "player.admin.notReady":     { en: "TokenShop contract not ready yet. Wait for wallet + config to load.", sv: "TokenShop-kontraktet är inte redo. Vänta på att plånbok + konfiguration laddas." },
+};
+
+export function LanguageProvider({ children }) {
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("lang") || "en"; }
+    catch { return "en"; }
+  });
+
+  const toggle = useCallback(() => {
+    setLang((prev) => {
+      const next = prev === "en" ? "sv" : "en";
+      try { localStorage.setItem("lang", next); } catch {}
+      return next;
+    });
+  }, []);
+
+  const t = useCallback(
+    (key) => {
+      const entry = translations[key];
+      if (!entry) return key;
+      return entry[lang] || entry.en || key;
+    },
+    [lang]
+  );
+
+  return (
+    <LanguageContext.Provider value={{ lang, t, toggle }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+export function useLanguage() {
+  return useContext(LanguageContext);
+}
