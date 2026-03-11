@@ -9,6 +9,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../lib/LanguageContext";
 import { useAuthState } from "../../lib/AuthContext";
+import { getGames } from "../../lib/platform";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -76,9 +77,36 @@ export default function Trade() {
   const [gameSession, setGameSession] = useState(null);
   const [gameSessionLoading, setGameSessionLoading] = useState(false);
   const [gameSessionError, setGameSessionError] = useState("");
+  const [availableGames, setAvailableGames] = useState([]);
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    getGames()
+      .then((response) => {
+        if (!active) return;
+
+        const mappedGames = (response.data || []).map((game) => ({
+          gameId: game.id,
+          name: game.name,
+          slug: game.slug,
+        }));
+
+        setAvailableGames(mappedGames);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load games for trade scope selector:", error);
+        setAvailableGames([]);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -471,17 +499,21 @@ export default function Trade() {
   const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
   const scopeLabel = gameId ? "Game" : "Global";
   const scopeValue = gameId ? `game:${gameId}` : "global";
+  const orderedGames = [...availableGames].sort((left, right) => {
+    if (activeGame?.gameId === left.gameId) return -1;
+    if (activeGame?.gameId === right.gameId) return 1;
+    return left.name.localeCompare(right.name);
+  });
   const availableScopeOptions = [
     { value: "global", label: "Global", disabled: false },
-    ...(activeGame
-      ? [
-          {
-            value: `game:${activeGame.gameId}`,
-            label: `Game: ${activeGame.name}`,
-            disabled: false,
-          },
-        ]
-      : []),
+    ...orderedGames.map((game) => ({
+      value: `game:${game.gameId}`,
+      label:
+        activeGame?.gameId === game.gameId
+          ? `Game: ${game.name} (current studio selection)`
+          : `Game: ${game.name}`,
+      disabled: false,
+    })),
     {
       value: "studio",
       label: "Studio (coming soon)",
@@ -538,7 +570,7 @@ export default function Trade() {
             ))}
           </select>
           <p className="mt-2 text-xs text-gray-400">
-            Choose whether this trade should stay global or be attributed to the currently selected game.
+            Choose whether this trade should stay global or be attributed to any available game. The current studio selection is only a shortcut, not a live-state toggle.
           </p>
         </div>
 
