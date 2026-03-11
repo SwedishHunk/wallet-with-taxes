@@ -16,6 +16,15 @@ type Repo = {
   save: jest.Mock;
 };
 
+type MockQueryRunner = {
+  connect: jest.Mock;
+  startTransaction: jest.Mock;
+  commitTransaction: jest.Mock;
+  rollbackTransaction: jest.Mock;
+  release: jest.Mock;
+  manager: { create: jest.Mock; save: jest.Mock };
+};
+
 describe("UsersService", () => {
   let userRepo: Repo;
   let studioRepo: Repo;
@@ -25,6 +34,8 @@ describe("UsersService", () => {
     maskToPermissionStrings: jest.Mock;
   };
   let jwtService: { sign: jest.Mock };
+  let queryRunner: MockQueryRunner;
+  let dataSource: { createQueryRunner: jest.Mock };
   let service: UsersService;
   const originalEnv = {
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
@@ -61,12 +72,29 @@ describe("UsersService", () => {
     jwtService = {
       sign: jest.fn().mockReturnValue("jwt-token"),
     };
+    queryRunner = {
+      connect: jest.fn(),
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(),
+      release: jest.fn(),
+      manager: {
+        create: jest.fn((_, data: Record<string, unknown>) => ({ ...data })),
+        save: jest.fn(async (x: Record<string, unknown>) => {
+          // User has passwordHash; Studio has name/email but no passwordHash
+          if ("passwordHash" in x) return { id: "u1", ...x };
+          return { id: "s1", ...x };
+        }),
+      },
+    };
+    dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
     service = new UsersService(
       userRepo as never,
       studioRepo as never,
       studioMemberRepo as never,
       studioMemberService as never,
       jwtService as never,
+      dataSource as never,
     );
 
     process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";
@@ -128,14 +156,16 @@ describe("UsersService", () => {
 
     const result = await service.signup("user@test.com", "pw", "My Studio");
 
-    expect(userRepo.create).toHaveBeenCalledWith(
+    expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         email: "user@test.com",
         custodyMode: "custodial",
         kycStatus: "pending",
       }),
     );
-    expect(studioRepo.create).toHaveBeenCalledWith(
+    expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         name: "My Studio",
         email: "user@test.com",
