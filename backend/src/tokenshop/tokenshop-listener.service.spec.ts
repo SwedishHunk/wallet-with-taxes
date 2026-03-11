@@ -64,8 +64,10 @@ describe("TokenShopListenerService", () => {
   let syncStateRepo: MockRepo<TokenShopSyncState>;
   let dataSource: { transaction: jest.Mock };
   let service: TokenShopListenerService;
+  const originalTokenShopEthUsd = process.env.TOKENSHOP_ETH_USD;
 
   beforeEach(() => {
+    process.env.TOKENSHOP_ETH_USD = "3500";
     taxEventRepo = makeRepo<TaxEvent>();
     shopEventRepo = makeRepo<ShopEvent>();
     syncStateRepo = makeRepo<TokenShopSyncState>();
@@ -91,6 +93,15 @@ describe("TokenShopListenerService", () => {
       shopEventRepo as never,
       syncStateRepo as never,
     );
+  });
+
+  afterEach(() => {
+    if (originalTokenShopEthUsd === undefined) {
+      delete process.env.TOKENSHOP_ETH_USD;
+      return;
+    }
+
+    process.env.TOKENSHOP_ETH_USD = originalTokenShopEthUsd;
   });
 
   it("parseLog maps Bought event into normalized internal shape", () => {
@@ -153,12 +164,37 @@ describe("TokenShopListenerService", () => {
       tokenId: 0,
       amount: 100,
       feeUSD: 0,
-      priceUSD: 0.02,
+      priceUSD: 70,
       source: "tokenshop",
       txHash:
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       logIndex: 3,
     });
+  });
+
+  it("withholds fiat pricing for non-ETH payment assets", async () => {
+    taxEventRepo.findOne.mockResolvedValueOnce(null);
+    shopEventRepo.findOne.mockResolvedValueOnce(null);
+    (service as any).triTokenAddress =
+      "0x9999999999999999999999999999999999999999";
+
+    await (service as any).persistParsedEvent({
+      name: "Bought",
+      userAddress: "0xabc",
+      payAsset: "0x1111111111111111111111111111111111111111",
+      amountInRaw: ethers.parseUnits("200", 18),
+      triAmountRaw: ethers.parseUnits("100", 18),
+      txHash:
+        "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      logIndex: 4,
+      blockNumber: 43,
+    });
+
+    expect(taxEventRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priceUSD: undefined,
+      }),
+    );
   });
 
   it("persistParsedEvent skips duplicates when tax event already exists", async () => {

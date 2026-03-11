@@ -43,6 +43,9 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       : null;
   private readonly interface = new ethers.Interface(TOKENSHOP_ABI);
   private readonly ethAddress = ethers.ZeroAddress.toLowerCase();
+  private readonly ethUsdSnapshot = this.parsePositiveNumber(
+    process.env.TOKENSHOP_ETH_USD,
+  );
 
   private timer: NodeJS.Timeout | null = null;
   private syncInProgress = false;
@@ -220,8 +223,11 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       event.payAsset,
       event.amountInRaw,
     );
-    const placeholderUnitPrice =
-      paymentAmount !== null ? paymentAmount / triAmount : undefined;
+    const estimatedUnitPriceUsd = this.estimateUnitPriceUsd(
+      event.payAsset,
+      paymentAmount,
+      triAmount,
+    );
     const normalizedAssetAddress = (
       this.triTokenAddress ?? "TRI"
     ).toLowerCase();
@@ -284,9 +290,9 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
           amount: triAmount,
           feeUSD: 0,
           priceUSD:
-            placeholderUnitPrice !== undefined &&
-            Number.isFinite(placeholderUnitPrice)
-              ? placeholderUnitPrice
+            estimatedUnitPriceUsd !== null &&
+            Number.isFinite(estimatedUnitPriceUsd)
+              ? estimatedUnitPriceUsd
               : undefined,
           source: "tokenshop",
           txHash: event.txHash,
@@ -305,12 +311,40 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
         return Number(ethers.formatEther(amountRaw));
       }
 
-      // Placeholder assumption for MVP: non-ETH payment assets are 18 decimals
-      // until a proper valuation/decimals adapter is introduced.
+      // Placeholder assumption for MVP decimals only; fiat valuation is withheld
+      // unless a reliable valuation source is configured.
       return Number(ethers.formatUnits(amountRaw, 18));
     } catch {
       return null;
     }
+  }
+
+  private estimateUnitPriceUsd(
+    payAsset: string,
+    paymentAmount: number | null,
+    triAmount: number,
+  ) {
+    if (
+      payAsset !== this.ethAddress ||
+      paymentAmount === null ||
+      !this.ethUsdSnapshot ||
+      !Number.isFinite(paymentAmount) ||
+      !Number.isFinite(triAmount) ||
+      triAmount <= 0
+    ) {
+      return null;
+    }
+
+    return (paymentAmount * this.ethUsdSnapshot) / triAmount;
+  }
+
+  private parsePositiveNumber(value?: string) {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 
   private formatError(error: unknown) {
