@@ -1,50 +1,295 @@
 @import "./styles/tokens.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ===== Global Reset ===== */
 * {
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
+  scroll-behavior: smooth;
+}
+
+html, body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  line-height: 1.5;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-gradient);
   color: var(--text);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Subtle animated noise overlay */
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(168, 85, 247, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 a {
   color: var(--primary);
   text-decoration: none;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
 }
 
 a:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  text-shadow: 0 0 12px rgba(var(--primary-rgb), 0.4);
 }
 
-input,
-select,
-textarea {
+input, select, textarea {
   background: var(--surface2);
   color: var(--text);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  font-family: inherit;
 }
 
-input::placeholder,
-select::placeholder,
-textarea::placeholder {
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15), 0 0 20px rgba(var(--primary-rgb), 0.1);
+}
+
+input::placeholder, select::placeholder, textarea::placeholder {
   color: var(--muted);
+}
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--primary-rgb), 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--primary-rgb), 0.4);
+}
+
+/* ========================================
+   KEYFRAME ANIMATIONS
+   ======================================== */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(var(--primary-rgb), 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(var(--primary-rgb), 0.4), 0 0 80px rgba(var(--primary-rgb), 0.1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(var(--primary-rgb), 0.15);
+  }
+  50% {
+    border-color: rgba(var(--primary-rgb), 0.4);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rotateGlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Shared logo triangle animations (used in AppLayout + player Navbar) */
+@keyframes triPulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(0,212,255,0.55)) drop-shadow(0 0 6px rgba(168,85,247,0.30)); }
+  50%       { filter: drop-shadow(0 0 9px rgba(0,212,255,0.90)) drop-shadow(0 0 18px rgba(168,85,247,0.65)) drop-shadow(0 0 28px rgba(0,212,255,0.35)); }
+}
+
+@keyframes triSpin3D {
+  0%   { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+  25%  { transform: perspective(180px) rotateY(18deg)  rotateZ(4deg); }
+  50%  { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+  75%  { transform: perspective(180px) rotateY(-18deg) rotateZ(-4deg); }
+  100% { transform: perspective(180px) rotateY(0deg)   rotateZ(0deg); }
+}
+
+/* ===== Utility Animation Classes ===== */
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fadeInDown {
+  animation: fadeInDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease both;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulseGlow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Stagger delays — max 0.18s total spread */
+.delay-100 { animation-delay: 0.06s; }
+.delay-200 { animation-delay: 0.12s; }
+.delay-300 { animation-delay: 0.18s; }
+.delay-400 { animation-delay: 0.18s; }
+.delay-500 { animation-delay: 0.18s; }
+
+/* Gaming heading font */
+.font-display {
+  font-family: "Orbitron", "Inter", sans-serif;
+}
+
+/* Neon text glow */
+.text-glow {
+  text-shadow: 0 0 10px rgba(var(--primary-rgb), 0.5), 0 0 40px rgba(var(--primary-rgb), 0.2);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(var(--secondary-rgb), 0.5), 0 0 40px rgba(var(--secondary-rgb), 0.2);
+}
+
+/* Glass panel utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
 }

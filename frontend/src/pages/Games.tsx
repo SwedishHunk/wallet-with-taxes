@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../lib/AuthContext";
 import { getGames, createGame } from "../lib/platform";
 import { ROUTES } from "../routes";
+import { useLanguage } from "../lib/LanguageContext";
 import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 
 interface Game {
@@ -14,6 +15,7 @@ interface Game {
 export default function Games() {
   const navigate = useNavigate();
   const { activeGame, setActiveGame } = useAuthState();
+  const { t } = useLanguage();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function Games() {
       console.error("Failed to load games:", err);
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to load games"
+          ?.message || t("games.errLoadFailed")
       );
     } finally {
       setLoading(false);
@@ -79,7 +81,7 @@ export default function Games() {
     // Use manual slug if provided, otherwise auto-generate from name
     const slug = newGameSlug.trim() || generateSlug(newGameName);
     if (!slug) {
-      setError("Game name must contain at least one alphanumeric character");
+      setError(t("games.errNameAlphanumeric"));
       return;
     }
 
@@ -90,12 +92,12 @@ export default function Games() {
     const duplicateSlug = games.find((g) => g.slug === slug);
 
     if (duplicateName) {
-      setError(`A game with the name "${newGameName.trim()}" already exists`);
+      setError(`${t("games.errDupNamePre")} "${newGameName.trim()}" ${t("games.errAlreadyExists")}`);
       return;
     }
 
     if (duplicateSlug) {
-      setError(`A game with the slug "${slug}" already exists`);
+      setError(`${t("games.errDupSlugPre")} "${slug}" ${t("games.errAlreadyExists")}`);
       return;
     }
 
@@ -114,7 +116,7 @@ export default function Games() {
       console.error("Failed to create game:", err);
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to create game"
+          ?.message || t("games.errCreateFailed")
       );
     } finally {
       setCreating(false);
@@ -124,21 +126,21 @@ export default function Games() {
   return (
     <Page>
       <PageHeader
-        title="Games"
-        subtitle="Välj ett game att arbeta med eller skapa ett nytt"
+        title={t("games.title")}
+        subtitle={t("games.subtitle")}
       />
 
       {activeGame && (
         <Card>
           <div style={{ marginBottom: "1rem" }}>
-            <strong>Aktivt game:</strong> {activeGame.name}{" "}
+            <strong>{t("games.activeGame")}:</strong> {activeGame.name}{" "}
             <Badge variant="permission">{activeGame.slug}</Badge>
           </div>
           <Button
             variant="secondary"
             onClick={() => setActiveGame(null)}
             style={{ marginRight: "0.5rem" }}>
-            Rensa aktivt game
+            {t("games.clearActive")}
           </Button>
         </Card>
       )}
@@ -151,17 +153,17 @@ export default function Games() {
 
       {loading ? (
         <Card>
-          <p>Laddar games...</p>
+          <p>{t("games.loading")}</p>
         </Card>
       ) : (
         <>
           {games.length === 0 ? (
             <Card>
-              <p>Inga games hittades. Skapa ditt första game nedan.</p>
+              <p>{t("games.noGamesYet")}</p>
             </Card>
           ) : (
             <Card>
-              <h3 style={{ marginTop: 0 }}>Tillgängliga games</h3>
+              <h3 style={{ marginTop: 0 }}>{t("games.available")}</h3>
               <div
                 style={{
                   display: "flex",
@@ -193,8 +195,8 @@ export default function Games() {
                       onClick={() => handleSetActive(game)}
                       disabled={activeGame?.gameId === game.gameId}>
                       {activeGame?.gameId === game.gameId
-                        ? "Aktivt"
-                        : "Set active"}
+                        ? t("games.active")
+                        : t("games.setActive")}
                     </Button>
                   </div>
                 ))}
@@ -205,16 +207,16 @@ export default function Games() {
           <Card>
             {!showCreateForm ? (
               <Button onClick={() => setShowCreateForm(true)}>
-                + Skapa nytt game
+                {t("games.createNewBtn")}
               </Button>
             ) : (
               <form onSubmit={handleCreateGame}>
-                <h3 style={{ marginTop: 0 }}>Skapa nytt game</h3>
+                <h3 style={{ marginTop: 0 }}>{t("games.createNewTitle")}</h3>
                 <div style={{ marginBottom: "1rem" }}>
                   <label
                     htmlFor="gameName"
                     style={{ display: "block", marginBottom: "0.25rem" }}>
-                    Game Name:
+                    {t("games.nameLabel")}
                   </label>
                   <input
                     id="gameName"
@@ -236,14 +238,14 @@ export default function Games() {
                   <label
                     htmlFor="gameSlug"
                     style={{ display: "block", marginBottom: "0.25rem" }}>
-                    Slug (frivillig):
+                    {t("games.slugLabel")}
                   </label>
                   <input
                     id="gameSlug"
                     type="text"
                     value={newGameSlug}
                     onChange={(e) => setNewGameSlug(e.target.value)}
-                    placeholder="Lämna tomt för auto-generering"
+                    placeholder={t("games.slugPlaceholder")}
                     style={{
                       width: "100%",
                       padding: "0.5rem",
@@ -259,14 +261,14 @@ export default function Games() {
                         fontSize: "0.875rem",
                         color: "#666",
                       }}>
-                      Auto-genererad slug:{" "}
+                      {t("games.slugAuto")}{" "}
                       <strong>{generateSlug(newGameName)}</strong>
                     </div>
                   )}
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <Button type="submit" disabled={creating}>
-                    {creating ? "Skapar..." : "Skapa"}
+                    {creating ? t("games.creating") : t("games.createBtn")}
                   </Button>
                   <Button
                     type="button"
@@ -277,7 +279,7 @@ export default function Games() {
                       setNewGameSlug("");
                       setError(null);
                     }}>
-                    Avbryt
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </form>

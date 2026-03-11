@@ -34,15 +34,31 @@ export function useContracts() {
   const { signer, provider, isConnected } = useWallet();
   const [shopAddress, setShopAddress] = useState(null);
   const [tokenAddress, setTokenAddress] = useState(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [configError, setConfigError] = useState(null);
 
   // Fetch shop address from backend config
   useEffect(() => {
+    let active = true;
+
     apiGet("/shop/config")
       .then((config) => {
-        setShopAddress(config.shopAddress);
-        setTokenAddress(config.tokenAddress);
+        if (!active) return;
+        setShopAddress(config.shopAddress || null);
+        setTokenAddress(config.tokenAddress || null);
+        setConfigError(null);
+        setConfigLoaded(true);
       })
-      .catch(console.error);
+      .catch((error) => {
+        if (!active) return;
+        console.error(error);
+        setConfigError(error);
+        setConfigLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   function getShop() {
@@ -72,6 +88,8 @@ export function useContracts() {
     getToken,
     getErc20,
     getReadOnlyShop,
-    ready: isConnected && !!shopAddress,
+    configLoaded,
+    configError,
+    ready: configLoaded && !configError && isConnected && !!signer && !!shopAddress,
   };
 }

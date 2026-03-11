@@ -13,6 +13,7 @@ import { EventsModule } from "./__events/events.module";
 import { AdminModule } from "./admin/admin.module";
 import { PlatformModule } from "./platform/platform.module";
 import { TokenShopModule } from "./tokenshop/tokenshop.module";
+import { EconomicsModule } from "./economics/economics.module";
 
 @Module({
   imports: [
@@ -64,6 +65,13 @@ import { TokenShopModule } from "./tokenshop/tokenshop.module";
     AdminModule,
     PlatformModule,
     TokenShopModule,
+    EconomicsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
   providers: [
     {

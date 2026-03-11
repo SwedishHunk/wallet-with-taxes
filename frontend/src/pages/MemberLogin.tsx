@@ -10,6 +10,7 @@ import { ROUTES } from "../routes";
 import { useAuthState } from "../lib/AuthContext";
 import { setAuthToken } from "../lib/api";
 import { getMemberSession, getMembersCount, login } from "../lib/users";
+import { useLanguage } from "../lib/LanguageContext";
 
 type ApiError = {
   response?: {
@@ -34,6 +35,7 @@ export default function MemberLogin() {
   const navigate = useNavigate();
   const { authContext, isLoading, setMemberSession, setStudioSession } =
     useAuthState();
+  const { t } = useLanguage();
 
   const [members, setMembers] = useState<StudioMember[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function MemberLogin() {
     }
 
     if (!studioId) {
-      setError("Studio saknar ID. Logga in igen.");
+      setError("Studio is missing an ID. Please log in again.");
       setLoadingMembers(false);
       return;
     }
@@ -91,7 +93,7 @@ export default function MemberLogin() {
       setError(null);
 
       if (!studioId) {
-        setError("Studio saknar ID. Logga in igen.");
+        setError("Studio is missing an ID. Please log in again.");
         return;
       }
 
@@ -108,7 +110,7 @@ export default function MemberLogin() {
       setMembers(normalized);
     } catch (err) {
       const apiErr = err as ApiError;
-      setError(apiErr.response?.data?.message || "Kunde inte ladda medlemmar");
+      setError(apiErr.response?.data?.message || "Could not load members");
     } finally {
       setLoadingMembers(false);
     }
@@ -131,11 +133,11 @@ export default function MemberLogin() {
 
     if (!studioId) return;
     if (!selectedMember) {
-      setError("Välj en medlem först.");
+      setError(t("member.selectFirst"));
       return;
     }
     if (!password.trim()) {
-      setError("Ange lösenord.");
+      setError(t("member.enterPassword"));
       return;
     }
 
@@ -153,7 +155,7 @@ export default function MemberLogin() {
 
       const token = loginRes.data?.token;
       if (!token) {
-        throw new Error("Login saknar token i response.");
+        throw new Error(t("member.missingToken"));
       }
 
       localStorage.setItem("token", token);
@@ -196,7 +198,7 @@ export default function MemberLogin() {
       const apiErr = err as ApiError;
       const msg =
         apiErr.response?.data?.message ||
-        (err instanceof Error ? err.message : "Inloggning misslyckades");
+        (err instanceof Error ? err.message : "Login failed");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -206,7 +208,7 @@ export default function MemberLogin() {
   if (isLoading || loadingMembers) {
     return (
       <Page>
-        <PageHeader title="Laddar..." />
+        <PageHeader title={t("member.loadingTitle")} />
       </Page>
     );
   }
@@ -214,7 +216,7 @@ export default function MemberLogin() {
   return (
     <Page>
       <PageHeader
-        title="Logga in som medlem"
+        title={t("member.loginAsTitle")}
         subtitle={`Studio: ${authContext.studioSession?.studioName ?? ""}`}
       />
 
@@ -242,7 +244,7 @@ export default function MemberLogin() {
 
         {/* Lista */}
         {normalizedMembers.length === 0 ? (
-          <p>Inga medlemmar tillgängliga</p>
+          <p>{t("member.noMembersAvailable")}</p>
         ) : (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -281,10 +283,10 @@ export default function MemberLogin() {
                         color: "var(--muted)",
                         marginTop: "4px",
                       }}>
-                      ID: {member.memberId ?? member.id ?? "(saknas)"}
+                      ID: {member.memberId ?? member.id ?? t("member.idMissing")}
                     </div>
                   </div>
-                  {member.isOwner && <Badge variant="owner">Owner</Badge>}
+                  {member.isOwner && <Badge variant="owner">{t("common.owner")}</Badge>}
                 </button>
               );
             })}
@@ -296,15 +298,15 @@ export default function MemberLogin() {
           <div style={{ marginBottom: "10px", color: "var(--muted)" }}>
             {selectedMember ? (
               <>
-                Vald medlem: <strong>{selectedMember.email}</strong>
+                {t("member.selectedMember")}: <strong>{selectedMember.email}</strong>
               </>
             ) : (
-              "Välj en medlem i listan."
+              t("member.selectFromList")
             )}
           </div>
 
           <label style={{ display: "block", marginBottom: "8px" }}>
-            Lösenord
+            {t("member.password")}
           </label>
 
           <input
@@ -312,7 +314,7 @@ export default function MemberLogin() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={!selectedMember || submitting}
-            placeholder={selectedMember ? "Ange lösenord" : "Välj medlem först"}
+            placeholder={selectedMember ? t("member.enterPw") : t("member.selectMemberFirst")}
             style={{
               width: "100%",
               padding: "10px 12px",
@@ -337,7 +339,7 @@ export default function MemberLogin() {
               cursor: !selectedMember || submitting ? "not-allowed" : "pointer",
               opacity: !selectedMember || submitting ? 0.6 : 1,
             }}>
-            {submitting ? "Loggar in..." : "Logga in"}
+            {submitting ? t("member.loggingIn") : t("member.loginBtn")}
           </button>
         </form>
       </Card>

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
-import { useApiData, apiGet, triggerSync } from "../hooks/useApi";
+import { useApiData, apiGet, apiPost, triggerSync } from "../hooks/useApi";
+import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
-import { ArrowDownUp, Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { useLanguage } from "../../lib/LanguageContext";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -13,8 +16,11 @@ import { ArrowDownUp, Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-
 const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
-  const { isConnected, address } = useWallet();
-  const { getShop, getToken, getErc20, shopAddress, ready } = useContracts();
+  const { t } = useLanguage();
+  const { isConnected, address, provider } = useWallet();
+  const { gameId } = useParams();
+  const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
+    useContracts();
 
   // ---------------------------------------------------------------
   // STEP 1: Fetch supported assets from the backend
@@ -30,6 +36,9 @@ export default function Trade() {
     error: assetsError,
     refresh: refreshAssets,
   } = useApiData("/shop/supported-assets");
+  const { data: tokenBalance, refresh: refreshTokenBalance } = useApiData(
+    isConnected && address ? `/user/${address}/balance` : null
+  );
 
   // ---------------------------------------------------------------
   // STEP 2: Track which asset is selected
@@ -59,10 +68,106 @@ export default function Trade() {
 
   // Config (for fee display)
   const [config, setConfig] = useState(null);
+  const [ethBalance, setEthBalance] = useState(null);
+  const [selectedAssetBalance, setSelectedAssetBalance] = useState(null);
+  const [gameSession, setGameSession] = useState(null);
+  const [gameSessionLoading, setGameSessionLoading] = useState(false);
+  const [gameSessionError, setGameSessionError] = useState("");
 
   useEffect(() => {
     apiGet("/shop/config").then(setConfig).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!gameId || !address) {
+      setGameSession(null);
+      setGameSessionLoading(false);
+      setGameSessionError("");
+      return;
+    }
+
+    setGameSessionLoading(true);
+    setGameSessionError("");
+    apiGet(
+      `/player/session?gameId=${encodeURIComponent(
+        gameId
+      )}&walletAddress=${encodeURIComponent(address)}`
+    )
+      .then((session) => {
+        setGameSession(session);
+        setGameSessionError("");
+      })
+      .catch((error) => {
+        console.error("Failed to resolve player session:", error);
+        setGameSession(null);
+        setGameSessionError("Game session could not be resolved yet.");
+      })
+      .finally(() => {
+        setGameSessionLoading(false);
+      });
+  }, [gameId, address]);
+
+  useEffect(() => {
+    if (!isConnected || !address || !provider) {
+      setEthBalance(null);
+      return;
+    }
+
+    let active = true;
+
+    provider
+      .getBalance(address)
+      .then((balance) => {
+        if (!active) return;
+        setEthBalance(Number(ethers.formatEther(balance)));
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load ETH balance:", error);
+        setEthBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, provider, txStatus]);
+
+  useEffect(() => {
+    if (!isConnected || !address || !selectedAsset) {
+      setSelectedAssetBalance(null);
+      return;
+    }
+
+    if (selectedAsset.address === ETH_ADDRESS) {
+      setSelectedAssetBalance(ethBalance);
+      return;
+    }
+
+    let active = true;
+    const erc20 = getErc20(selectedAsset.address);
+    if (!erc20) {
+      setSelectedAssetBalance(null);
+      return;
+    }
+
+    erc20
+      .balanceOf(address)
+      .then((balance) => {
+        if (!active) return;
+        setSelectedAssetBalance(
+          Number(ethers.formatUnits(balance, selectedAsset.decimals))
+        );
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load selected asset balance:", error);
+        setSelectedAssetBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isConnected, address, selectedAsset, ethBalance, getErc20, txStatus]);
 
   // ---------------------------------------------------------------
   // STEP 3: Fetch quotes using the selected asset
@@ -118,6 +223,35 @@ export default function Trade() {
     setQuote(null);
   }, [mode, selectedAsset]);
 
+  function getPreflightError() {
+    if (!isConnected || !selectedAsset || !amount || Number(amount) <= 0) {
+      return null;
+    }
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) {
+      return "Enter a valid amount.";
+    }
+
+    if (mode === "buy" && selectedAsset.address === ETH_ADDRESS) {
+      const maxEthIn = config?.maxEthIn ? Number(config.maxEthIn) : null;
+      if (
+        maxEthIn !== null &&
+        Number.isFinite(maxEthIn) &&
+        maxEthIn > 0 &&
+        numericAmount > maxEthIn
+      ) {
+        return "Amount exceeds the current maximum ETH buy limit.";
+      }
+
+      if (ethBalance !== null && numericAmount >= ethBalance) {
+        return "Wallet does not have enough ETH to cover this purchase and gas fees.";
+      }
+    }
+
+    return null;
+  }
+
   // ---------------------------------------------------------------
   // STEP 4: Execute trade using the selected asset
   // ---------------------------------------------------------------
@@ -133,6 +267,11 @@ export default function Trade() {
 
     try {
       const shop = getShop();
+      if (!shop) {
+        throw new Error(
+          "TokenShop contract is not ready yet. Verify wallet connection and shop config."
+        );
+      }
       const isEth = selectedAsset.address === ETH_ADDRESS;
       let tx;
 
@@ -148,6 +287,9 @@ export default function Trade() {
 
         // Approve: "Hey TRI token, let the shop take X TRI from me"
         const token = getToken();
+        if (!token) {
+          throw new Error("TRI token contract is not ready yet.");
+        }
         setTxMessage("Approving TRI transfer...");
         const approveTx = await token.approve(shopAddress, genIn);
         await approveTx.wait();
@@ -158,6 +300,9 @@ export default function Trade() {
       } else if (mode === "buy") {
         // --- Buy TRI with ERC-20 (e.g. USDT) ---
         const erc20 = getErc20(selectedAsset.address);
+        if (!erc20) {
+          throw new Error(`${selectedAsset.symbol} contract is not ready yet.`);
+        }
 
         // Use the asset's decimals (USDT = 6, not 18!)
         const amountIn = ethers.parseUnits(amount, selectedAsset.decimals);
@@ -174,6 +319,9 @@ export default function Trade() {
         // --- Sell TRI for ERC-20 ---
         const genIn = ethers.parseUnits(amount, 18);
         const token = getToken();
+        if (!token) {
+          throw new Error("TRI token contract is not ready yet.");
+        }
 
         setTxMessage("Approving TRI transfer...");
         const approveTx = await token.approve(shopAddress, genIn);
@@ -196,14 +344,52 @@ export default function Trade() {
       try {
         await triggerSync();
         refreshAssets();
+        refreshTokenBalance();
         // Re-fetch config too (supply may have changed)
         apiGet("/shop/config").then(setConfig).catch(console.error);
       } catch {
         // sync failed silently — not critical
       }
+
+      if (gameId && address) {
+        try {
+          await apiPost("/player/game-economic-event", {
+            gameId,
+            walletAddress: address,
+            txHash: tx.hash,
+            eventType: isBuy ? "buy_tri" : "sell_tri",
+            assetKey: "tri",
+            assetSymbol: "TRI",
+            amount: isBuy
+              ? String(estimatedNetOutput ?? 0)
+              : amount,
+            direction: isBuy ? "in" : "out",
+            metadata: {
+              tradeMode: mode,
+              tradeAssetAddress: selectedAsset.address,
+              tradeAssetSymbol: selectedAsset.symbol,
+              tradeAmountInput: amount,
+              tradeNetOutput: estimatedNetOutput,
+              playerScope: "game",
+            },
+          });
+        } catch (eventError) {
+          console.error("Failed to log game-scoped economic event:", eventError);
+          const attributionError =
+            eventError instanceof Error
+              ? eventError.message
+              : "Unknown attribution error";
+          setTxMessage(
+            `Transaction confirmed, but game attribution failed: ${attributionError}`.slice(
+              0,
+              180
+            )
+          );
+        }
+      }
     } catch (err) {
       setTxStatus("error");
-      const reason = err.reason || err.message || "Transaction failed";
+      const reason = formatTxError(err, "Transaction failed");
       setTxMessage(reason.length > 100 ? reason.slice(0, 100) + "..." : reason);
       console.error("Trade error:", err);
     }
@@ -211,15 +397,47 @@ export default function Trade() {
 
   const isBuy = mode === "buy";
   const isEth = selectedAsset?.address === ETH_ADDRESS;
+  const preflightError = getPreflightError();
+  const maxEthIn = config?.maxEthIn ? Number(config.maxEthIn) : null;
+  const maxTriIn = config?.maxGenIn ? Number(config.maxGenIn) : null;
+  const feePercent = config?.feePercent ? Number(config.feePercent) : 0;
+
+  function formatBalance(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "—";
+    }
+    return value >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value.toFixed(4);
+  }
+
+  function formatTradeNumber(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "—";
+    }
+    return value >= 1000
+      ? value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+      : value.toFixed(4);
+  }
+
+  const grossOutput = quote
+    ? Number(isBuy ? quote.genOut : quote.amountOut)
+    : null;
+  const estimatedFeeAmount =
+    grossOutput !== null ? (grossOutput * feePercent) / 100 : null;
+  const estimatedNetOutput =
+    grossOutput !== null ? grossOutput - (estimatedFeeAmount ?? 0) : null;
+  const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
+  const scopeLabel = gameId ? "Game" : "Global";
 
   return (
     <div className="max-w-lg mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold">
-          <span className="glow-text-cyan">Trade</span>
+          <span className="glow-text-cyan">{t("player.trade.title")}</span>
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Buy or sell TRI tokens</p>
+        {!gameSession && (
+          <p className="text-gray-500 text-sm mt-1">{t("player.trade.subtitle")}</p>
+        )}
       </div>
 
       {/* Error Banner — shows if asset loading failed */}
@@ -227,6 +445,99 @@ export default function Trade() {
 
       {/* Trade Card */}
       <div className="card border-dark-500">
+        <div className="mb-6 rounded-lg border border-dark-500 bg-dark-700/40 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+            Trade Scope
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                gameId
+                  ? "border-neon-purple/40 bg-neon-purple/10 text-neon-purple"
+                  : "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan"
+              }`}
+            >
+              {scopeLabel}
+            </span>
+            {gameSession?.gameName && (
+              <span className="text-sm text-gray-200">
+                {gameSession.gameName}
+              </span>
+            )}
+            {gameSession?.studioName && (
+              <span className="text-xs text-gray-500">
+                via {gameSession.studioName}
+              </span>
+            )}
+          </div>
+          {gameId ? (
+            <div className="mt-2 space-y-1 text-xs text-gray-400">
+              <p>
+                {gameSession
+                  ? "Trades from this route are attributed to the selected game and studio."
+                  : gameSessionLoading
+                  ? "Resolving game session for this wallet..."
+                  : "This route is game-scoped, but the game session is not resolved yet."}
+              </p>
+              <p className="font-mono text-[11px] text-gray-500">
+                Game ID: {gameId}
+              </p>
+              {gameSessionError && (
+                <p className="text-neon-pink">{gameSessionError}</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">
+              Trades here are global and are not attributed to a specific game or studio.
+            </p>
+          )}
+        </div>
+
+        {isConnected && (
+          <div className="mb-6">
+            <div className="mb-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                {t("player.trade.balances")}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {t("player.trade.balancesDesc")}
+              </p>
+            </div>
+            <div
+              className={`grid grid-cols-1 gap-3 ${
+                isEth ? "sm:grid-cols-2" : "sm:grid-cols-3"
+              }`}
+            >
+              <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                  {t("player.trade.ethBalance")}
+                </p>
+                <p className="mt-1 font-mono text-sm text-gray-100">
+                  {formatBalance(ethBalance)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                  {t("player.trade.triBalance")}
+                </p>
+                <p className="mt-1 font-mono text-sm text-gray-100">
+                  {tokenBalance?.genBalance ?? "—"}
+                </p>
+              </div>
+              {!isEth && (
+                <div className="rounded-lg border border-dark-500 bg-dark-700/50 px-3 py-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                    {selectedAsset ? `${selectedAsset.symbol} ${t("player.trade.assetBalance")}` : t("player.trade.assetBalance")}
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-gray-100">
+                    {selectedAsset ? formatBalance(selectedAssetBalance) : "—"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <div className="flex rounded-lg bg-dark-700 p-1 mb-6">
           <button
@@ -237,7 +548,7 @@ export default function Trade() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Buy TRI
+            {t("player.trade.buyTri")}
           </button>
           <button
             onClick={() => setMode("sell")}
@@ -247,7 +558,7 @@ export default function Trade() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Sell TRI
+            {t("player.trade.sellTri")}
           </button>
         </div>
 
@@ -261,7 +572,7 @@ export default function Trade() {
             ------------------------------------------------------- */}
         <div className="mb-4">
           <label className="label">
-            {isBuy ? "Pay with" : "Receive"}
+            {isBuy ? t("player.trade.payWith") : t("player.trade.receive")}
           </label>
 
           {assetsLoading ? (
@@ -291,7 +602,7 @@ export default function Trade() {
           <label className="label">
             {isBuy
               ? `Amount (${selectedAsset?.symbol || "..."})`
-              : "Amount (TRI)"}
+              : t("player.trade.amountTri")}
           </label>
           <input
             type="number"
@@ -304,33 +615,45 @@ export default function Trade() {
           />
         </div>
 
-        {/* Arrow Divider */}
-        <div className="flex justify-center my-2">
-          <div className="p-2 rounded-full bg-dark-700 border border-dark-500">
-            <ArrowDownUp size={16} className="text-gray-400" />
-          </div>
-        </div>
-
         {/* Quote Display */}
         <div className="mb-6">
           <label className="label">
             {isBuy
-              ? "You receive (TRI)"
-              : `You receive (${selectedAsset?.symbol || "..."})`}
+              ? t("player.trade.estReceiveTri")
+              : `${t("player.trade.estReceiveAsset")} (${selectedAsset?.symbol || "..."})`}
           </label>
           <div className="input-field bg-dark-900 text-lg flex items-center justify-between">
             {quoteLoading ? (
-              <span className="text-gray-500 animate-pulse">Fetching quote...</span>
-            ) : quote ? (
+              <span className="text-gray-500 animate-pulse">{t("player.trade.fetchingQuote")}</span>
+            ) : estimatedNetOutput !== null ? (
               <span className={isBuy ? "glow-text-green" : "glow-text-pink"}>
-                {isBuy ? quote.genOut : quote.amountOut}
+                {formatTradeNumber(estimatedNetOutput)}
               </span>
             ) : (
               <span className="text-gray-600">—</span>
             )}
           </div>
-          {quote?.note && (
-            <p className="text-xs text-gray-600 mt-1">{quote.note}</p>
+          {quote && (
+            <div className="mt-2 space-y-1 text-xs text-gray-500">
+              <div className="flex justify-between">
+                <span>{t("player.trade.grossQuote")}</span>
+                <span className="font-mono">
+                  {formatTradeNumber(grossOutput)} {outputSymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("player.trade.estFee")}</span>
+                <span className="font-mono">
+                  {formatTradeNumber(estimatedFeeAmount)} {outputSymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("player.trade.netAfterFee")}</span>
+                <span className="font-mono">
+                  {formatTradeNumber(estimatedNetOutput)} {outputSymbol}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
@@ -338,20 +661,32 @@ export default function Trade() {
         {selectedAsset && (
           <div className="bg-dark-700/50 rounded-lg p-3 mb-6">
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Rate</span>
+              <span>{t("player.trade.rate")}</span>
               <span className="font-mono">
                 1 {selectedAsset.symbol} = {isBuy ? selectedAsset.buyRate : selectedAsset.sellRate} TRI
               </span>
             </div>
             {config && config.feePercent > 0 && (
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Fee</span>
+                <span>{t("player.trade.feeLabel")}</span>
                 <span className="font-mono">{config.feePercent}%</span>
               </div>
             )}
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>{isBuy ? t("player.trade.maxBuy") : t("player.trade.maxSell")}</span>
+              <span className="font-mono">
+                {isBuy
+                  ? maxEthIn && maxEthIn > 0
+                    ? `${config.maxEthIn} ETH`
+                    : t("player.trade.unlimited")
+                  : maxTriIn && maxTriIn > 0
+                  ? `${config.maxGenIn} TRI`
+                  : t("player.trade.unlimited")}
+              </span>
+            </div>
             {!isEth && (
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Decimals</span>
+                <span>{t("player.trade.decimals")}</span>
                 <span className="font-mono">{selectedAsset.decimals}</span>
               </div>
             )}
@@ -361,25 +696,44 @@ export default function Trade() {
         {/* Action Button */}
         {!isConnected ? (
           <p className="text-center text-gray-500 text-sm py-3">
-            Connect your wallet to trade
+            {t("player.trade.connectToTrade")}
           </p>
         ) : (
-          <button
-            onClick={handleTrade}
-            disabled={!amount || !quote || txStatus === "pending" || !selectedAsset}
-            className={`w-full py-3.5 rounded-lg font-bold text-sm transition-all duration-200 ${
-              isBuy
-                ? "bg-gradient-to-r from-neon-green/80 to-neon-cyan/80 text-dark-900 hover:opacity-90 shadow-neon-green disabled:opacity-30"
-                : "bg-gradient-to-r from-neon-pink/80 to-neon-purple/80 text-white hover:opacity-90 shadow-neon-pink disabled:opacity-30"
-            }`}
-          >
-            <Zap size={14} className="inline mr-1" />
-            {txStatus === "pending"
-              ? "Processing..."
-              : isBuy
-              ? `Buy TRI with ${selectedAsset?.symbol || "..."}`
-              : `Sell TRI for ${selectedAsset?.symbol || "..."}`}
-          </button>
+          <>
+            <button
+              onClick={handleTrade}
+              disabled={
+                !amount ||
+                !quote ||
+                txStatus === "pending" ||
+                !selectedAsset ||
+                !ready ||
+                !!preflightError
+              }
+              className={`w-full py-3.5 rounded-lg font-bold text-sm transition-all duration-200 ${
+                isBuy
+                  ? "bg-gradient-to-r from-neon-green/80 to-neon-cyan/80 text-dark-900 hover:opacity-90 shadow-neon-green disabled:opacity-30"
+                  : "bg-gradient-to-r from-neon-pink/80 to-neon-purple/80 text-white hover:opacity-90 shadow-neon-pink disabled:opacity-30"
+              }`}
+            >
+              <Zap size={14} className="inline mr-1" />
+              {txStatus === "pending"
+                ? t("player.trade.processing")
+                : isBuy
+                ? `${t("player.trade.buyWith")} ${selectedAsset?.symbol || "..."}`
+                : `${t("player.trade.sellFor")} ${selectedAsset?.symbol || "..."}`}
+            </button>
+            {!ready && configLoaded && (
+              <p className="text-xs text-neon-pink mt-2 text-center">
+                {t("player.trade.notReady")}
+              </p>
+            )}
+            {preflightError && (
+              <p className="text-xs text-neon-pink mt-2 text-center">
+                {preflightError}
+              </p>
+            )}
+          </>
         )}
 
         {/* TX Status */}

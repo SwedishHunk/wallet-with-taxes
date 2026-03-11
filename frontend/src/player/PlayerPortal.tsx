@@ -14,10 +14,15 @@ export default function PlayerPortal() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/game/:gameId" element={<Dashboard />} />
           <Route path="/trade" element={<Trade />} />
+          <Route path="/game/:gameId/trade" element={<Trade />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/game/:gameId/portfolio" element={<Portfolio />} />
           <Route path="/tax" element={<TaxReport />} />
+          <Route path="/game/:gameId/tax" element={<TaxReport />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/game/:gameId/admin" element={<Admin />} />
           <Route path="*" element={<Navigate to="/player" replace />} />
         </Routes>
       </Layout>
