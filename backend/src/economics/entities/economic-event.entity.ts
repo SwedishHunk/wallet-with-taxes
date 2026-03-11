@@ -31,25 +31,25 @@ export class EconomicEvent {
   @Column({ type: "enum", enum: EconomicScopeType })
   scopeType: EconomicScopeType;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   studioId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   gameId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   userId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   gamePlayerId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   walletAddress: string | null;
 
   @Column()
   assetKey: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   assetSymbol: string | null;
 
   @Column({ type: "decimal", precision: 36, scale: 18, default: "0" })
