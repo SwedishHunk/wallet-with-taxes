@@ -25,7 +25,7 @@ import { EconomicsModule } from "./economics/economics.module";
       {
         name: "auth",
         ttl: 60000, // 1 minute window
-        limit: 10,  // max 10 requests per minute per IP
+        limit: 10, // max 10 requests per minute per IP
       },
     ]),
     TypeOrmModule.forRoot({

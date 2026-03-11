@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ethers } from "ethers";
 import { DataSource } from "typeorm";
 import tokenShopAbi from "../shared/constants/abis/TokenShop.json";
@@ -235,9 +241,9 @@ describe("TokenShopListenerService", () => {
             amountOut: ethers.parseEther("0.25"),
           }),
         ]),
-      token: jest.fn().mockResolvedValue(
-        "0x9999999999999999999999999999999999999999",
-      ),
+      token: jest
+        .fn()
+        .mockResolvedValue("0x9999999999999999999999999999999999999999"),
     };
     (service as any).triTokenAddress =
       "0x9999999999999999999999999999999999999999";

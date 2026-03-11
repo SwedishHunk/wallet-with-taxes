@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
 import { ForbiddenException } from "@nestjs/common";
 import { PlatformController } from "./platform.controller";
 
@@ -44,10 +45,13 @@ describe("PlatformController", () => {
   });
 
   it("createGame delegates for owner/admin", async () => {
-    await controller.createGame(req({ id: "u1", studioId: "s1", role: "owner" }), {
-      name: "Game",
-      slug: "game",
-    } as never);
+    await controller.createGame(
+      req({ id: "u1", studioId: "s1", role: "owner" }),
+      {
+        name: "Game",
+        slug: "game",
+      } as never,
+    );
     expect(service.createGameForUser).toHaveBeenCalledWith(
       "u1",
       "s1",
@@ -56,9 +60,18 @@ describe("PlatformController", () => {
   });
 
   it("delegates wallet and game read endpoints", () => {
-    controller.getGameWallet(req({ id: "u1", studioId: "s1", role: "member" }), "g1");
-    controller.getGameWalletLedger(req({ id: "u1", studioId: "s1", role: "member" }), "g1");
-    controller.getGameDetails(req({ id: "u1", studioId: "s1", role: "member" }), "g1");
+    controller.getGameWallet(
+      req({ id: "u1", studioId: "s1", role: "member" }),
+      "g1",
+    );
+    controller.getGameWalletLedger(
+      req({ id: "u1", studioId: "s1", role: "member" }),
+      "g1",
+    );
+    controller.getGameDetails(
+      req({ id: "u1", studioId: "s1", role: "member" }),
+      "g1",
+    );
     controller.getGames(req({ id: "u1", studioId: "s1", role: "member" }));
 
     expect(service.getGameWalletBalance).toHaveBeenCalledWith("g1", "u1", "s1");
@@ -94,7 +107,12 @@ describe("PlatformController", () => {
       { toUserId: "u2", amount: 2, description: "tip" } as never,
     );
 
-    expect(service.depositToGameWallet).toHaveBeenCalledWith("g1", "u1", "s1", 10);
+    expect(service.depositToGameWallet).toHaveBeenCalledWith(
+      "g1",
+      "u1",
+      "s1",
+      10,
+    );
     expect(service.createWalletDepositIntent).toHaveBeenCalledWith(
       "g1",
       "u1",
@@ -108,7 +126,12 @@ describe("PlatformController", () => {
       "i1",
       "0xabc",
     );
-    expect(service.withdrawFromGameWallet).toHaveBeenCalledWith("g1", "u1", "s1", 3);
+    expect(service.withdrawFromGameWallet).toHaveBeenCalledWith(
+      "g1",
+      "u1",
+      "s1",
+      3,
+    );
     expect(service.transferBetweenPlayersInGame).toHaveBeenCalledWith(
       "g1",
       "u1",
@@ -120,8 +143,14 @@ describe("PlatformController", () => {
   });
 
   it("delegates nft read/update endpoints", () => {
-    controller.getNFTTemplates(req({ id: "u1", studioId: "s1", role: "member" }), "g1");
-    controller.getPlayerNFTs(req({ id: "u1", studioId: "s1", role: "member" }), "g1");
+    controller.getNFTTemplates(
+      req({ id: "u1", studioId: "s1", role: "member" }),
+      "g1",
+    );
+    controller.getPlayerNFTs(
+      req({ id: "u1", studioId: "s1", role: "member" }),
+      "g1",
+    );
     controller.updateNFT(
       req({ id: "u1", studioId: "s1", role: "member" }),
       "g1",
@@ -200,7 +229,9 @@ describe("PlatformController", () => {
       req({ id: "u1", studioId: "s1", role: "owner" }),
       { email: "a@b.com", password: "x", accessPoints: ["wallet"] } as never,
     );
-    controller.getPersonalAccounts(req({ id: "u1", studioId: "s1", role: "owner" }));
+    controller.getPersonalAccounts(
+      req({ id: "u1", studioId: "s1", role: "owner" }),
+    );
     controller.loginPersonalAccount(
       req({ id: "u1", studioId: "s1", role: "owner" }),
       { email: "a@b.com", password: "x" } as never,

@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { QueryFailedError } from "typeorm";
 import { PlatformService } from "./platform.service";
 import { AppException } from "../common/exceptions/app-exception";
@@ -34,21 +39,66 @@ describe("PlatformService", () => {
     dataSource = {
       transaction: jest.fn(),
     };
-    studioRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    studioMemberRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    gameRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    gamePlayerRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    walletRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    ledgerRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    nftTemplateRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
-    nftInstanceRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
+    studioRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    studioMemberRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    gameRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    gamePlayerRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    walletRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    ledgerRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    nftTemplateRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
+    nftInstanceRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
     walletDepositIntentRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
     };
-    userRepo = { findOne: jest.fn(), find: jest.fn(), create: jest.fn((x) => x), save: jest.fn() };
+    userRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
 
     service = new PlatformService(
       dataSource as never,
@@ -76,7 +126,12 @@ describe("PlatformService", () => {
       id: x.id,
     }));
 
-    const result = await service.createWalletDepositIntent("g1", "u1", "s1", "10.5");
+    const result = await service.createWalletDepositIntent(
+      "g1",
+      "u1",
+      "s1",
+      "10.5",
+    );
 
     expect(result.amount).toBe("10.5");
     expect(result.depositAddress).toMatch(/^0x[a-f0-9]{40}$/);
@@ -100,20 +155,29 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent maps txHash unique violation to AppException", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     const qf = new QueryFailedError("INSERT", [], new Error("duplicate"));
-    (qf as QueryFailedError & {
-      driverError?: Error & { code?: string; constraint?: string };
-    }).driverError = Object.assign(new Error("duplicate key"), {
+    (
+      qf as QueryFailedError & {
+        driverError?: Error & { code?: string; constraint?: string };
+      }
+    ).driverError = Object.assign(new Error("duplicate key"), {
       code: "23505",
       constraint: "uq_wallet_deposit_intents_tx_hash_not_null",
     });
     dataSource.transaction.mockRejectedValueOnce(qf);
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
     ).rejects.toMatchObject({
       statusCode: 400,
       message: "txHash already used",
@@ -122,13 +186,20 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent has expired", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     dataSource.transaction.mockResolvedValueOnce({ expired: true });
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
     ).rejects.toMatchObject({
       statusCode: 400,
       message: "Deposit intent has expired",
@@ -163,7 +234,13 @@ describe("PlatformService", () => {
       }),
     );
 
-    const saved = await service.depositToGameWallet("g1", "u1", "s1", 5, "topup");
+    const saved = await service.depositToGameWallet(
+      "g1",
+      "u1",
+      "s1",
+      5,
+      "topup",
+    );
     expect(saved.balance).toBe("7");
     expect(saved.totalDeposited).toBe("8");
     expect(txLedgerRepo.create).toHaveBeenCalledWith(
@@ -186,7 +263,10 @@ describe("PlatformService", () => {
       } as never,
     });
     const txWalletRepo = { save: jest.fn(async (x) => x) };
-    const txLedgerRepo = { create: jest.fn((x) => x), save: jest.fn(async (x) => x) };
+    const txLedgerRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+    };
     dataSource.transaction.mockImplementation(async (cb) =>
       cb({
         getRepository: (entity: unknown) => {
@@ -265,9 +345,10 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent succeeds and returns wallet on happy path", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
 
     const now = new Date();
     const intent = {
@@ -337,7 +418,10 @@ describe("PlatformService", () => {
       email: "owner@test.com",
       walletAddress: "0xwallet",
     });
-    studioRepo.save.mockResolvedValueOnce({ id: "s1", email: "owner@test.com" });
+    studioRepo.save.mockResolvedValueOnce({
+      id: "s1",
+      email: "owner@test.com",
+    });
 
     const studio = await service.ensureStudioForUser("u1");
     expect(studioRepo.create).toHaveBeenCalledWith(
@@ -358,7 +442,9 @@ describe("PlatformService", () => {
 
   it("getStudioWithRoleForUser rejects non-member", async () => {
     studioMemberRepo.findOne.mockResolvedValueOnce(null);
-    await expect(service.getStudioWithRoleForUser("s1", "u1")).rejects.toMatchObject({
+    await expect(
+      service.getStudioWithRoleForUser("s1", "u1"),
+    ).rejects.toMatchObject({
       statusCode: 403,
       message: ERROR_MESSAGES.ACCESS_DENIED,
     });
@@ -369,10 +455,12 @@ describe("PlatformService", () => {
       studio: { id: "s1" },
       role: "owner",
     });
-    await expect(service.getStudioWithRoleForUser("s1", "u1")).resolves.toEqual({
-      studio: { id: "s1" },
-      role: "owner",
-    });
+    await expect(service.getStudioWithRoleForUser("s1", "u1")).resolves.toEqual(
+      {
+        studio: { id: "s1" },
+        role: "owner",
+      },
+    );
   });
 
   it("createGameForUser rejects unknown studio", async () => {
@@ -418,7 +506,11 @@ describe("PlatformService", () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
     userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce(null);
-    gamePlayerRepo.create.mockReturnValueOnce({ id: "gp1", user: { id: "u1" }, game: { id: "g1" } });
+    gamePlayerRepo.create.mockReturnValueOnce({
+      id: "gp1",
+      user: { id: "u1" },
+      game: { id: "g1" },
+    });
     gamePlayerRepo.save.mockImplementationOnce(async (x) => x);
     walletRepo.findOne.mockResolvedValueOnce(null);
     walletRepo.create.mockReturnValueOnce({
@@ -470,11 +562,21 @@ describe("PlatformService", () => {
       }),
     );
 
-    const saved = await service.withdrawFromGameWallet("g1", "u1", "s1", 4, "cashout");
+    const saved = await service.withdrawFromGameWallet(
+      "g1",
+      "u1",
+      "s1",
+      4,
+      "cashout",
+    );
     expect(saved.balance).toBe("6");
     expect(saved.totalWithdrawn).toBe("5");
     expect(txLedgerRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "withdraw", amount: "4", description: "cashout" }),
+      expect.objectContaining({
+        type: "withdraw",
+        amount: "4",
+        description: "cashout",
+      }),
     );
   });
 
@@ -485,7 +587,10 @@ describe("PlatformService", () => {
       totalWithdrawn: "0",
     } as never);
     const txWalletRepo = { save: jest.fn(async (x) => x) };
-    const txLedgerRepo = { create: jest.fn((x) => x), save: jest.fn(async (x) => x) };
+    const txLedgerRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+    };
     dataSource.transaction.mockImplementation(async (cb) =>
       cb({
         getRepository: (entity: unknown) => {
@@ -615,17 +720,23 @@ describe("PlatformService", () => {
       where: jest.fn().mockReturnThis(),
       getMany,
     };
-    (studioRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = jest
-      .fn()
-      .mockReturnValue(qb);
+    (
+      studioRepo as unknown as { createQueryBuilder: jest.Mock }
+    ).createQueryBuilder = jest.fn().mockReturnValue(qb);
 
-    await expect(service.getStudiosForUser("u1")).resolves.toEqual([{ id: "s1" }]);
+    await expect(service.getStudiosForUser("u1")).resolves.toEqual([
+      { id: "s1" },
+    ]);
   });
 
   it("getGamesForUser delegates repository find", async () => {
     gameRepo.find.mockResolvedValueOnce([{ id: "g1" }]);
-    await expect(service.getGamesForUser("s1")).resolves.toEqual([{ id: "g1" }]);
-    expect(gameRepo.find).toHaveBeenCalledWith({ where: { studio: { id: "s1" } } });
+    await expect(service.getGamesForUser("s1")).resolves.toEqual([
+      { id: "g1" },
+    ]);
+    expect(gameRepo.find).toHaveBeenCalledWith({
+      where: { studio: { id: "s1" } },
+    });
   });
 
   it("getGameWalletBalance delegates ensureGameWalletForPlayer", async () => {
@@ -633,7 +744,9 @@ describe("PlatformService", () => {
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
-    await expect(service.getGameWalletBalance("g1", "u1", "s1")).resolves.toEqual({
+    await expect(
+      service.getGameWalletBalance("g1", "u1", "s1"),
+    ).resolves.toEqual({
       id: "w1",
     });
   });
@@ -651,10 +764,14 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent is missing", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
-    const txIntentRepo = { findOne: jest.fn(async () => null), save: jest.fn() };
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
+    const txIntentRepo = {
+      findOne: jest.fn(async () => null),
+      save: jest.fn(),
+    };
     const txWalletRepo = { findOne: jest.fn(), save: jest.fn() };
     const txLedgerRepo = { create: jest.fn(), save: jest.fn() };
     dataSource.transaction.mockImplementation(async (cb) =>
@@ -669,7 +786,13 @@ describe("PlatformService", () => {
     );
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i404", "0xabcdef1234"),
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i404",
+        "0xabcdef1234",
+      ),
     ).rejects.toMatchObject({
       statusCode: 404,
       message: "Deposit intent not found",
@@ -678,9 +801,10 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent is not pending", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     const txIntentRepo = {
       findOne: jest.fn(async () => ({
         id: "i1",
@@ -692,15 +816,23 @@ describe("PlatformService", () => {
       cb({
         getRepository: (entity: unknown) => {
           if (entity === WalletDepositIntent) return txIntentRepo;
-          if (entity === GameWallet) return { findOne: jest.fn(), save: jest.fn() };
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn() };
+          if (entity === GameWallet)
+            return { findOne: jest.fn(), save: jest.fn() };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn() };
           throw new Error("unexpected repository");
         },
       }),
     );
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
     ).rejects.toMatchObject({
       statusCode: 400,
       message: "Deposit intent is not pending",
@@ -709,9 +841,10 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent marks expired intent inside transaction", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     const intent = {
       id: "i1",
       status: WalletDepositIntentStatus.PENDING,
@@ -725,43 +858,64 @@ describe("PlatformService", () => {
       cb({
         getRepository: (entity: unknown) => {
           if (entity === WalletDepositIntent) return txIntentRepo;
-          if (entity === GameWallet) return { findOne: jest.fn(), save: jest.fn() };
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn() };
+          if (entity === GameWallet)
+            return { findOne: jest.fn(), save: jest.fn() };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn() };
           throw new Error("unexpected repository");
         },
       }),
     );
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
-    ).rejects.toMatchObject({ statusCode: 400, message: "Deposit intent has expired" });
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Deposit intent has expired",
+    });
     expect(intent.status).toBe(WalletDepositIntentStatus.EXPIRED);
     expect(txIntentRepo.save).toHaveBeenCalled();
   });
 
   it("confirmWalletDepositIntent rethrows unknown query failures", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     const qf = new QueryFailedError("INSERT", [], new Error("boom"));
-    (qf as QueryFailedError & {
-      driverError?: Error & { code?: string; constraint?: string };
-    }).driverError = Object.assign(new Error("other"), {
+    (
+      qf as QueryFailedError & {
+        driverError?: Error & { code?: string; constraint?: string };
+      }
+    ).driverError = Object.assign(new Error("other"), {
       code: "99999",
       constraint: "something_else",
     });
     dataSource.transaction.mockRejectedValueOnce(qf);
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
     ).rejects.toBe(qf);
   });
 
   it("confirmWalletDepositIntent throws when locked wallet is missing", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest
-      .spyOn(service, "ensureGameWalletForPlayer")
-      .mockResolvedValue({ gamePlayer: { id: "gp1" } as never, wallet: { id: "w1" } as never });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
     const txIntentRepo = {
       findOne: jest.fn(async () => ({
         id: "i1",
@@ -771,21 +925,34 @@ describe("PlatformService", () => {
       })),
       save: jest.fn(),
     };
-    const txWalletRepo = { findOne: jest.fn(async () => null), save: jest.fn() };
+    const txWalletRepo = {
+      findOne: jest.fn(async () => null),
+      save: jest.fn(),
+    };
     dataSource.transaction.mockImplementation(async (cb) =>
       cb({
         getRepository: (entity: unknown) => {
           if (entity === WalletDepositIntent) return txIntentRepo;
           if (entity === GameWallet) return txWalletRepo;
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn() };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn() };
           throw new Error("unexpected repository");
         },
       }),
     );
 
     await expect(
-      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabcdef1234"),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Game wallet not found" });
+      service.confirmWalletDepositIntent(
+        "g1",
+        "u1",
+        "s1",
+        "i1",
+        "0xabcdef1234",
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Game wallet not found",
+    });
   });
 
   it("transferBetweenPlayersInGame handles happy path", async () => {
@@ -795,8 +962,18 @@ describe("PlatformService", () => {
     const toUser = { id: "u2" };
     const fromPlayer = { id: "gp1", user: fromUser, game: { id: "g1" } };
     const toPlayer = { id: "gp2", user: toUser, game: { id: "g1" } };
-    const fromWallet = { id: "w1", gamePlayer: fromPlayer, balance: "10", totalWithdrawn: "1" };
-    const toWallet = { id: "w2", gamePlayer: toPlayer, balance: "2", totalDeposited: "3" };
+    const fromWallet = {
+      id: "w1",
+      gamePlayer: fromPlayer,
+      balance: "10",
+      totalWithdrawn: "1",
+    };
+    const toWallet = {
+      id: "w2",
+      gamePlayer: toPlayer,
+      balance: "2",
+      totalDeposited: "3",
+    };
 
     const txUserRepo = {
       findOne: jest
@@ -855,7 +1032,10 @@ describe("PlatformService", () => {
   it("transferBetweenPlayersInGame throws when recipient user is missing", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
     const txUserRepo = {
-      findOne: jest.fn().mockResolvedValueOnce({ id: "u1" }).mockResolvedValueOnce(null),
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({ id: "u1" })
+        .mockResolvedValueOnce(null),
     };
     dataSource.transaction.mockImplementation(async (cb) =>
       cb({
@@ -872,13 +1052,19 @@ describe("PlatformService", () => {
 
     await expect(
       service.transferBetweenPlayersInGame("g1", "u1", "u2", "s1", 1),
-    ).rejects.toMatchObject({ statusCode: 404, message: ERROR_MESSAGES.USER_NOT_FOUND });
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: ERROR_MESSAGES.USER_NOT_FOUND,
+    });
   });
 
   it("transferBetweenPlayersInGame creates missing players/wallets then fails insufficient balance", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
     const txUserRepo = {
-      findOne: jest.fn().mockResolvedValueOnce({ id: "u1" }).mockResolvedValueOnce({ id: "u2" }),
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({ id: "u1" })
+        .mockResolvedValueOnce({ id: "u2" }),
     };
     const createdFromPlayer = { id: "gp1", user: { id: "u1" } };
     const createdToPlayer = { id: "gp2", user: { id: "u2" } };
@@ -895,7 +1081,10 @@ describe("PlatformService", () => {
       totalDeposited: "0",
     };
     const txPlayerRepo = {
-      findOne: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null),
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null),
       create: jest
         .fn()
         .mockReturnValueOnce(createdFromPlayer)
@@ -921,7 +1110,8 @@ describe("PlatformService", () => {
           if (entity === User) return txUserRepo;
           if (entity === GamePlayer) return txPlayerRepo;
           if (entity === GameWallet) return txWalletRepo;
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn(async (x) => x) };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn(async (x) => x) };
           throw new Error("unexpected repository");
         },
       }),
@@ -929,7 +1119,10 @@ describe("PlatformService", () => {
 
     await expect(
       service.transferBetweenPlayersInGame("g1", "u1", "u2", "s1", 1),
-    ).rejects.toMatchObject({ statusCode: 400, message: ERROR_MESSAGES.INSUFFICIENT_BALANCE });
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
     expect(txPlayerRepo.create).toHaveBeenCalledTimes(2);
     expect(txWalletRepo.create).toHaveBeenCalledTimes(2);
   });
@@ -940,11 +1133,29 @@ describe("PlatformService", () => {
     const toUser = { id: "u2" };
     const fromPlayer = { id: "gp1", user: fromUser };
     const toPlayer = { id: "gp2", user: toUser };
-    const fromWallet = { id: "w1", gamePlayer: fromPlayer, balance: "10", totalWithdrawn: "0" };
-    const toWallet = { id: "w2", gamePlayer: toPlayer, balance: "1", totalDeposited: "0" };
-    const txUserRepo = { findOne: jest.fn().mockResolvedValueOnce(fromUser).mockResolvedValueOnce(toUser) };
+    const fromWallet = {
+      id: "w1",
+      gamePlayer: fromPlayer,
+      balance: "10",
+      totalWithdrawn: "0",
+    };
+    const toWallet = {
+      id: "w2",
+      gamePlayer: toPlayer,
+      balance: "1",
+      totalDeposited: "0",
+    };
+    const txUserRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(fromUser)
+        .mockResolvedValueOnce(toUser),
+    };
     const txPlayerRepo = {
-      findOne: jest.fn().mockResolvedValueOnce(fromPlayer).mockResolvedValueOnce(toPlayer),
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(fromPlayer)
+        .mockResolvedValueOnce(toPlayer),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
     };
@@ -963,7 +1174,8 @@ describe("PlatformService", () => {
           if (entity === User) return txUserRepo;
           if (entity === GamePlayer) return txPlayerRepo;
           if (entity === GameWallet) return txWalletRepo;
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn(async (x) => x) };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn(async (x) => x) };
           throw new Error("unexpected repository");
         },
       }),
@@ -971,7 +1183,10 @@ describe("PlatformService", () => {
 
     await expect(
       service.transferBetweenPlayersInGame("g1", "u1", "u2", "s1", 1),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Sender wallet not found" });
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Sender wallet not found",
+    });
   });
 
   it("transferBetweenPlayersInGame throws when recipient lock fails", async () => {
@@ -980,11 +1195,29 @@ describe("PlatformService", () => {
     const toUser = { id: "u2" };
     const fromPlayer = { id: "gp1", user: fromUser };
     const toPlayer = { id: "gp2", user: toUser };
-    const fromWallet = { id: "w1", gamePlayer: fromPlayer, balance: "10", totalWithdrawn: "0" };
-    const toWallet = { id: "w2", gamePlayer: toPlayer, balance: "1", totalDeposited: "0" };
-    const txUserRepo = { findOne: jest.fn().mockResolvedValueOnce(fromUser).mockResolvedValueOnce(toUser) };
+    const fromWallet = {
+      id: "w1",
+      gamePlayer: fromPlayer,
+      balance: "10",
+      totalWithdrawn: "0",
+    };
+    const toWallet = {
+      id: "w2",
+      gamePlayer: toPlayer,
+      balance: "1",
+      totalDeposited: "0",
+    };
+    const txUserRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(fromUser)
+        .mockResolvedValueOnce(toUser),
+    };
     const txPlayerRepo = {
-      findOne: jest.fn().mockResolvedValueOnce(fromPlayer).mockResolvedValueOnce(toPlayer),
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(fromPlayer)
+        .mockResolvedValueOnce(toPlayer),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
     };
@@ -1004,7 +1237,8 @@ describe("PlatformService", () => {
           if (entity === User) return txUserRepo;
           if (entity === GamePlayer) return txPlayerRepo;
           if (entity === GameWallet) return txWalletRepo;
-          if (entity === LedgerEntry) return { create: jest.fn(), save: jest.fn(async (x) => x) };
+          if (entity === LedgerEntry)
+            return { create: jest.fn(), save: jest.fn(async (x) => x) };
           throw new Error("unexpected repository");
         },
       }),
@@ -1012,12 +1246,17 @@ describe("PlatformService", () => {
 
     await expect(
       service.transferBetweenPlayersInGame("g1", "u1", "u2", "s1", 1),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Recipient wallet not found" });
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Recipient wallet not found",
+    });
   });
 
   it("getNFTTemplatesForGame rejects when game is missing", async () => {
     gameRepo.findOne.mockResolvedValueOnce(null);
-    await expect(service.getNFTTemplatesForGame("g404", "s1")).rejects.toMatchObject({
+    await expect(
+      service.getNFTTemplatesForGame("g404", "s1"),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: ERROR_MESSAGES.GAME_NOT_FOUND,
     });
@@ -1025,7 +1264,9 @@ describe("PlatformService", () => {
 
   it("getNFTTemplatesForGame rejects when game does not belong to studio", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s2" } });
-    await expect(service.getNFTTemplatesForGame("g1", "s1")).rejects.toMatchObject({
+    await expect(
+      service.getNFTTemplatesForGame("g1", "s1"),
+    ).rejects.toMatchObject({
       statusCode: 403,
       message: ERROR_MESSAGES.ACCESS_DENIED,
     });

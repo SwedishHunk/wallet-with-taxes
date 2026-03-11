@@ -30,7 +30,9 @@ describe("AdminService", () => {
     const userRepo = { find: jest.fn() };
     const service = new AdminService(taxRepo as never, userRepo as never);
 
-    await expect(service.getFeeStats("2026-01-01", "2026-01-31")).resolves.toEqual({
+    await expect(
+      service.getFeeStats("2026-01-01", "2026-01-31"),
+    ).resolves.toEqual({
       totalFeesUSD: 12.5,
       totalTrades: 3,
       from: "2026-01-01",

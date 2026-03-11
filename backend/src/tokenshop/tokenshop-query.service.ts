@@ -20,16 +20,25 @@ export class TokenShopQueryService {
     const ethUsd = this.parseEnvNumber(process.env.TOKENSHOP_ETH_USD);
     const usdSek = this.parseEnvNumber(process.env.TOKENSHOP_USD_SEK);
 
-    const [feeBps, maxEthIn, maxGenIn, paused, buyRateEth, sellRateEth, totalSupply] =
-      await Promise.all([
-        contract.feeBps().catch(() => 0n),
-        contract.maxEthIn().catch(() => 0n),
-        contract.maxGenIn().catch(() => 0n),
-        contract.paused().catch(() => false),
-        contract.buyRate(ethers.ZeroAddress).catch(() => 0n),
-        contract.sellRate(ethers.ZeroAddress).catch(() => 0n),
-        this.getTokenSupply(tokenAddress),
-      ]);
+    const [
+      feeBps,
+      maxEthIn,
+      maxGenIn,
+      paused,
+      buyRateEth,
+      sellRateEth,
+      totalSupply,
+    ] = await Promise.all([
+      (contract.feeBps() as Promise<bigint>).catch(() => 0n),
+      (contract.maxEthIn() as Promise<bigint>).catch(() => 0n),
+      (contract.maxGenIn() as Promise<bigint>).catch(() => 0n),
+      (contract.paused() as Promise<boolean>).catch(() => false),
+      (contract.buyRate(ethers.ZeroAddress) as Promise<bigint>).catch(() => 0n),
+      (contract.sellRate(ethers.ZeroAddress) as Promise<bigint>).catch(
+        () => 0n,
+      ),
+      this.getTokenSupply(tokenAddress),
+    ]);
 
     return {
       shopAddress: this.chainService.getShopAddress(),
@@ -101,8 +110,10 @@ export class TokenShopQueryService {
     const seenAddresses = new Set<string>([this.chainService.ethAddress]);
 
     const [ethBuyRate, ethSellRate] = await Promise.all([
-      contract.buyRate(ethers.ZeroAddress).catch(() => 0n),
-      contract.sellRate(ethers.ZeroAddress).catch(() => 0n),
+      (contract.buyRate(ethers.ZeroAddress) as Promise<bigint>).catch(() => 0n),
+      (contract.sellRate(ethers.ZeroAddress) as Promise<bigint>).catch(
+        () => 0n,
+      ),
     ]);
 
     const assets = [
@@ -117,7 +128,10 @@ export class TokenShopQueryService {
 
     const knownAssets = await this.shopEventRepo
       .createQueryBuilder("shopEvent")
-      .select(["shopEvent.asset AS asset", "shopEvent.assetSymbol AS assetSymbol"])
+      .select([
+        "shopEvent.asset AS asset",
+        "shopEvent.assetSymbol AS assetSymbol",
+      ])
       .groupBy("shopEvent.asset")
       .addGroupBy("shopEvent.assetSymbol")
       .getRawMany<{ asset: string; assetSymbol: string }>();
@@ -130,7 +144,9 @@ export class TokenShopQueryService {
       seenAddresses.add(normalized);
 
       try {
-        const isSupported = (await contract.supportedTokens(normalized)) as boolean;
+        const isSupported = (await contract.supportedTokens(
+          normalized,
+        )) as boolean;
         if (!isSupported) {
           continue;
         }
@@ -146,8 +162,8 @@ export class TokenShopQueryService {
 
         const decimals = await this.chainService.getAssetDecimals(normalized);
         const [buyRate, sellRate] = await Promise.all([
-          contract.buyRate(normalized).catch(() => 0n),
-          contract.sellRate(normalized).catch(() => 0n),
+          (contract.buyRate(normalized) as Promise<bigint>).catch(() => 0n),
+          (contract.sellRate(normalized) as Promise<bigint>).catch(() => 0n),
         ]);
 
         if (buyRate === 0n && sellRate === 0n) {
@@ -237,7 +253,11 @@ export class TokenShopQueryService {
   async getUserBalance(userAddress: string) {
     const normalizedUser = userAddress.toLowerCase();
     const tokenAddress = await this.chainService.getTokenAddress();
-    const erc20 = new Contract(tokenAddress, ERC20_ABI, this.chainService.getProvider());
+    const erc20 = new Contract(
+      tokenAddress,
+      ERC20_ABI,
+      this.chainService.getProvider(),
+    );
     const balance = (await erc20.balanceOf(normalizedUser)) as bigint;
 
     return {
@@ -249,7 +269,11 @@ export class TokenShopQueryService {
 
   private async getTokenSupply(tokenAddress: string) {
     try {
-      const erc20 = new Contract(tokenAddress, ERC20_ABI, this.chainService.getProvider());
+      const erc20 = new Contract(
+        tokenAddress,
+        ERC20_ABI,
+        this.chainService.getProvider(),
+      );
       const totalSupply = (await erc20.totalSupply()) as bigint;
       return ethers.formatUnits(totalSupply, 18);
     } catch {

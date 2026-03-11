@@ -11,7 +11,9 @@ export class TokenShopChainService {
   private readonly tokenShopAddress?: string;
   private readonly provider: JsonRpcProvider | null;
   private readonly contract: Contract | null;
-  private readonly symbolCache = new Map<string, string>([[ETH_ADDRESS, "ETH"]]);
+  private readonly symbolCache = new Map<string, string>([
+    [ETH_ADDRESS, "ETH"],
+  ]);
   private readonly decimalsCache = new Map<string, number>([[ETH_ADDRESS, 18]]);
 
   constructor(private readonly configService: ConfigService) {
@@ -34,7 +36,9 @@ export class TokenShopChainService {
 
   ensureConfigured() {
     if (!this.provider || !this.contract || !this.tokenShopAddress) {
-      throw new Error("TokenShop is not configured. Missing RPC_URL or TOKENSHOP_ADDRESS.");
+      throw new Error(
+        "TokenShop is not configured. Missing RPC_URL or TOKENSHOP_ADDRESS.",
+      );
     }
   }
 

@@ -26,9 +26,7 @@ type ParsedTokenShopEvent = {
 };
 
 @Injectable()
-export class TokenShopListenerService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
   private static readonly SYNC_STATE_ID = "tokenshop";
   private readonly logger = new Logger(TokenShopListenerService.name);
   private readonly pollIntervalMs = Number(
@@ -153,9 +151,7 @@ export class TokenShopListenerService
       syncState.lastSyncedBlock = String(latestBlock);
       await this.syncStateRepo.save(syncState);
     } catch (error) {
-      this.logger.error(
-        `TokenShop sync failed: ${this.formatError(error)}`,
-      );
+      this.logger.error(`TokenShop sync failed: ${this.formatError(error)}`);
     } finally {
       this.syncInProgress = false;
     }
@@ -226,7 +222,9 @@ export class TokenShopListenerService
     );
     const placeholderUnitPrice =
       paymentAmount !== null ? paymentAmount / triAmount : undefined;
-    const normalizedAssetAddress = (this.triTokenAddress ?? "TRI").toLowerCase();
+    const normalizedAssetAddress = (
+      this.triTokenAddress ?? "TRI"
+    ).toLowerCase();
     const normalizedPayAsset = event.payAsset.toLowerCase();
     const taxType = event.name === "Bought" ? "acquisition" : "disposal";
     const shopEventType = event.name === "Bought" ? "BUY" : "SELL";

@@ -49,9 +49,7 @@ export class EconomicsController {
     @Query("walletAddress") walletAddress?: string,
   ) {
     if (!gameId || !walletAddress) {
-      throw new BadRequestException(
-        "gameId and walletAddress are required",
-      );
+      throw new BadRequestException("gameId and walletAddress are required");
     }
 
     this.logger.log(
@@ -63,9 +61,7 @@ export class EconomicsController {
   @Post("api/player/session")
   createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {
     if (!body?.gameId || !body?.walletAddress) {
-      throw new BadRequestException(
-        "gameId and walletAddress are required",
-      );
+      throw new BadRequestException("gameId and walletAddress are required");
     }
 
     return this.playerEconomicsService.resolveSession(
@@ -112,6 +108,9 @@ export class EconomicsController {
     @Param("gameId") gameId: string,
   ) {
     const jwtUser = req.user as JwtUser;
-    return this.economicsService.getEventsForStudioGame(jwtUser.studioId, gameId);
+    return this.economicsService.getEventsForStudioGame(
+      jwtUser.studioId,
+      gameId,
+    );
   }
 }

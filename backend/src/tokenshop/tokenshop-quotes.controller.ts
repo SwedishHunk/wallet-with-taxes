@@ -9,7 +9,9 @@ export class TokenShopQuotesController {
   @Get("buy-eth")
   getBuyEthQuote(@Query("amount") amount?: string) {
     if (!amount || Number.isNaN(Number(amount)) || Number(amount) <= 0) {
-      throw new BadRequestException("Invalid amount — provide a positive ETH value");
+      throw new BadRequestException(
+        "Invalid amount — provide a positive ETH value",
+      );
     }
 
     return this.tokenShopQueryService.quoteBuyEth(amount);
@@ -18,14 +20,19 @@ export class TokenShopQuotesController {
   @Get("sell-eth")
   getSellEthQuote(@Query("gen") gen?: string) {
     if (!gen || Number.isNaN(Number(gen)) || Number(gen) <= 0) {
-      throw new BadRequestException("Invalid gen — provide a positive TRI value");
+      throw new BadRequestException(
+        "Invalid gen — provide a positive TRI value",
+      );
     }
 
     return this.tokenShopQueryService.quoteSellEth(gen);
   }
 
   @Get("buy-token")
-  getBuyTokenQuote(@Query("asset") asset?: string, @Query("amount") amount?: string) {
+  getBuyTokenQuote(
+    @Query("asset") asset?: string,
+    @Query("amount") amount?: string,
+  ) {
     if (!asset || !ethers.isAddress(asset)) {
       throw new BadRequestException("Invalid asset address");
     }
@@ -37,7 +44,10 @@ export class TokenShopQuotesController {
   }
 
   @Get("sell-token")
-  getSellTokenQuote(@Query("asset") asset?: string, @Query("gen") gen?: string) {
+  getSellTokenQuote(
+    @Query("asset") asset?: string,
+    @Query("gen") gen?: string,
+  ) {
     if (!asset || !ethers.isAddress(asset)) {
       throw new BadRequestException("Invalid asset address");
     }

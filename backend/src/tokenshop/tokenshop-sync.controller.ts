@@ -3,7 +3,9 @@ import { TokenShopListenerService } from "./tokenshop-listener.service";
 
 @Controller("api")
 export class TokenShopSyncController {
-  constructor(private readonly tokenShopListenerService: TokenShopListenerService) {}
+  constructor(
+    private readonly tokenShopListenerService: TokenShopListenerService,
+  ) {}
 
   @Post("sync")
   syncNow() {

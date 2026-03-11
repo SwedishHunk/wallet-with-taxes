@@ -3,7 +3,9 @@ import { TokenShopAnalyticsService } from "./tokenshop-analytics.service";
 
 @Controller("api/analytics")
 export class TokenShopAnalyticsController {
-  constructor(private readonly tokenShopAnalyticsService: TokenShopAnalyticsService) {}
+  constructor(
+    private readonly tokenShopAnalyticsService: TokenShopAnalyticsService,
+  ) {}
 
   @Get("summary")
   getSummary() {

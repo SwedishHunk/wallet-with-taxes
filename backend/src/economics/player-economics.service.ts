@@ -68,7 +68,10 @@ export class PlayerEconomicsService {
   }
 
   async logGameScopedEvent(input: LogGameScopedEventInput) {
-    const session = await this.resolveSession(input.gameId, input.walletAddress);
+    const session = await this.resolveSession(
+      input.gameId,
+      input.walletAddress,
+    );
     this.logger.log(
       `Persisting game-scoped event type=${input.eventType} game=${session.gameId} player=${session.gamePlayerId} tx=${input.txHash ?? "n/a"}`,
     );

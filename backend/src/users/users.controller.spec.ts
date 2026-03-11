@@ -22,7 +22,11 @@ describe("UsersController", () => {
   it("delegates signup", async () => {
     service.signup.mockResolvedValueOnce({ token: "x" });
     await expect(
-      controller.signup({ email: "a@b.com", password: "pw", studioName: "S" } as never),
+      controller.signup({
+        email: "a@b.com",
+        password: "pw",
+        studioName: "S",
+      } as never),
     ).resolves.toEqual({ token: "x" });
     expect(service.signup).toHaveBeenCalledWith("a@b.com", "pw", "S");
   });
@@ -30,7 +34,11 @@ describe("UsersController", () => {
   it("delegates login", async () => {
     service.login.mockResolvedValueOnce({ token: "x" });
     await expect(
-      controller.login({ email: "a@b.com", password: "pw", studioId: "s1" } as never),
+      controller.login({
+        email: "a@b.com",
+        password: "pw",
+        studioId: "s1",
+      } as never),
     ).resolves.toEqual({ token: "x" });
     expect(service.login).toHaveBeenCalledWith("a@b.com", "pw", "s1");
   });
@@ -38,7 +46,10 @@ describe("UsersController", () => {
   it("delegates link wallet", async () => {
     service.linkWallet.mockResolvedValueOnce({ ok: true });
     await expect(
-      controller.linkWallet({ email: "a@b.com", walletAddress: "0xabc" } as never),
+      controller.linkWallet({
+        email: "a@b.com",
+        walletAddress: "0xabc",
+      } as never),
     ).resolves.toEqual({ ok: true });
     expect(service.linkWallet).toHaveBeenCalledWith("a@b.com", "0xabc");
   });

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { WalletsService } from "./wallets.service";
 import { ethers } from "ethers";
 
@@ -57,7 +59,9 @@ describe("WalletsService", () => {
 
   it("getBalance returns formatted balance from RPC provider", async () => {
     process.env.RPC_URL = "http://localhost:8545";
-    const provider = { getBalance: jest.fn().mockResolvedValue(1500000000000000000n) };
+    const provider = {
+      getBalance: jest.fn().mockResolvedValue(1500000000000000000n),
+    };
     const providerSpy = jest
       .spyOn(ethers, "JsonRpcProvider")
       .mockImplementation(() => provider as never);
@@ -72,10 +76,15 @@ describe("WalletsService", () => {
 
   it("getBalance returns unavailable marker on provider failure", async () => {
     process.env.RPC_URL = "http://localhost:8545";
-    jest
-      .spyOn(ethers, "JsonRpcProvider")
-      .mockImplementation(() => ({ getBalance: jest.fn().mockRejectedValue(new Error("boom")) }) as never);
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.spyOn(ethers, "JsonRpcProvider").mockImplementation(
+      () =>
+        ({
+          getBalance: jest.fn().mockRejectedValue(new Error("boom")),
+        }) as never,
+    );
+    const warnSpy = jest
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
 
     await expect(service.getBalance("0xwallet")).resolves.toEqual({
       address: "0xwallet",

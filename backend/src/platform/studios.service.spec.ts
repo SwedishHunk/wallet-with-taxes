@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   BadRequestException,
   ForbiddenException,
@@ -76,9 +80,9 @@ describe("StudiosService", () => {
   it("getStudioMembers rejects non-member actor", async () => {
     memberRepo.findOne.mockResolvedValueOnce(null);
 
-    await expect(service.getStudioMembers("s1", "actor")).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.getStudioMembers("s1", "actor"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("getStudioMembers maps response fields", async () => {
@@ -105,7 +109,9 @@ describe("StudiosService", () => {
         gameAccessIds: ["g1"],
       }),
     ]);
-    expect(studioMemberService.maskToPermissionStrings).toHaveBeenCalledWith(3n);
+    expect(studioMemberService.maskToPermissionStrings).toHaveBeenCalledWith(
+      3n,
+    );
   });
 
   it("createMember rejects actor without membership", async () => {
@@ -158,7 +164,10 @@ describe("StudiosService", () => {
         studio: { id: "s1" },
       })
       .mockResolvedValueOnce({ id: "existing-member" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1", email: "user@test.com" });
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+    });
 
     await expect(
       service.createMember("s1", "actor", {
@@ -176,7 +185,10 @@ describe("StudiosService", () => {
         studio: { id: "s1" },
       })
       .mockResolvedValueOnce(null);
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1", email: "user@test.com" });
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+    });
     studioRepo.findOne.mockResolvedValueOnce(null);
 
     await expect(
@@ -210,8 +222,12 @@ describe("StudiosService", () => {
         kycStatus: "pending",
       }),
     );
-    expect(userRepo.create.mock.calls[0][0].passwordHash).toEqual(expect.any(String));
-    expect(userRepo.create.mock.calls[0][0].walletAddress).toMatch(/^0x[a-fA-F0-9]{40}$/);
+    expect(userRepo.create.mock.calls[0][0].passwordHash).toEqual(
+      expect.any(String),
+    );
+    expect(userRepo.create.mock.calls[0][0].walletAddress).toMatch(
+      /^0x[a-fA-F0-9]{40}$/,
+    );
     expect(memberRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         role: "admin",
@@ -219,7 +235,9 @@ describe("StudiosService", () => {
         gameAccessIds: [],
       }),
     );
-    expect(typeof memberRepo.create.mock.calls[0][0].permissionsMask).toBe("bigint");
+    expect(typeof memberRepo.create.mock.calls[0][0].permissionsMask).toBe(
+      "bigint",
+    );
     expect(result).toEqual(
       expect.objectContaining({
         id: "m-new",

@@ -6,6 +6,7 @@ export class AddWalletAndLedgerSafetyConstraints1762351800000
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const duplicateWallets = await queryRunner.query(`
       SELECT COUNT(*)::int AS count
       FROM (
@@ -15,6 +16,7 @@ export class AddWalletAndLedgerSafetyConstraints1762351800000
         HAVING COUNT(*) > 1
       ) duplicates
     `);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const duplicateWalletCount = Number(duplicateWallets?.[0]?.count ?? 0);
     if (duplicateWalletCount > 0) {
       throw new Error(
@@ -22,6 +24,7 @@ export class AddWalletAndLedgerSafetyConstraints1762351800000
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const duplicateIntents = await queryRunner.query(`
       SELECT COUNT(*)::int AS count
       FROM (
@@ -32,6 +35,7 @@ export class AddWalletAndLedgerSafetyConstraints1762351800000
         HAVING COUNT(*) > 1
       ) duplicates
     `);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const duplicateIntentCount = Number(duplicateIntents?.[0]?.count ?? 0);
     if (duplicateIntentCount > 0) {
       throw new Error(

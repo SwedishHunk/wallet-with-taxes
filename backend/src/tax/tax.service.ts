@@ -93,7 +93,7 @@ export class TaxService {
 
     // Swedish tax law: capital losses on financial assets are 70% deductible
     // (Inkomstskattelagen 48 kap. 20-24 §§)
-    const SWEDISH_LOSS_DEDUCTION_RATE = 0.70;
+    const SWEDISH_LOSS_DEDUCTION_RATE = 0.7;
     const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
     const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
 
@@ -115,7 +115,10 @@ export class TaxService {
     const events = await this.getEventsForUser(userAddress);
     if (events.length === 0) {
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=tax-report.csv");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=tax-report.csv",
+      );
       res.send("Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD");
       return;
     }

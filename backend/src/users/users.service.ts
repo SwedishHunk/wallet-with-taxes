@@ -117,7 +117,10 @@ export class UsersService {
       );
       return null;
     } catch (err) {
-      console.warn("Skipping on-chain wallet creation (RPC unavailable?):", err);
+      console.warn(
+        "Skipping on-chain wallet creation (RPC unavailable?):",
+        err,
+      );
       return null;
     }
   }
@@ -132,12 +135,8 @@ export class UsersService {
       throw new AppException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS, 409);
     }
 
-    const {
-      passwordHash,
-      wallet,
-      encryptedPrivateKey,
-      onChainWallet,
-    } = await this.buildCustodialCredentials(password);
+    const { passwordHash, wallet, encryptedPrivateKey, onChainWallet } =
+      await this.buildCustodialCredentials(password);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

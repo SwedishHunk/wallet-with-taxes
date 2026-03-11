@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-} from "@nestjs/common";
+import { BadRequestException, HttpException, HttpStatus } from "@nestjs/common";
 import { AppExceptionFilter } from "./app-exception.filter";
 import { AppException } from "../exceptions/app-exception";
 
@@ -93,7 +89,9 @@ describe("AppExceptionFilter", () => {
 
   it("formats generic Error as internal server error", () => {
     const { host, status, json } = setup();
-    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     const filter = new AppExceptionFilter();
     filter.catch(new Error("unexpected"), host as never);
     expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -108,7 +106,9 @@ describe("AppExceptionFilter", () => {
 
   it("formats unknown exception object", () => {
     const { host, status, json } = setup();
-    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     const filter = new AppExceptionFilter();
     filter.catch({ boom: true }, host as never);
     expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);

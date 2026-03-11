@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   BadRequestException,
   ForbiddenException,
@@ -64,7 +68,9 @@ describe("StudioMemberService", () => {
         PermissionBitMask.ManageMembers | PermissionBitMask.ManageGames,
     });
 
-    expect(service.hasPermission(m, PermissionBitMask.ManageMembers)).toBe(true);
+    expect(service.hasPermission(m, PermissionBitMask.ManageMembers)).toBe(
+      true,
+    );
     expect(service.hasPermission(m, PermissionBitMask.MintNFT)).toBe(false);
   });
 
@@ -132,15 +138,25 @@ describe("StudioMemberService", () => {
       }),
     );
 
-    await expect(service.promoteToOwner("actor", "target")).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.promoteToOwner("actor", "target"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("promoteToOwner upgrades member and grants full permissions", async () => {
-    const actor = member({ id: "actor", isOwner: true, studio: { id: "s1" } as never });
-    const target = member({ id: "target", isOwner: false, studio: { id: "s1" } as never });
-    memberRepo.findOne.mockResolvedValueOnce(actor).mockResolvedValueOnce(target);
+    const actor = member({
+      id: "actor",
+      isOwner: true,
+      studio: { id: "s1" } as never,
+    });
+    const target = member({
+      id: "target",
+      isOwner: false,
+      studio: { id: "s1" } as never,
+    });
+    memberRepo.findOne
+      .mockResolvedValueOnce(actor)
+      .mockResolvedValueOnce(target);
 
     await service.promoteToOwner("actor", "target");
 
@@ -206,11 +222,15 @@ describe("StudioMemberService", () => {
   });
 
   it("getStudioOwners and getStudioMembers query repository", async () => {
-    memberRepo.find.mockResolvedValueOnce([{ id: "o1" }]).mockResolvedValueOnce([
+    memberRepo.find
+      .mockResolvedValueOnce([{ id: "o1" }])
+      .mockResolvedValueOnce([{ id: "m1" }]);
+    await expect(service.getStudioOwners("s1")).resolves.toEqual([
+      { id: "o1" },
+    ]);
+    await expect(service.getStudioMembers("s1")).resolves.toEqual([
       { id: "m1" },
     ]);
-    await expect(service.getStudioOwners("s1")).resolves.toEqual([{ id: "o1" }]);
-    await expect(service.getStudioMembers("s1")).resolves.toEqual([{ id: "m1" }]);
   });
 
   it("createMember throws when actor does not exist", async () => {
@@ -352,12 +372,15 @@ describe("StudioMemberService", () => {
 
     memberRepo.findOne
       .mockResolvedValueOnce(
-        member({ id: "actor", permissionsMask: PermissionBitMask.ManageMembers }),
+        member({
+          id: "actor",
+          permissionsMask: PermissionBitMask.ManageMembers,
+        }),
       )
       .mockResolvedValueOnce(null);
-    await expect(service.deleteMember("actor", "missing")).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.deleteMember("actor", "missing"),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("deleteMember blocks when operation would remove last owner", async () => {
@@ -383,9 +406,9 @@ describe("StudioMemberService", () => {
         }),
       );
 
-    await expect(service.deleteMember("actor", "target")).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.deleteMember("actor", "target"),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("deleteMember removes target when owner invariant is satisfied", async () => {
@@ -416,22 +439,22 @@ describe("StudioMemberService", () => {
 
   it("promoteToOwner throws on missing actor/target or already-owner target", async () => {
     memberRepo.findOne.mockResolvedValueOnce(null);
-    await expect(service.promoteToOwner("missing", "target")).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.promoteToOwner("missing", "target"),
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     memberRepo.findOne
       .mockResolvedValueOnce(member({ id: "actor", isOwner: true }))
       .mockResolvedValueOnce(null);
-    await expect(service.promoteToOwner("actor", "missing")).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.promoteToOwner("actor", "missing"),
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     memberRepo.findOne
       .mockResolvedValueOnce(member({ id: "actor", isOwner: true }))
       .mockResolvedValueOnce(member({ id: "target", isOwner: true }));
-    await expect(service.promoteToOwner("actor", "target")).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.promoteToOwner("actor", "target"),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

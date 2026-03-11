@@ -70,20 +70,18 @@ export class TokenShopAnalyticsService {
 
     for (const event of events) {
       const key = event.asset;
-      const current =
-        assetMap.get(key) ??
-        {
-          asset: event.asset,
-          symbol: event.assetSymbol || event.asset,
-          buys: 0,
-          sells: 0,
-          uniqueBuyers: new Set<string>(),
-          uniqueSellers: new Set<string>(),
-          totalPaidIn: 0n,
-          totalPaidOut: 0n,
-          totalGenOut: 0n,
-          totalGenIn: 0n,
-        };
+      const current = assetMap.get(key) ?? {
+        asset: event.asset,
+        symbol: event.assetSymbol || event.asset,
+        buys: 0,
+        sells: 0,
+        uniqueBuyers: new Set<string>(),
+        uniqueSellers: new Set<string>(),
+        totalPaidIn: 0n,
+        totalPaidOut: 0n,
+        totalGenOut: 0n,
+        totalGenIn: 0n,
+      };
 
       if (event.type === "BUY") {
         current.buys += 1;
@@ -155,18 +153,16 @@ export class TokenShopAnalyticsService {
     >();
 
     for (const event of events) {
-      const current =
-        assetMap.get(event.asset) ??
-        {
-          asset: event.asset,
-          symbol: event.assetSymbol || event.asset,
-          buys: 0,
-          sells: 0,
-          totalPaidIn: 0n,
-          totalPaidOut: 0n,
-          totalGenOut: 0n,
-          totalGenIn: 0n,
-        };
+      const current = assetMap.get(event.asset) ?? {
+        asset: event.asset,
+        symbol: event.assetSymbol || event.asset,
+        buys: 0,
+        sells: 0,
+        totalPaidIn: 0n,
+        totalPaidOut: 0n,
+        totalGenOut: 0n,
+        totalGenIn: 0n,
+      };
 
       if (event.type === "BUY") {
         current.buys += 1;
@@ -214,7 +210,9 @@ export class TokenShopAnalyticsService {
     const padded = stringValue.padStart(19, "0");
     const integerPart = padded.slice(0, -18) || "0";
     const decimalPart = padded.slice(-18).replace(/0+$/, "");
-    const formatted = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+    const formatted = decimalPart
+      ? `${integerPart}.${decimalPart}`
+      : integerPart;
     return negative ? `-${formatted}` : formatted;
   }
 }

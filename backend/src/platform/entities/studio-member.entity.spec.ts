@@ -28,7 +28,9 @@ describe("StudioMember entity bigint transformer", () => {
     const transformer = column?.options.transformer as {
       from: (value: string | null | undefined) => bigint;
     };
-    const errSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const errSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     expect(transformer.from("not-a-number")).toBe(0n);
     expect(errSpy).toHaveBeenCalled();
   });

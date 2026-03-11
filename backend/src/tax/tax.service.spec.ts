@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { TaxService } from "./tax.service";
 import { TaxEvent } from "./entities/tax-event.entity";
 
@@ -119,14 +122,20 @@ describe("TaxService", () => {
 
     await service.exportEventsAsCSV("0xuser", res as never);
 
-    expect(res.setHeader).toHaveBeenNthCalledWith(1, "Content-Type", "text/csv");
+    expect(res.setHeader).toHaveBeenNthCalledWith(
+      1,
+      "Content-Type",
+      "text/csv",
+    );
     expect(res.setHeader).toHaveBeenNthCalledWith(
       2,
       "Content-Disposition",
       "attachment; filename=tax-report.csv",
     );
     expect(res.send).toHaveBeenCalledTimes(1);
-    expect(res.send.mock.calls[0][0]).toContain("Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD");
+    expect(res.send.mock.calls[0][0]).toContain(
+      "Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD",
+    );
     expect(res.send.mock.calls[0][0]).toContain(",reward,0xasset,1,3,5,0.25");
   });
 });

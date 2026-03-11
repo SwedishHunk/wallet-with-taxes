@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as bcrypt from "bcryptjs";
 import { UsersService } from "./users.service";
 import { AppException } from "../common/exceptions/app-exception";
@@ -168,10 +173,12 @@ describe("UsersService", () => {
       email: "user@test.com",
       passwordHash,
     });
-    await expect(service.login("user@test.com", "wrong")).rejects.toMatchObject({
-      statusCode: 401,
-      message: ERROR_MESSAGES.INVALID_CREDENTIALS,
-    });
+    await expect(service.login("user@test.com", "wrong")).rejects.toMatchObject(
+      {
+        statusCode: 401,
+        message: ERROR_MESSAGES.INVALID_CREDENTIALS,
+      },
+    );
   });
 
   it("login with studioId enforces membership", async () => {
@@ -183,7 +190,9 @@ describe("UsersService", () => {
     });
     studioMemberRepo.findOne.mockResolvedValueOnce(null);
 
-    await expect(service.login("user@test.com", "pw", "s1")).rejects.toMatchObject({
+    await expect(
+      service.login("user@test.com", "pw", "s1"),
+    ).rejects.toMatchObject({
       statusCode: 403,
       message: ERROR_MESSAGES.NOT_STUDIO_MEMBER,
     });
@@ -228,7 +237,10 @@ describe("UsersService", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
     studioRepo.findOne.mockResolvedValueOnce(null);
-    studioRepo.save.mockImplementationOnce(async (x) => ({ id: "s-new", ...x }));
+    studioRepo.save.mockImplementationOnce(async (x) => ({
+      id: "s-new",
+      ...x,
+    }));
     studioMemberService.createBootstrapOwner.mockResolvedValueOnce({
       id: "m-new",
       studio: { id: "s-new" },
@@ -251,12 +263,10 @@ describe("UsersService", () => {
       custodyMode: "custodial",
       kycStatus: "pending",
     });
-    studioMemberRepo.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        studio: { id: "s-existing" },
-        role: "owner",
-      });
+    studioMemberRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      studio: { id: "s-existing" },
+      role: "owner",
+    });
     studioRepo.findOne.mockResolvedValueOnce({ id: "s-existing" });
 
     const result = await service.login("user@test.com", "pw");
@@ -288,7 +298,9 @@ describe("UsersService", () => {
 
   it("linkWallet throws when user does not exist", async () => {
     userRepo.findOne.mockResolvedValueOnce(null);
-    await expect(service.linkWallet("missing@test.com", "0xnew")).rejects.toMatchObject({
+    await expect(
+      service.linkWallet("missing@test.com", "0xnew"),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: ERROR_MESSAGES.USER_NOT_FOUND,
     });
@@ -304,9 +316,11 @@ describe("UsersService", () => {
     };
     userRepo.findOne.mockResolvedValueOnce(user);
 
-    await expect(service.linkWallet("user@test.com", "0xnew")).resolves.toEqual({
-      message: "Wallet linked successfully",
-    });
+    await expect(service.linkWallet("user@test.com", "0xnew")).resolves.toEqual(
+      {
+        message: "Wallet linked successfully",
+      },
+    );
     expect(user.walletAddress).toBe("0xnew");
     expect(user.custodyMode).toBe("self");
     expect(user.encryptedPrivateKey).toBeNull();
@@ -373,7 +387,9 @@ describe("UsersService", () => {
     process.env.DEPLOYER_PRIVATE_KEY =
       "0x1111111111111111111111111111111111111111111111111111111111111111";
     userRepo.findOne.mockResolvedValueOnce(null);
-    jest.spyOn(ethers, "JsonRpcProvider").mockImplementation(() => ({}) as never);
+    jest
+      .spyOn(ethers, "JsonRpcProvider")
+      .mockImplementation(() => ({}) as never);
     jest.spyOn(ethers, "Contract").mockImplementation(
       () =>
         ({

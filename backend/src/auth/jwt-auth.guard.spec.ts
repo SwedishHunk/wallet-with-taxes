@@ -10,7 +10,9 @@ describe("JwtAuthGuard", () => {
 
   it("throws unauthorized when user missing", () => {
     const guard = new JwtAuthGuard();
-    expect(() => guard.handleRequest(null, null)).toThrow(UnauthorizedException);
+    expect(() => guard.handleRequest(null, null)).toThrow(
+      UnauthorizedException,
+    );
   });
 
   it("throws unauthorized when error exists", () => {

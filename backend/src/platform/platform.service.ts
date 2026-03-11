@@ -561,13 +561,20 @@ export class PlatformService {
         game,
         fromUser,
       );
-      const toGamePlayer = await this.ensureGamePlayer(gamePlayerRepo, game, toUser);
+      const toGamePlayer = await this.ensureGamePlayer(
+        gamePlayerRepo,
+        game,
+        toUser,
+      );
 
       const fromWallet = await this.ensureWalletForGamePlayer(
         walletRepo,
         fromGamePlayer,
       );
-      const toWallet = await this.ensureWalletForGamePlayer(walletRepo, toGamePlayer);
+      const toWallet = await this.ensureWalletForGamePlayer(
+        walletRepo,
+        toGamePlayer,
+      );
 
       const lockedFromWallet = await this.lockWalletOrThrow(
         walletRepo,
