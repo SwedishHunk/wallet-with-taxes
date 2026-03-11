@@ -373,8 +373,15 @@ export default function Trade() {
           });
         } catch (eventError) {
           console.error("Failed to log game-scoped economic event:", eventError);
+          const attributionError =
+            eventError instanceof Error
+              ? eventError.message
+              : "Unknown attribution error";
           setTxMessage(
-            "Transaction confirmed, but game attribution failed. Check backend logs."
+            `Transaction confirmed, but game attribution failed: ${attributionError}`.slice(
+              0,
+              180
+            )
           );
         }
       }
