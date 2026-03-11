@@ -13,7 +13,9 @@ export const setAuthToken = (token: string | null) => {
   }
 };
 
-// Central 401/403 handler: clear sessions and redirect to /login
+// Central 401 handler: clear sessions on token expiry / invalid token.
+// 403 (Forbidden) is NOT handled here — it means the token is valid but the
+// user lacks permission for that resource, so we must not wipe their session.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -26,7 +28,7 @@ api.interceptors.response.use(
       requestUrl.includes("/users/member-session") ||
       requestUrl.includes("/users/studios");
 
-    if ((status === 401 || status === 403) && !isAuthEndpoint) {
+    if (status === 401 && !isAuthEndpoint) {
       try {
         localStorage.removeItem("token");
         localStorage.removeItem("studio_session");
@@ -35,7 +37,6 @@ api.interceptors.response.use(
       } catch {
         // ignore
       }
-      return Promise.reject(error);
     }
     return Promise.reject(error);
   },
