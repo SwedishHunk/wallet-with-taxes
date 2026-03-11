@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useParams } from "react-router-dom";
 import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
@@ -7,12 +7,14 @@ import { useLanguage } from "../../lib/LanguageContext";
 export default function Navbar() {
   const { isAdmin } = useWallet();
   const { t } = useLanguage();
+  const { gameId } = useParams();
+  const base = gameId ? `/player/game/${gameId}` : "/player";
 
   const navItems = [
-    { to: "/player", label: t("player.nav.dashboard"), icon: LayoutDashboard },
-    { to: "/player/trade", label: t("player.nav.trade"), icon: ArrowLeftRight },
-    { to: "/player/portfolio", label: t("player.nav.portfolio"), icon: Briefcase },
-    { to: "/player/tax", label: t("player.nav.tax"), icon: Receipt },
+    { to: `${base}`, label: t("player.nav.dashboard"), icon: LayoutDashboard },
+    { to: `${base}/trade`, label: t("player.nav.trade"), icon: ArrowLeftRight },
+    { to: `${base}/portfolio`, label: t("player.nav.portfolio"), icon: Briefcase },
+    { to: `${base}/tax`, label: t("player.nav.tax"), icon: Receipt },
   ];
 
   return (
@@ -70,6 +72,14 @@ export default function Navbar() {
 
           {/* Nav links */}
           <div className="flex items-center gap-1">
+            {gameId && (
+              <NavLink
+                to="/player/trade"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700"
+              >
+                Global
+              </NavLink>
+            )}
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -96,7 +106,7 @@ export default function Navbar() {
 
             {isAdmin && (
               <NavLink
-                to="/player/admin"
+                to={`${base}/admin`}
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
