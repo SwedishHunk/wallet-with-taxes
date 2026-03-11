@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { UsersModule } from "./users/users.module";
 import { WalletsModule } from "./wallets/wallets.module";
@@ -19,6 +21,13 @@ import { EconomicsModule } from "./economics/economics.module";
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === "test" ? ".env.test" : ".env",
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: "auth",
+        ttl: 60000, // 1 minute window
+        limit: 10,  // max 10 requests per minute per IP
+      },
+    ]),
     TypeOrmModule.forRoot({
       type: "postgres",
       host:
@@ -57,6 +66,12 @@ import { EconomicsModule } from "./economics/economics.module";
     PlatformModule,
     TokenShopModule,
     EconomicsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

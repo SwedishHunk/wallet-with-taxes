@@ -102,6 +102,12 @@ export class TaxService {
     };
   }
 
+  // Prevent CSV formula injection: prefix values starting with =, +, -, @ with a single quote
+  private escapeCsvValue(value: string | number): string {
+    const str = String(value);
+    return /^[=+\-@]/.test(str) ? `'${str}` : str;
+  }
+
   async exportEventsAsCSV(userAddress: string, res: Response): Promise<void> {
     const events = await this.getEventsForUser(userAddress);
     if (events.length === 0) {
@@ -124,7 +130,7 @@ export class TaxService {
     const header = Object.keys(formatted[0]).join(",");
     const rows = formatted.map(
       (row) =>
-        `${row.Date},${row.Type},${row.Asset},${row.TokenID},${row.Amount},${row.PriceUSD},${row.FeeUSD}`,
+        `${this.escapeCsvValue(row.Date)},${this.escapeCsvValue(row.Type)},${this.escapeCsvValue(row.Asset)},${this.escapeCsvValue(row.TokenID)},${this.escapeCsvValue(row.Amount)},${this.escapeCsvValue(row.PriceUSD)},${this.escapeCsvValue(row.FeeUSD)}`,
     );
     const csv = [header, ...rows].join("\n");
 

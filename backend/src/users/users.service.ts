@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, DataSource } from "typeorm";
 import { User } from "./user.entity";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
@@ -30,6 +30,7 @@ export class UsersService {
     private readonly studioMemberRepository: Repository<StudioMember>,
     private readonly studioMemberService: StudioMemberService,
     private readonly jwtService: JwtService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private isValidEmail(email: string): boolean {
@@ -138,75 +139,80 @@ export class UsersService {
       onChainWallet,
     } = await this.buildCustodialCredentials(password);
 
-    const user = this.userRepository.create({
-      email,
-      passwordHash,
-      custodyMode: "custodial",
-      encryptedPrivateKey,
-      walletAddress: wallet.address,
-      onChainWallet,
-      kycStatus: "pending",
-    });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    await this.userRepository.save(user);
+    try {
+      const user = queryRunner.manager.create(User, {
+        email,
+        passwordHash,
+        custodyMode: "custodial",
+        encryptedPrivateKey,
+        walletAddress: wallet.address,
+        onChainWallet,
+        kycStatus: "pending",
+      });
+      await queryRunner.manager.save(user);
 
-    // Auto-create a studio and set user as owner (bootstrap)
-    const studio = this.studioRepository.create({
-      name: studioName || email, // Use provided studioName or fallback to email
-      email,
-      walletAddress: wallet.address,
-    });
-    const savedStudio = await this.studioRepository.save(studio);
+      const studio = queryRunner.manager.create(Studio, {
+        name: studioName || email,
+        email,
+        walletAddress: wallet.address,
+      });
+      const savedStudio = await queryRunner.manager.save(studio);
 
-    // Create owner membership via StudioMemberService
-    // This sets isOwner=true and all permissions
-    const membership = await this.studioMemberService.createBootstrapOwner(
-      savedStudio,
-      user,
-    );
+      const membership = await this.studioMemberService.createBootstrapOwner(
+        savedStudio,
+        user,
+        queryRunner.manager,
+      );
 
-    // Generate JWT token for auto-login
-    const token = this.jwtService.sign(
-      {
-        id: user.id,
-        email: user.email,
-        studioId: savedStudio.id,
-        role: membership.role,
-      },
-      {
-        secret: process.env.JWT_SECRET,
-        expiresIn: "7d",
-      },
-    );
+      await queryRunner.commitTransaction();
 
-    // Return full session data for auto-login
-    return {
-      token,
-      studio: {
-        studioId: savedStudio.id,
-        studioName: savedStudio.name,
-      },
-      member: {
-        memberId: membership.id,
-        userId: user.id,
-        studioId: savedStudio.id,
-        email: user.email,
-        isOwner: membership.isOwner,
-        permissions: this.studioMemberService.maskToPermissionStrings(
-          membership.permissionsMask,
-        ),
-        gameAccessIds: membership.gameAccessIds ?? [],
-      },
-    };
+      const token = this.jwtService.sign(
+        {
+          id: user.id,
+          email: user.email,
+          studioId: savedStudio.id,
+          role: membership.role,
+        },
+        {
+          secret: process.env.JWT_SECRET,
+          expiresIn: "7d",
+        },
+      );
+
+      return {
+        token,
+        studio: {
+          studioId: savedStudio.id,
+          studioName: savedStudio.name,
+        },
+        member: {
+          memberId: membership.id,
+          userId: user.id,
+          studioId: savedStudio.id,
+          email: user.email,
+          isOwner: membership.isOwner,
+          permissions: this.studioMemberService.maskToPermissionStrings(
+            membership.permissionsMask,
+          ),
+          gameAccessIds: membership.gameAccessIds ?? [],
+        },
+      };
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async login(email: string, password: string, studioId?: string) {
     this.assertValidEmail(email);
 
-    console.log("Login attempt with:", email, password, "studioId:", studioId);
-
     const user = await this.userRepository.findOne({ where: { email } });
-    console.log("Found user:", user);
 
     if (!user) {
       throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 401);
