@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
 } from "typeorm";
 
@@ -18,6 +19,14 @@ export enum EconomicDirection {
 }
 
 @Entity({ name: "economic_events" })
+@Index("IDX_economic_events_scope_timestamp", ["scopeType", "timestamp"])
+@Index("IDX_economic_events_studio_game_timestamp", [
+  "studioId",
+  "gameId",
+  "timestamp",
+])
+@Index("IDX_economic_events_wallet_timestamp", ["walletAddress", "timestamp"])
+@Index("IDX_economic_events_tx_hash", ["txHash"])
 export class EconomicEvent {
   @PrimaryGeneratedColumn("uuid")
   id: string;

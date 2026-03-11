@@ -14,6 +14,7 @@ function makeRepo() {
   return {
     create: jest.fn((x) => x),
     save: jest.fn(async (x) => ({ id: "evt-1", ...x })),
+    findOne: jest.fn(async () => null),
     find: jest.fn(async () => []),
   };
 }
@@ -117,5 +118,34 @@ describe("EconomicsService", () => {
     });
 
     expect(repo.save).toHaveBeenCalled();
+  });
+
+  it("skips duplicate events when txHash matches an existing record", async () => {
+    repo.findOne.mockResolvedValueOnce({
+      id: "evt-existing",
+      source: "player_portal",
+      eventType: "buy_tri",
+      txHash: "0xabc",
+    } as any);
+
+    const result = await service.logEvent({
+      source: "player_portal",
+      eventType: "buy_tri",
+      scopeType: EconomicScopeType.GAME,
+      studioId: "studio-1",
+      gameId: "game-1",
+      walletAddress: "0x1234",
+      assetKey: "tri",
+      amount: "10",
+      direction: EconomicDirection.IN,
+      txHash: "0xABC",
+    });
+
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "evt-existing",
+      }),
+    );
   });
 });

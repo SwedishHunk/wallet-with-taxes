@@ -37,7 +37,7 @@ export class EconomicsService {
   async logEvent(input: LogEconomicEventInput) {
     this.assertValidScope(input);
 
-    const event = this.repo.create({
+    const normalizedEvent = {
       ...input,
       walletAddress: input.walletAddress?.toLowerCase() ?? null,
       assetKey: input.assetKey.trim(),
@@ -49,7 +49,35 @@ export class EconomicsService {
       txHash: input.txHash?.toLowerCase() ?? null,
       metadata: input.metadata ?? null,
       timestamp: input.timestamp ?? new Date(),
-    });
+    };
+
+    if (normalizedEvent.txHash) {
+      const duplicateWhere = {
+        source: normalizedEvent.source,
+        eventType: normalizedEvent.eventType,
+        txHash: normalizedEvent.txHash,
+        assetKey: normalizedEvent.assetKey,
+        direction: normalizedEvent.direction,
+        amount: normalizedEvent.amount,
+        ...(normalizedEvent.walletAddress
+          ? { walletAddress: normalizedEvent.walletAddress }
+          : {}),
+        ...(normalizedEvent.gameId ? { gameId: normalizedEvent.gameId } : {}),
+      };
+
+      const existing = await this.repo.findOne({
+        where: duplicateWhere,
+      });
+
+      if (existing) {
+        this.logger.warn(
+          `Skipping duplicate economic event tx=${normalizedEvent.txHash} type=${normalizedEvent.eventType} scope=${normalizedEvent.scopeType}`,
+        );
+        return existing;
+      }
+    }
+
+    const event = this.repo.create(normalizedEvent);
 
     const saved = await this.repo.save(event);
     this.logger.log(
