@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
 import { useContracts } from "../hooks/useContracts";
@@ -8,6 +8,7 @@ import { formatTxError } from "../formatTxError";
 import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../lib/LanguageContext";
+import { useAuthState } from "../../lib/AuthContext";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -17,8 +18,10 @@ const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function Trade() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { isConnected, address, provider, signer } = useWallet();
   const { gameId } = useParams();
+  const { activeGame } = useAuthState();
   const { getShop, getToken, getErc20, shopAddress, ready, configLoaded } =
     useContracts();
 
@@ -467,6 +470,38 @@ export default function Trade() {
     grossOutput !== null ? grossOutput - (estimatedFeeAmount ?? 0) : null;
   const outputSymbol = isBuy ? "TRI" : selectedAsset?.symbol || "asset";
   const scopeLabel = gameId ? "Game" : "Global";
+  const scopeValue = gameId ? `game:${gameId}` : "global";
+  const availableScopeOptions = [
+    { value: "global", label: "Global", disabled: false },
+    ...(activeGame
+      ? [
+          {
+            value: `game:${activeGame.gameId}`,
+            label: `Game: ${activeGame.name}`,
+            disabled: false,
+          },
+        ]
+      : []),
+    {
+      value: "studio",
+      label: "Studio (coming soon)",
+      disabled: true,
+    },
+  ];
+
+  function handleScopeChange(nextScope) {
+    if (nextScope === "global") {
+      navigate("/player/trade");
+      return;
+    }
+
+    if (nextScope.startsWith("game:")) {
+      const nextGameId = nextScope.slice("game:".length);
+      if (nextGameId) {
+        navigate(`/player/game/${nextGameId}/trade`);
+      }
+    }
+  }
 
   return (
     <div className="max-w-lg mx-auto">
@@ -485,6 +520,28 @@ export default function Trade() {
 
       {/* Trade Card */}
       <div className="card border-dark-500">
+        <div className="mb-4">
+          <label className="label">Trade Context</label>
+          <select
+            value={scopeValue}
+            onChange={(e) => handleScopeChange(e.target.value)}
+            className="input-field cursor-pointer"
+          >
+            {availableScopeOptions.map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
+                disabled={option.disabled}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-gray-400">
+            Choose whether this trade should stay global or be attributed to the currently selected game.
+          </p>
+        </div>
+
         <div className="mb-6 rounded-lg border border-dark-500 bg-dark-700/40 px-4 py-3">
           <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
             Trade Scope
