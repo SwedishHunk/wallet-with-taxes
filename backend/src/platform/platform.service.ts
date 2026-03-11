@@ -23,6 +23,10 @@ import { parseAmount } from "./parse-amount";
 export class PlatformService {
   private static readonly DEPOSIT_INTENT_TTL_MS = 15 * 60 * 1000;
 
+  private buildStudioScopedSlug(baseSlug: string, studioId: string): string {
+    return `${baseSlug}-${studioId.slice(0, 8)}`;
+  }
+
   constructor(
     private dataSource: DataSource,
     @InjectRepository(Studio)
@@ -203,7 +207,35 @@ export class PlatformService {
     const studio = await this.studioRepo.findOne({ where: { id: studioId } });
     if (!studio) throw new AppException(ERROR_MESSAGES.STUDIO_NOT_FOUND, 404);
 
-    const game = this.gameRepo.create({ ...data, studio });
+    const existingStudioGame = await this.gameRepo.findOne({
+      where: { studio: { id: studioId }, slug: data.slug },
+    });
+    if (existingStudioGame) {
+      throw new AppException(
+        "A game with this slug already exists in this studio.",
+        409,
+      );
+    }
+
+    let slugToSave = data.slug;
+    let globalSlugConflict = await this.gameRepo.findOne({
+      where: { slug: slugToSave },
+      relations: ["studio"],
+    });
+
+    if (globalSlugConflict && globalSlugConflict.studio?.id !== studioId) {
+      slugToSave = this.buildStudioScopedSlug(data.slug, studioId);
+
+      while (
+        await this.gameRepo.findOne({
+          where: { slug: slugToSave },
+        })
+      ) {
+        slugToSave = `${this.buildStudioScopedSlug(data.slug, studioId)}-${randomUUID().slice(0, 4)}`;
+      }
+    }
+
+    const game = this.gameRepo.create({ ...data, slug: slugToSave, studio });
     return this.gameRepo.save(game);
   }
 

@@ -8,6 +8,27 @@ import { useLoginStudio, useLoginMember } from "../lib/useAuth";
 import "../style/Bright.css";
 import "../style/Login.css";
 
+function extractApiErrorMessage(err: unknown, fallback: string): string {
+  const responseMessage = (
+    err as { response?: { data?: { message?: string | string[] } } }
+  )?.response?.data?.message;
+
+  if (Array.isArray(responseMessage)) {
+    return responseMessage.join(", ");
+  }
+
+  if (typeof responseMessage === "string" && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  const networkMessage = (err as { message?: string })?.message;
+  if (typeof networkMessage === "string" && networkMessage.trim()) {
+    return networkMessage;
+  }
+
+  return fallback;
+}
+
 export default function CreateStudio() {
   const navigate = useNavigate();
   const { loginStudio } = useLoginStudio();
@@ -73,10 +94,7 @@ export default function CreateStudio() {
       // Navigate to dashboard
       navigate(ROUTES.dashboard, { replace: true });
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || t("studio.errFailed");
-      setError(message);
+      setError(extractApiErrorMessage(err, t("studio.errFailed")));
     } finally {
       setLoading(false);
     }

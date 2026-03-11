@@ -475,6 +475,7 @@ describe("PlatformService", () => {
 
   it("createGameForUser creates and saves game", async () => {
     studioRepo.findOne.mockResolvedValueOnce({ id: "s1" });
+    gameRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     gameRepo.create.mockImplementationOnce((x) => x);
     gameRepo.save.mockImplementationOnce(async (x) => ({ id: "g1", ...x }));
 
@@ -484,6 +485,42 @@ describe("PlatformService", () => {
     });
     expect(game.id).toBe("g1");
     expect(gameRepo.save).toHaveBeenCalled();
+  });
+
+  it("createGameForUser rejects duplicate slug within the same studio", async () => {
+    studioRepo.findOne.mockResolvedValueOnce({ id: "s1" });
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g-existing", slug: "game" });
+
+    await expect(
+      service.createGameForUser("u1", "s1", { name: "Game", slug: "game" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "A game with this slug already exists in this studio.",
+    });
+  });
+
+  it("createGameForUser scopes slug when it collides with another studio", async () => {
+    studioRepo.findOne.mockResolvedValueOnce({ id: "studio-abcdef12" });
+    gameRepo.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "g-other",
+        slug: "game",
+        studio: { id: "s2" },
+      })
+      .mockResolvedValueOnce(null);
+    gameRepo.create.mockImplementationOnce((x) => x);
+    gameRepo.save.mockImplementationOnce(async (x) => ({ id: "g1", ...x }));
+
+    const game = await service.createGameForUser("u1", "studio-abcdef12", {
+      name: "Game",
+      slug: "game",
+    });
+
+    expect(game.slug).toBe("game-studio-a");
+    expect(gameRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: "game-studio-a" }),
+    );
   });
 
   it("getGameById rejects unknown game", async () => {

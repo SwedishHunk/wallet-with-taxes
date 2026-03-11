@@ -254,9 +254,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Persist studio session to localStorage AND load members count
   const setStudioSession = (session: StudioSession | null) => {
+    const previousStudioId = studioSession?.studioId ?? null;
+    const nextStudioId = session?.studioId ?? null;
+    const studioChanged = previousStudioId !== nextStudioId;
+
     if (session) {
       localStorage.setItem(STUDIO_SESSION_KEY, JSON.stringify(session));
       setStudioSessionState(session);
+
+      if (studioChanged) {
+        localStorage.removeItem(ACTIVE_GAME_KEY);
+        setActiveGameState(null);
+      }
 
       // Load members count for auto-owner logic
       (async () => {
@@ -276,6 +285,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.removeItem(STUDIO_SESSION_KEY);
       setStudioSessionState(null);
       setMembersCount(null); // Reset count when studio is cleared
+      localStorage.removeItem(ACTIVE_GAME_KEY);
+      setActiveGameState(null);
     }
   };
 

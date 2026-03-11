@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { useWallet } from "../context/WalletContext";
@@ -83,31 +83,36 @@ export default function Trade() {
     apiGet("/shop/config").then(setConfig).catch(console.error);
   }, []);
 
-  useEffect(() => {
-    let active = true;
+  const loadAvailableGames = useCallback(async () => {
+    try {
+      const response = await getGames();
+      const mappedGames = (response.data || []).map((game) => ({
+        gameId: game.id,
+        name: game.name,
+        slug: game.slug,
+      }));
 
-    getGames()
-      .then((response) => {
-        if (!active) return;
-
-        const mappedGames = (response.data || []).map((game) => ({
-          gameId: game.id,
-          name: game.name,
-          slug: game.slug,
-        }));
-
-        setAvailableGames(mappedGames);
-      })
-      .catch((error) => {
-        if (!active) return;
-        console.error("Failed to load games for trade scope selector:", error);
-        setAvailableGames([]);
-      });
-
-    return () => {
-      active = false;
-    };
+      setAvailableGames(mappedGames);
+    } catch (error) {
+      console.error("Failed to load games for trade scope selector:", error);
+      setAvailableGames([]);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadAvailableGames();
+  }, [loadAvailableGames, activeGame?.gameId]);
+
+  useEffect(() => {
+    function handleWindowFocus() {
+      void loadAvailableGames();
+    }
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [loadAvailableGames]);
 
   useEffect(() => {
     if (!gameId || !address || !signer) {

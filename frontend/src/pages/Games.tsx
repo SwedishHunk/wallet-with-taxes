@@ -23,6 +23,16 @@ export default function Games() {
   const [newGameName, setNewGameName] = useState("");
   const [newGameSlug, setNewGameSlug] = useState("");
   const [creating, setCreating] = useState(false);
+  const visibleActiveGame =
+    activeGame && games.some((game) => game.gameId === activeGame.gameId)
+      ? activeGame
+      : null;
+
+  useEffect(() => {
+    if (activeGame && !loading && !visibleActiveGame) {
+      setActiveGame(null);
+    }
+  }, [activeGame, loading, visibleActiveGame, setActiveGame]);
 
   useEffect(() => {
     loadGames();
@@ -70,6 +80,10 @@ export default function Games() {
       slug: game.slug,
     });
     navigate(ROUTES.dashboard);
+  };
+
+  const handleOpenTrade = (game: Game) => {
+    navigate(`/player/game/${game.gameId}/trade`);
   };
 
   const handleCreateGame = async (e: React.FormEvent) => {
@@ -130,18 +144,23 @@ export default function Games() {
         subtitle={t("games.subtitle")}
       />
 
-      {activeGame && (
+      {visibleActiveGame && (
         <Card>
           <div style={{ marginBottom: "1rem" }}>
-            <strong>{t("games.activeGame")}:</strong> {activeGame.name}{" "}
-            <Badge variant="permission">{activeGame.slug}</Badge>
+            <strong>{t("games.activeGame")}:</strong> {visibleActiveGame.name}{" "}
+            <Badge variant="permission">{visibleActiveGame.slug}</Badge>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => setActiveGame(null)}
-            style={{ marginRight: "0.5rem" }}>
-            {t("games.clearActive")}
-          </Button>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <Button
+              variant="secondary"
+              onClick={() => setActiveGame(null)}
+              style={{ marginRight: "0.5rem" }}>
+              {t("games.clearActive")}
+            </Button>
+            <Button onClick={() => handleOpenTrade(visibleActiveGame)}>
+              Open Trade
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -181,7 +200,7 @@ export default function Games() {
                       border: "1px solid var(--border, #ccc)",
                       borderRadius: "4px",
                       backgroundColor:
-                        activeGame?.gameId === game.gameId
+                        visibleActiveGame?.gameId === game.gameId
                           ? "var(--primary-light, #e3f2fd)"
                           : "transparent",
                     }}>
@@ -191,13 +210,18 @@ export default function Games() {
                         Slug: {game.slug} | ID: {game.gameId}
                       </div>
                     </div>
-                    <Button
-                      onClick={() => handleSetActive(game)}
-                      disabled={activeGame?.gameId === game.gameId}>
-                      {activeGame?.gameId === game.gameId
-                        ? t("games.active")
-                        : t("games.setActive")}
-                    </Button>
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <Button onClick={() => handleOpenTrade(game)}>
+                        Open Trade
+                      </Button>
+                      <Button
+                        onClick={() => handleSetActive(game)}
+                        disabled={visibleActiveGame?.gameId === game.gameId}>
+                        {visibleActiveGame?.gameId === game.gameId
+                          ? t("games.active")
+                          : t("games.setActive")}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
