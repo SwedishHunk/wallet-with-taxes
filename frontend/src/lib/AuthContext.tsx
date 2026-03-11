@@ -185,7 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     activeGame,
   });
 
-  if (!validation.valid) {
+  if (!isLoading && !validation.valid) {
     console.error("[STATE VIOLATION]", validation.violations, {
       studioSession,
       memberSession,
