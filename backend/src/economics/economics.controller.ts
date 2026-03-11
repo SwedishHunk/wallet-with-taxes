@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -39,7 +40,13 @@ export class EconomicsController {
   ) {}
 
   @Post("api/player/session")
-  createOrLoadPlayerSession(@Body() body: PlayerSessionBody) {
+  createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {
+    if (!body?.gameId || !body?.walletAddress) {
+      throw new BadRequestException(
+        "gameId and walletAddress are required",
+      );
+    }
+
     return this.playerEconomicsService.resolveSession(
       body.gameId,
       body.walletAddress,
@@ -47,7 +54,20 @@ export class EconomicsController {
   }
 
   @Post("api/player/game-economic-event")
-  logGameScopedPlayerEvent(@Body() body: LogPlayerEventBody) {
+  logGameScopedPlayerEvent(@Body() body?: LogPlayerEventBody) {
+    if (
+      !body?.gameId ||
+      !body?.walletAddress ||
+      !body?.eventType ||
+      !body?.assetKey ||
+      !body?.amount ||
+      !body?.direction
+    ) {
+      throw new BadRequestException(
+        "gameId, walletAddress, eventType, assetKey, amount and direction are required",
+      );
+    }
+
     return this.playerEconomicsService.logGameScopedEvent({
       gameId: body.gameId,
       walletAddress: body.walletAddress,
