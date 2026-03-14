@@ -68,12 +68,21 @@ export class EconomicsController {
       );
     }
 
-    return this.playerWalletAuthService.issueNonce(walletAddress, purpose, gameId);
+    return this.playerWalletAuthService.issueNonce(
+      walletAddress,
+      purpose,
+      gameId,
+    );
   }
 
   @Post("api/player/session")
   createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {
-    if (!body?.gameId || !body?.walletAddress || !body?.nonce || !body?.signature) {
+    if (
+      !body?.gameId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature
+    ) {
       throw new BadRequestException(
         "gameId, walletAddress, nonce and signature are required",
       );

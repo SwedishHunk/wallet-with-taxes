@@ -175,6 +175,7 @@ export class UsersService {
           email: user.email,
           studioId: savedStudio.id,
           role: membership.role,
+          isAdmin: user.isAdmin,
         },
         {
           secret: process.env.JWT_SECRET,
@@ -304,6 +305,7 @@ export class UsersService {
         email: user.email,
         studioId: selectedStudio.id,
         role: selectedRole,
+        isAdmin: user.isAdmin,
       },
       {
         secret: process.env.JWT_SECRET,
@@ -320,6 +322,7 @@ export class UsersService {
         custodyMode: user.custodyMode,
         kycStatus: user.kycStatus,
         studioId: selectedStudio.id,
+        isAdmin: user.isAdmin,
       },
     };
   }

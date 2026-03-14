@@ -31,7 +31,11 @@ describe("PlayerWalletAuthService", () => {
   });
 
   it("rejects replaying a consumed nonce", async () => {
-    const issued = service.issueNonce(wallet.address, "economic_event", "game-1");
+    const issued = service.issueNonce(
+      wallet.address,
+      "economic_event",
+      "game-1",
+    );
     const signature = await wallet.signMessage(issued.message);
 
     service.verifySignedRequest({
@@ -51,5 +55,65 @@ describe("PlayerWalletAuthService", () => {
         gameId: "game-1",
       }),
     ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects an expired nonce", async () => {
+    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const signature = await wallet.signMessage(issued.message);
+
+    // Force expiry by manipulating the internal map
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const map = (service as any).pendingNonces as Map<
+      string,
+      { expiresAt: number }
+    >;
+    for (const [k, v] of map.entries()) {
+      map.set(k, { ...v, expiresAt: Date.now() - 1 });
+    }
+
+    expect(() =>
+      service.verifySignedRequest({
+        walletAddress: wallet.address,
+        nonce: issued.nonce,
+        signature,
+        purpose: "session",
+        gameId: "game-1",
+      }),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects a game scope mismatch", async () => {
+    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const signature = await wallet.signMessage(issued.message);
+
+    expect(() =>
+      service.verifySignedRequest({
+        walletAddress: wallet.address,
+        nonce: issued.nonce,
+        signature,
+        purpose: "session",
+        gameId: "game-2",
+      }),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects an invalid signature", async () => {
+    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const otherWallet = Wallet.createRandom();
+    const badSignature = await otherWallet.signMessage(issued.message);
+
+    expect(() =>
+      service.verifySignedRequest({
+        walletAddress: wallet.address,
+        nonce: issued.nonce,
+        signature: badSignature,
+        purpose: "session",
+        gameId: "game-1",
+      }),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects an invalid wallet address", () => {
+    expect(() => service.issueNonce("not-an-address", "session")).toThrow();
   });
 });

@@ -5,6 +5,8 @@ describe("AdminController", () => {
     getFeeStats: jest.fn(),
     getRevenueSplit: jest.fn(),
     getUserList: jest.fn(),
+    getAllStudios: jest.fn(),
+    getAllTransactions: jest.fn(),
   };
   const controller = new AdminController(service as never);
 
@@ -32,5 +34,23 @@ describe("AdminController", () => {
     service.getUserList.mockResolvedValueOnce([{ id: "u1" }]);
     await expect(controller.getAllUsers()).resolves.toEqual([{ id: "u1" }]);
     expect(service.getUserList).toHaveBeenCalled();
+  });
+
+  it("delegates getAllStudios", async () => {
+    service.getAllStudios.mockResolvedValueOnce([{ id: "s1" }]);
+    await expect(controller.getAllStudios()).resolves.toEqual([{ id: "s1" }]);
+    expect(service.getAllStudios).toHaveBeenCalled();
+  });
+
+  it("delegates getAllTransactions with default pagination", async () => {
+    service.getAllTransactions.mockResolvedValueOnce({ events: [], total: 0 });
+    await controller.getAllTransactions();
+    expect(service.getAllTransactions).toHaveBeenCalledWith(50, 0);
+  });
+
+  it("delegates getAllTransactions with explicit pagination", async () => {
+    service.getAllTransactions.mockResolvedValueOnce({ events: [], total: 0 });
+    await controller.getAllTransactions("10", "20");
+    expect(service.getAllTransactions).toHaveBeenCalledWith(10, 20);
   });
 });

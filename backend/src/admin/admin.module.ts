@@ -9,12 +9,13 @@ import { TaxModule } from "../tax/tax.module";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
 import { Game } from "../platform/entities/game.entity";
+import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { UsersModule } from "../users/users.module";
 import { PlatformModule } from "../platform/platform.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TaxEvent, User, Studio, Game]),
+    TypeOrmModule.forFeature([TaxEvent, User, Studio, Game, EconomicEvent]),
     TaxModule,
     UsersModule,
     PlatformModule,

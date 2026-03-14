@@ -133,6 +133,29 @@ export function ProtectedMemberAuth({ children }: GuardProps) {
 }
 
 /**
+ * ProtectedTriolithAdmin
+ * Requires studioSession.isTriolithAdmin === true
+ * Regular studio owners are redirected to /dashboard
+ */
+export function ProtectedTriolithAdmin({ children }: GuardProps) {
+  const { authContext, isLoading } = useAuthState();
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (authContext.state === "Unauthenticated") {
+    return <Navigate to={ROUTES.login} replace />;
+  }
+
+  if (authContext.studioSession?.isTriolithAdmin !== true) {
+    return <Navigate to={ROUTES.dashboard} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+/**
  * WithAuth - Higher-order component version (if needed)
  *
  * Usage:

@@ -12,6 +12,8 @@ export interface StudioSession {
   studioName: string;
   /** Tidsstämpel när sessionen skapades */
   authenticatedAt: string;
+  /** True if this user is a Triolith platform-level super-admin */
+  isTriolithAdmin?: boolean;
 }
 
 /** Member-sessionsdata (sparas i localStorage/sessionStorage) */

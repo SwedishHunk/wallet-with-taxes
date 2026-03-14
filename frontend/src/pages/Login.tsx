@@ -61,6 +61,7 @@ export default function Login() {
         studioId,
         studioName,
         authenticatedAt: new Date().toISOString(),
+        isTriolithAdmin: data.user.isAdmin === true,
       });
 
       navigate(ROUTES.dashboard, { replace: true });

@@ -218,7 +218,7 @@ export class PlatformService {
     }
 
     let slugToSave = data.slug;
-    let globalSlugConflict = await this.gameRepo.findOne({
+    const globalSlugConflict = await this.gameRepo.findOne({
       where: { slug: slugToSave },
       relations: ["studio"],
     });

@@ -120,7 +120,9 @@ export class PlayerWalletAuthService {
   private normalizeWalletAddress(walletAddress: string) {
     const normalized = walletAddress?.trim().toLowerCase();
     if (!normalized || !ethers.isAddress(normalized)) {
-      throw new BadRequestException("walletAddress must be a valid EVM address");
+      throw new BadRequestException(
+        "walletAddress must be a valid EVM address",
+      );
     }
 
     return normalized;
