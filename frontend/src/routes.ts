@@ -14,4 +14,5 @@ export const ROUTES = {
   accountLogin: "/account-login",
   personalAccounts: "/personal-accounts",
   game: (gameId: string) => `/game/${gameId}`,
+  triolithAdmin: "/triolith-admin",
 };

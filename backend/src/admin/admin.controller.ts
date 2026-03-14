@@ -20,4 +20,20 @@ export class AdminController {
   async getAllUsers() {
     return this.adminService.getUserList();
   }
+
+  @Get("studios")
+  async getAllStudios() {
+    return this.adminService.getAllStudios();
+  }
+
+  @Get("transactions")
+  async getAllTransactions(
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ) {
+    return this.adminService.getAllTransactions(
+      limit ? parseInt(limit, 10) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
 }

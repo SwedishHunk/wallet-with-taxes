@@ -16,7 +16,7 @@ import React from "react";
 import { Link, NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   Users, Gamepad2, SlidersHorizontal, LayoutDashboard,
-  LogOut, LogIn, UserPlus, UserCheck,
+  LogOut, LogIn, UserPlus, UserCheck, ShieldCheck,
 } from "lucide-react";
 import { useAuthState } from "../lib/AuthContext";
 import { useLogout, useCanManageMembers } from "../lib/useAuth";
@@ -187,6 +187,11 @@ function AdminLinks() {
       <NavLink to={ROUTES.dashboard} className={linkClass}>
         <LayoutDashboard size={15} /> {t("nav.dashboard")}
       </NavLink>
+      {authContext.memberSession?.isOwner && (
+        <NavLink to={ROUTES.triolithAdmin} className={linkClass}>
+          <ShieldCheck size={15} /> Admin
+        </NavLink>
+      )}
     </div>
   );
 }

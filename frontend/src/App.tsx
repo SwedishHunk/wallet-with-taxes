@@ -35,6 +35,7 @@ import PersonalAccountLogin from "./pages/PersonalAccountLogin";
 import { GameControl } from "./pages/GameControl";
 import Games from "./pages/Games";
 import Settings from "./pages/Settings";
+import TriolithAdminPage from "./pages/admin/TriolithAdminPage";
 import PlayerPortal from "./player/PlayerPortal";
 import { ROUTES } from "./routes";
 import "./index.css";
@@ -171,6 +172,14 @@ function AppRoutes() {
           element={
             <ProtectedMemberAuth>
               <GameControl />
+            </ProtectedMemberAuth>
+          }
+        />
+        <Route
+          path={ROUTES.triolithAdmin}
+          element={
+            <ProtectedMemberAuth>
+              <TriolithAdminPage />
             </ProtectedMemberAuth>
           }
         />

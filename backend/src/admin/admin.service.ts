@@ -2,6 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { User } from "../users/user.entity";
+import { Studio } from "../platform/entities/studio.entity";
+import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { Repository } from "typeorm";
 
 interface FeeStatsRaw {
@@ -17,6 +19,12 @@ export class AdminService {
 
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+
+    @InjectRepository(Studio)
+    private readonly studioRepo: Repository<Studio>,
+
+    @InjectRepository(EconomicEvent)
+    private readonly economicEventRepo: Repository<EconomicEvent>,
   ) {}
 
   async getFeeStats(from?: string, to?: string) {
@@ -97,5 +105,31 @@ export class AdminService {
     });
 
     return users;
+  }
+
+  async getAllStudios() {
+    const studios = await this.studioRepo.find({
+      relations: ["members"],
+      order: { createdAt: "DESC" },
+    });
+
+    return studios.map((s) => ({
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      status: s.status,
+      memberCount: s.members?.length ?? 0,
+      createdAt: s.createdAt,
+    }));
+  }
+
+  async getAllTransactions(limit = 50, offset = 0) {
+    const [events, total] = await this.economicEventRepo.findAndCount({
+      order: { timestamp: "DESC" },
+      take: limit,
+      skip: offset,
+    });
+
+    return { events, total, limit, offset };
   }
 }
