@@ -41,6 +41,11 @@ import PlayerPortal from "./player/PlayerPortal";
 import { ROUTES } from "./routes";
 import "./index.css";
 
+// Set auth token synchronously at module load time so all API calls
+// (including AuthContext hydration) have the Authorization header from the start.
+const _storedToken = localStorage.getItem("token");
+if (_storedToken) setAuthToken(_storedToken);
+
 function NotFound() {
   return (
     <Page>
@@ -194,11 +199,6 @@ function AppRoutes() {
 
 function App() {
   useDocumentTitle(APP_NAME);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) setAuthToken(token);
-  }, []);
 
   return (
     <BrowserRouter>
