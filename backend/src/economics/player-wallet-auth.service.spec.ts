@@ -62,7 +62,7 @@ describe("PlayerWalletAuthService", () => {
     const signature = await wallet.signMessage(issued.message);
 
     // Force expiry by manipulating the internal map
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const map = (service as any).pendingNonces as Map<
       string,
       { expiresAt: number }
