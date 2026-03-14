@@ -108,7 +108,10 @@
       "!tokenshop/tokenshop-user*",
       "!tokenshop/guards/**",
       "!economics/economics.controller.ts",
-      "!economics/player-economics.service.ts"
+      "!economics/player-economics.service.ts",
+      "!admin/admin-dev.controller.ts",
+      "!admin/admin-dev.service.ts",
+      "!tokenshop/tokenshop-listener.service.ts"
     ],
     "coverageDirectory": "../coverage",
     "coveragePathIgnorePatterns": [
