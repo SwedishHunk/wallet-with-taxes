@@ -187,7 +187,7 @@ function AdminLinks() {
       <NavLink to={ROUTES.dashboard} className={linkClass}>
         <LayoutDashboard size={15} /> {t("nav.dashboard")}
       </NavLink>
-      {authContext.memberSession?.isOwner && (
+      {authContext.studioSession?.isTriolithAdmin === true && (
         <NavLink to={ROUTES.triolithAdmin} className={linkClass}>
           <ShieldCheck size={15} /> Admin
         </NavLink>

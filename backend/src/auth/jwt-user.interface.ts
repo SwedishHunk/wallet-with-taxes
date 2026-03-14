@@ -3,4 +3,5 @@ export interface JwtUser {
   email?: string;
   studioId: string;
   role: "owner" | "admin" | "member";
+  isAdmin: boolean;
 }

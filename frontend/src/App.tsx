@@ -18,6 +18,7 @@ import {
   ProtectedStudioAuth,
   ProtectedMemberAuth,
   ProtectedMemberLogin,
+  ProtectedTriolithAdmin,
 } from "./lib/RouteGuards";
 import { AppLayout } from "./components/AppLayout";
 import { Page, PageHeader, Card } from "./components/ui/index";
@@ -178,9 +179,9 @@ function AppRoutes() {
         <Route
           path={ROUTES.triolithAdmin}
           element={
-            <ProtectedMemberAuth>
+            <ProtectedTriolithAdmin>
               <TriolithAdminPage />
-            </ProtectedMemberAuth>
+            </ProtectedTriolithAdmin>
           }
         />
       </Route>
