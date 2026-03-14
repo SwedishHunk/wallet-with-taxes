@@ -22,7 +22,8 @@ function makeRepos(queryRaw?: unknown) {
 
 describe("AdminService", () => {
   it("getFeeStats returns defaults when raw is null", async () => {
-    const { taxRepo, userRepo, studioRepo, economicEventRepo } = makeRepos(null);
+    const { taxRepo, userRepo, studioRepo, economicEventRepo } =
+      makeRepos(null);
     const service = new AdminService(
       taxRepo as never,
       userRepo as never,
