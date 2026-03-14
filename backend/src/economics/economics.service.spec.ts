@@ -121,6 +121,7 @@ describe("EconomicsService", () => {
   });
 
   it("skips duplicate events when txHash matches an existing record", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     repo.findOne.mockResolvedValueOnce({
       id: "evt-existing",
       source: "player_portal",

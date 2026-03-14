@@ -33,27 +33,21 @@ const shouldSynchronizeSchema =
     ]),
     TypeOrmModule.forRoot({
       type: "postgres",
-      host:
-        isTestEnv
-          ? process.env.TEST_DATABASE_HOST
-          : process.env.DATABASE_HOST,
+      host: isTestEnv
+        ? process.env.TEST_DATABASE_HOST
+        : process.env.DATABASE_HOST,
       port: Number(
-        isTestEnv
-          ? process.env.TEST_DATABASE_PORT
-          : process.env.DATABASE_PORT,
+        isTestEnv ? process.env.TEST_DATABASE_PORT : process.env.DATABASE_PORT,
       ),
-      username:
-        isTestEnv
-          ? process.env.TEST_DATABASE_USER
-          : process.env.DATABASE_USER,
-      password:
-        isTestEnv
-          ? process.env.TEST_DATABASE_PASSWORD
-          : process.env.DATABASE_PASSWORD,
-      database:
-        isTestEnv
-          ? process.env.TEST_DATABASE_NAME
-          : process.env.DATABASE_NAME,
+      username: isTestEnv
+        ? process.env.TEST_DATABASE_USER
+        : process.env.DATABASE_USER,
+      password: isTestEnv
+        ? process.env.TEST_DATABASE_PASSWORD
+        : process.env.DATABASE_PASSWORD,
+      database: isTestEnv
+        ? process.env.TEST_DATABASE_NAME
+        : process.env.DATABASE_NAME,
       synchronize: shouldSynchronizeSchema,
       autoLoadEntities: true,
       dropSchema: isTestEnv ? true : false,

@@ -31,7 +31,11 @@ describe("PlayerWalletAuthService", () => {
   });
 
   it("rejects replaying a consumed nonce", async () => {
-    const issued = service.issueNonce(wallet.address, "economic_event", "game-1");
+    const issued = service.issueNonce(
+      wallet.address,
+      "economic_event",
+      "game-1",
+    );
     const signature = await wallet.signMessage(issued.message);
 
     service.verifySignedRequest({
