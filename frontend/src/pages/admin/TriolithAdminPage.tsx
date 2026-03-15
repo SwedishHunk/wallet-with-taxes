@@ -25,15 +25,16 @@ type StudioRow = {
 };
 
 type TransactionRow = {
-  id: string;
-  eventType: string;
-  source: string;
-  studioId: string | null;
-  gameId: string | null;
-  walletAddress: string | null;
-  assetKey: string;
-  amount: string;
-  direction: "in" | "out" | "neutral";
+  id: number;
+  type: string;
+  userAddress: string;
+  assetAddress: string;
+  tokenId: number;
+  amount: number;
+  feeUSD: number;
+  priceUSD: number | null;
+  source: string | null;
+  txHash: string | null;
   timestamp: string;
 };
 
@@ -117,20 +118,27 @@ export default function TriolithAdminPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const TX_LIMIT = 25;
 
+  const fetchAuditLog = () => {
+    void api
+      .get<AuditResponse>("/admin/audit-log?limit=25")
+      .then((r) => setAuditEntries(r.data.entries))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     void api.get<FeeStats>("/admin/fees").then((r) => setFees(r.data));
     void api.get<RevenueSplit>("/admin/revenue").then((r) => setRevenue(r.data));
     void api.get<StudioRow[]>("/admin/studios").then((r) => setStudios(r.data));
     void api.get<UserRow[]>("/admin/users").then((r) => setUsers(r.data));
     void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
-    void api.get<AuditResponse>("/admin/audit-log?limit=25").then((r) => setAuditEntries(r.data.entries));
+    fetchAuditLog();
     void api
       .get<{ feePercent: number }>("/admin/platform/fee")
       .then((r) => {
         setPlatformFee(r.data.feePercent);
         setFeeInput(String(r.data.feePercent));
       });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void api
@@ -159,7 +167,7 @@ export default function TriolithAdminPage() {
     const next = studio.status === "active" ? "suspended" : "active";
     void api
       .patch<{ id: string; status: string }>(`/admin/studios/${studio.id}/status`, { status: next })
-      .then(() => setStudios((prev) => prev.map((s) => (s.id === studio.id ? { ...s, status: next } : s))))
+      .then(() => { setStudios((prev) => prev.map((s) => (s.id === studio.id ? { ...s, status: next } : s))); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -167,7 +175,7 @@ export default function TriolithAdminPage() {
     if (!window.confirm(`Delete studio "${studio.name}"? This cannot be undone.`)) return;
     void api
       .delete<{ id: string; deleted: boolean }>(`/admin/studios/${studio.id}`)
-      .then(() => setStudios((prev) => prev.filter((s) => s.id !== studio.id)))
+      .then(() => { setStudios((prev) => prev.filter((s) => s.id !== studio.id)); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -189,7 +197,7 @@ export default function TriolithAdminPage() {
     const next = !user.isAdmin;
     void api
       .patch<{ id: string; isAdmin: boolean }>(`/admin/users/${user.id}/admin`, { isAdmin: next })
-      .then(() => setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isAdmin: next } : u))))
+      .then(() => { setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isAdmin: next } : u))); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -197,7 +205,7 @@ export default function TriolithAdminPage() {
     const next = !user.isSuspended;
     void api
       .patch<{ id: string; isSuspended: boolean }>(`/admin/users/${user.id}/suspended`, { suspended: next })
-      .then(() => setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isSuspended: next } : u))))
+      .then(() => { setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isSuspended: next } : u))); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -205,7 +213,7 @@ export default function TriolithAdminPage() {
     if (!window.confirm(`Delete user "${user.email}"? This cannot be undone.`)) return;
     void api
       .delete<{ id: string; deleted: boolean }>(`/admin/users/${user.id}`)
-      .then(() => setUsers((prev) => prev.filter((u) => u.id !== user.id)))
+      .then(() => { setUsers((prev) => prev.filter((u) => u.id !== user.id)); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -213,7 +221,7 @@ export default function TriolithAdminPage() {
     const next: "active" | "inactive" = game.status === "active" ? "inactive" : "active";
     void api
       .patch<{ id: string; status: string }>(`/admin/games/${game.id}/status`, { status: next })
-      .then(() => setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, status: next } : g))))
+      .then(() => { setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, status: next } : g))); fetchAuditLog(); })
       .catch(handleError);
   };
 
@@ -229,6 +237,7 @@ export default function TriolithAdminPage() {
         setPlatformFee(r.data.feePercent);
         setFeeMsg("Saved");
         setTimeout(() => setFeeMsg(""), 2000);
+        fetchAuditLog();
       })
       .catch(handleError);
   };
@@ -484,7 +493,7 @@ export default function TriolithAdminPage() {
             <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  {["Type", "Source", "Studio", "Game", "Wallet", "Amount", "Dir", "Time"].map((h) => (
+                  {["Type", "User Address", "Asset", "Token ID", "Amount", "Fee USD", "Tx Hash", "Time"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontWeight: 500 }}>
                       {h}
                     </th>
@@ -494,28 +503,24 @@ export default function TriolithAdminPage() {
               <tbody>
                 {transactions.map((tx) => (
                   <tr key={tx.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>{tx.eventType}</td>
-                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{tx.source}</td>
-                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.studioId ? tx.studioId.slice(0, 8) + "..." : "—"}
+                    <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>{tx.type}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {tx.userAddress ? tx.userAddress.slice(0, 10) + "..." : "—"}
                     </td>
-                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.gameId ? tx.gameId.slice(0, 8) + "..." : "—"}
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {tx.assetAddress ? tx.assetAddress.slice(0, 10) + "..." : "—"}
                     </td>
-                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.walletAddress ? tx.walletAddress.slice(0, 8) + "..." : "—"}
+                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
+                      {tx.tokenId ?? "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
-                      {tx.direction === "out" ? "-" : tx.direction === "in" ? "+" : ""}
-                      {tx.amount} {tx.assetKey.toUpperCase()}
+                      {tx.amount}
                     </td>
-                    <td style={{ padding: "0.4rem 0.6rem" }}>
-                      <span style={{
-                        color: tx.direction === "in" ? "var(--success, #22c55e)" : tx.direction === "out" ? "var(--danger, #ef4444)" : "var(--text-muted)",
-                        fontWeight: 500,
-                      }}>
-                        {tx.direction}
-                      </span>
+                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
+                      {tx.feeUSD != null ? `$${fmt(tx.feeUSD)}` : "—"}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {tx.txHash ? tx.txHash.slice(0, 10) + "..." : "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
                       {new Date(tx.timestamp).toLocaleString()}

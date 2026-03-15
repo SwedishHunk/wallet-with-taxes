@@ -161,7 +161,7 @@ export class AdminService {
   }
 
   async getAllTransactions(limit = 50, offset = 0) {
-    const [events, total] = await this.economicEventRepo.findAndCount({
+    const [events, total] = await this.taxRepo.findAndCount({
       order: { timestamp: "DESC" },
       take: limit,
       skip: offset,

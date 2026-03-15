@@ -12,7 +12,10 @@ function makeQuery(raw: unknown) {
 
 function makeService(queryRaw?: unknown) {
   const query = makeQuery(queryRaw ?? null);
-  const taxRepo = { createQueryBuilder: jest.fn().mockReturnValue(query) };
+  const taxRepo = {
+    createQueryBuilder: jest.fn().mockReturnValue(query),
+    findAndCount: jest.fn(),
+  };
   const userRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
@@ -199,8 +202,8 @@ describe("AdminService", () => {
   // ── transactions ───────────────────────────────────────────
   it("getAllTransactions returns paginated events", async () => {
     const events = [{ id: "e1" }];
-    const { service, economicEventRepo } = makeService();
-    economicEventRepo.findAndCount.mockResolvedValue([events, 1]);
+    const { service, taxRepo } = makeService();
+    taxRepo.findAndCount.mockResolvedValue([events, 1]);
 
     await expect(service.getAllTransactions(10, 0)).resolves.toEqual({
       events,
