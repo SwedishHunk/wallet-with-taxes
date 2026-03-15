@@ -48,8 +48,36 @@ type UserRow = {
   createdAt: string;
 };
 
+type GameRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  studioId: string | null;
+  studioName: string | null;
+  createdAt: string;
+};
+
+type AuditEntry = {
+  id: string;
+  adminId: string;
+  adminEmail: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 type TransactionsResponse = {
   events: TransactionRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+type AuditResponse = {
+  entries: AuditEntry[];
   total: number;
   limit: number;
   offset: number;
@@ -78,10 +106,14 @@ export default function TriolithAdminPage() {
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [txTotal, setTxTotal] = useState(0);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [games, setGames] = useState<GameRow[]>([]);
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [txOffset, setTxOffset] = useState(0);
   const [platformFee, setPlatformFee] = useState<number | null>(null);
   const [feeInput, setFeeInput] = useState("");
   const [feeMsg, setFeeMsg] = useState("");
+  const [expandedStudioId, setExpandedStudioId] = useState<string | null>(null);
+  const [studioGames, setStudioGames] = useState<Record<string, GameRow[]>>({});
   const TX_LIMIT = 25;
 
   useEffect(() => {
@@ -89,6 +121,8 @@ export default function TriolithAdminPage() {
     void api.get<RevenueSplit>("/admin/revenue").then((r) => setRevenue(r.data));
     void api.get<StudioRow[]>("/admin/studios").then((r) => setStudios(r.data));
     void api.get<UserRow[]>("/admin/users").then((r) => setUsers(r.data));
+    void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
+    void api.get<AuditResponse>("/admin/audit-log?limit=25").then((r) => setAuditEntries(r.data.entries));
     void api
       .get<{ feePercent: number }>("/admin/platform/fee")
       .then((r) => {
@@ -122,6 +156,30 @@ export default function TriolithAdminPage() {
       });
   };
 
+  const deleteStudio = (studio: StudioRow) => {
+    if (!window.confirm(`Delete studio "${studio.name}"? This cannot be undone.`)) return;
+    void api
+      .delete<{ id: string; deleted: boolean }>(`/admin/studios/${studio.id}`)
+      .then(() => {
+        setStudios((prev) => prev.filter((s) => s.id !== studio.id));
+      });
+  };
+
+  const toggleStudioGames = (studioId: string) => {
+    if (expandedStudioId === studioId) {
+      setExpandedStudioId(null);
+      return;
+    }
+    setExpandedStudioId(studioId);
+    if (!studioGames[studioId]) {
+      void api
+        .get<GameRow[]>(`/admin/studios/${studioId}/games`)
+        .then((r) => {
+          setStudioGames((prev) => ({ ...prev, [studioId]: r.data }));
+        });
+    }
+  };
+
   const toggleUserAdmin = (user: UserRow) => {
     const next = !user.isAdmin;
     void api
@@ -140,6 +198,26 @@ export default function TriolithAdminPage() {
       .then(() => {
         setUsers((prev) =>
           prev.map((u) => (u.id === user.id ? { ...u, isSuspended: next } : u)),
+        );
+      });
+  };
+
+  const deleteUser = (user: UserRow) => {
+    if (!window.confirm(`Delete user "${user.email}"? This cannot be undone.`)) return;
+    void api
+      .delete<{ id: string; deleted: boolean }>(`/admin/users/${user.id}`)
+      .then(() => {
+        setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      });
+  };
+
+  const toggleGameStatus = (game: GameRow) => {
+    const next: "active" | "inactive" = game.status === "active" ? "inactive" : "active";
+    void api
+      .patch<{ id: string; status: string }>(`/admin/games/${game.id}/status`, { status: next })
+      .then(() => {
+        setGames((prev) =>
+          prev.map((g) => (g.id === game.id ? { ...g, status: next } : g)),
         );
       });
   };
@@ -181,7 +259,7 @@ export default function TriolithAdminPage() {
               </tbody>
             </table>
           ) : (
-            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading…</p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading...</p>
           )}
         </Card>
 
@@ -204,14 +282,14 @@ export default function TriolithAdminPage() {
               </tbody>
             </table>
           ) : (
-            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading…</p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading...</p>
           )}
         </Card>
 
         <Card>
           <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>Platform Fee Rate</h3>
           <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
-            Current: <strong>{platformFee !== null ? `${platformFee}%` : "…"}</strong>
+            Current: <strong>{platformFee !== null ? `${platformFee}%` : "..."}</strong>
           </p>
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <input
@@ -248,7 +326,7 @@ export default function TriolithAdminPage() {
             <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  {["Name", "Email", "Members", "Status", "Created", "Action"].map((h) => (
+                  {["Name", "Email", "Members", "Status", "Created", "Actions"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontWeight: 500 }}>
                       {h}
                     </th>
@@ -257,24 +335,109 @@ export default function TriolithAdminPage() {
               </thead>
               <tbody>
                 {studios.map((s) => (
-                  <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>{s.name}</td>
-                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{s.email}</td>
-                    <td style={{ padding: "0.4rem 0.6rem" }}>{s.memberCount}</td>
+                  <>
+                    <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
+                        <button
+                          onClick={() => toggleStudioGames(s.id)}
+                          style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, color: "var(--text)" }}
+                        >
+                          {expandedStudioId === s.id ? "▼" : "▶"} {s.name}
+                        </button>
+                      </td>
+                      <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{s.email}</td>
+                      <td style={{ padding: "0.4rem 0.6rem" }}>{s.memberCount}</td>
+                      <td style={{ padding: "0.4rem 0.6rem" }}>
+                        <span style={{ color: s.status === "active" ? "var(--success, #22c55e)" : "var(--danger, #ef4444)", fontWeight: 500 }}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
+                        {new Date(s.createdAt).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: "0.4rem 0.6rem" }}>
+                        <div style={{ display: "flex", gap: "0.35rem" }}>
+                          <button
+                            onClick={() => toggleStudioStatus(s)}
+                            style={btnStyle(s.status === "active" ? "danger" : "success")}
+                          >
+                            {s.status === "active" ? "Suspend" : "Reactivate"}
+                          </button>
+                          <button
+                            onClick={() => deleteStudio(s)}
+                            style={btnStyle("danger")}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedStudioId === s.id && (
+                      <tr key={`${s.id}-games`} style={{ background: "var(--surface-alt, #f9f9f9)" }}>
+                        <td colSpan={6} style={{ padding: "0.5rem 1.5rem 0.75rem" }}>
+                          {studioGames[s.id] === undefined ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading games...</span>
+                          ) : studioGames[s.id].length === 0 ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No games for this studio.</span>
+                          ) : (
+                            <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.8rem" }}>
+                              {studioGames[s.id].map((g) => (
+                                <li key={g.id} style={{ marginBottom: "0.2rem" }}>
+                                  <strong>{g.name}</strong> ({g.slug}) — {g.status}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Games ── */}
+      <Card style={{ marginBottom: "1.5rem" }}>
+        <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
+          All Games ({games.length})
+        </h3>
+        {games.length === 0 ? (
+          <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>No games yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {["Name", "Slug", "Studio", "Status", "Created", "Action"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {games.map((g) => (
+                  <tr key={g.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>{g.name}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", color: "var(--text-muted)" }}>{g.slug}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{g.studioName ?? "—"}</td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>
-                      <span style={{ color: s.status === "active" ? "var(--success, #22c55e)" : "var(--danger, #ef4444)", fontWeight: 500 }}>
-                        {s.status}
+                      <span style={{ color: g.status === "active" ? "var(--success, #22c55e)" : "var(--text-muted)", fontWeight: 500 }}>
+                        {g.status}
                       </span>
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
-                      {new Date(s.createdAt).toLocaleDateString()}
+                      {new Date(g.createdAt).toLocaleDateString()}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>
                       <button
-                        onClick={() => toggleStudioStatus(s)}
-                        style={btnStyle(s.status === "active" ? "danger" : "success")}
+                        onClick={() => toggleGameStatus(g)}
+                        style={btnStyle(g.status === "active" ? "danger" : "success")}
                       >
-                        {s.status === "active" ? "Suspend" : "Reactivate"}
+                        {g.status === "active" ? "Suspend" : "Activate"}
                       </button>
                     </td>
                   </tr>
@@ -297,7 +460,7 @@ export default function TriolithAdminPage() {
               onClick={() => setTxOffset(Math.max(0, txOffset - TX_LIMIT))}
               style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", cursor: txOffset === 0 ? "not-allowed" : "pointer", opacity: txOffset === 0 ? 0.4 : 1 }}
             >
-              ← Prev
+              Prev
             </button>
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", alignSelf: "center" }}>
               {txOffset + 1}–{Math.min(txOffset + TX_LIMIT, txTotal)} of {txTotal}
@@ -307,7 +470,7 @@ export default function TriolithAdminPage() {
               onClick={() => setTxOffset(txOffset + TX_LIMIT)}
               style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", cursor: txOffset + TX_LIMIT >= txTotal ? "not-allowed" : "pointer", opacity: txOffset + TX_LIMIT >= txTotal ? 0.4 : 1 }}
             >
-              Next →
+              Next
             </button>
           </div>
         </div>
@@ -331,13 +494,13 @@ export default function TriolithAdminPage() {
                     <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>{tx.eventType}</td>
                     <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{tx.source}</td>
                     <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.studioId ? tx.studioId.slice(0, 8) + "…" : "—"}
+                      {tx.studioId ? tx.studioId.slice(0, 8) + "..." : "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.gameId ? tx.gameId.slice(0, 8) + "…" : "—"}
+                      {tx.gameId ? tx.gameId.slice(0, 8) + "..." : "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                      {tx.walletAddress ? tx.walletAddress.slice(0, 8) + "…" : "—"}
+                      {tx.walletAddress ? tx.walletAddress.slice(0, 8) + "..." : "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
                       {tx.direction === "out" ? "-" : tx.direction === "in" ? "+" : ""}
@@ -363,7 +526,7 @@ export default function TriolithAdminPage() {
       </Card>
 
       {/* ── Users ── */}
-      <Card>
+      <Card style={{ marginBottom: "1.5rem" }}>
         <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
           All Users ({users.length})
         </h3>
@@ -386,7 +549,7 @@ export default function TriolithAdminPage() {
                   <tr key={u.id} style={{ borderBottom: "1px solid var(--border)", opacity: u.isSuspended ? 0.6 : 1 }}>
                     <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>{u.email}</td>
                     <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      {u.walletAddress ? u.walletAddress.slice(0, 10) + "…" : "—"}
+                      {u.walletAddress ? u.walletAddress.slice(0, 10) + "..." : "—"}
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>{u.custodyMode}</td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>
@@ -396,7 +559,7 @@ export default function TriolithAdminPage() {
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>
                       <span style={{ color: u.isAdmin ? "var(--success, #22c55e)" : "var(--text-muted)" }}>
-                        {u.isAdmin ? "✓ Admin" : "—"}
+                        {u.isAdmin ? "Admin" : "—"}
                       </span>
                     </td>
                     <td style={{ padding: "0.4rem 0.6rem" }}>
@@ -422,7 +585,55 @@ export default function TriolithAdminPage() {
                         >
                           {u.isSuspended ? "Unsuspend" : "Suspend"}
                         </button>
+                        <button
+                          onClick={() => deleteUser(u)}
+                          style={btnStyle("danger")}
+                        >
+                          Delete
+                        </button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Audit Log ── */}
+      <Card>
+        <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
+          Audit Log (last 25)
+        </h3>
+        {auditEntries.length === 0 ? (
+          <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>No audit entries yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {["Time", "Admin", "Action", "Target Type", "Target ID", "Details"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {auditEntries.map((entry) => (
+                  <tr key={entry.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.6rem" }}>{entry.adminEmail}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>{entry.action}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>{entry.targetType}</td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {entry.targetId ? entry.targetId.slice(0, 8) + "..." : "—"}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.7rem", color: "var(--text-muted)", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {entry.details ? JSON.stringify(entry.details) : "—"}
                     </td>
                   </tr>
                 ))}

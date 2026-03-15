@@ -3,8 +3,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
+import { Game } from "../platform/entities/game.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
+import { AdminAuditLog } from "./admin-audit-log.entity";
 import { Repository } from "typeorm";
 
 interface FeeStatsRaw {
@@ -24,12 +26,37 @@ export class AdminService {
     @InjectRepository(Studio)
     private readonly studioRepo: Repository<Studio>,
 
+    @InjectRepository(Game)
+    private readonly gameRepo: Repository<Game>,
+
     @InjectRepository(EconomicEvent)
     private readonly economicEventRepo: Repository<EconomicEvent>,
 
     @InjectRepository(PlatformConfig)
     private readonly platformConfigRepo: Repository<PlatformConfig>,
+
+    @InjectRepository(AdminAuditLog)
+    private readonly auditLogRepo: Repository<AdminAuditLog>,
   ) {}
+
+  private async writeAudit(
+    adminId: string,
+    adminEmail: string,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    details?: Record<string, unknown>,
+  ) {
+    const entry = this.auditLogRepo.create({
+      adminId,
+      adminEmail,
+      action,
+      targetType,
+      targetId: targetId ?? undefined,
+      details,
+    });
+    await this.auditLogRepo.save(entry);
+  }
 
   async getFeeStats(from?: string, to?: string) {
     const query = this.taxRepo
@@ -103,6 +130,7 @@ export class AdminService {
         "custodyMode",
         "kycStatus",
         "isAdmin",
+        "isSuspended",
         "createdAt",
       ],
       order: { createdAt: "DESC" },
@@ -137,24 +165,53 @@ export class AdminService {
     return { events, total, limit, offset };
   }
 
-  async setStudioStatus(id: string, status: "active" | "suspended") {
+  async setStudioStatus(
+    id: string,
+    status: "active" | "suspended",
+    adminId: string,
+    adminEmail: string,
+  ) {
     const studio = await this.studioRepo.findOne({ where: { id } });
     if (!studio) throw new NotFoundException(`Studio ${id} not found`);
     await this.studioRepo.update(id, { status });
+    await this.writeAudit(
+      adminId,
+      adminEmail,
+      "setStudioStatus",
+      "studio",
+      id,
+      { status },
+    );
     return { id, status };
   }
 
-  async setUserAdmin(id: string, isAdmin: boolean) {
+  async setUserAdmin(
+    id: string,
+    isAdmin: boolean,
+    adminId: string,
+    adminEmail: string,
+  ) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.update(id, { isAdmin });
+    await this.writeAudit(adminId, adminEmail, "setUserAdmin", "user", id, {
+      isAdmin,
+    });
     return { id, isAdmin };
   }
 
-  async setUserSuspended(id: string, isSuspended: boolean) {
+  async setUserSuspended(
+    id: string,
+    isSuspended: boolean,
+    adminId: string,
+    adminEmail: string,
+  ) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.update(id, { isSuspended });
+    await this.writeAudit(adminId, adminEmail, "setUserSuspended", "user", id, {
+      isSuspended,
+    });
     return { id, isSuspended };
   }
 
@@ -165,11 +222,79 @@ export class AdminService {
     return { feePercent: Number(config?.value ?? 2.5) };
   }
 
-  async setPlatformFee(feePercent: number) {
+  async setPlatformFee(
+    feePercent: number,
+    adminId: string,
+    adminEmail: string,
+  ) {
     await this.platformConfigRepo.save({
       key: "platform_fee_percent",
       value: feePercent,
     });
+    await this.writeAudit(
+      adminId,
+      adminEmail,
+      "setPlatformFee",
+      "platform",
+      null,
+      { feePercent },
+    );
     return { feePercent };
+  }
+
+  async deleteUser(id: string, adminId: string, adminEmail: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    await this.userRepo.delete(id);
+    await this.writeAudit(adminId, adminEmail, "deleteUser", "user", id);
+    return { id, deleted: true };
+  }
+
+  async deleteStudio(id: string, adminId: string, adminEmail: string) {
+    const studio = await this.studioRepo.findOne({ where: { id } });
+    if (!studio) throw new NotFoundException(`Studio ${id} not found`);
+    await this.studioRepo.delete(id);
+    await this.writeAudit(adminId, adminEmail, "deleteStudio", "studio", id);
+    return { id, deleted: true };
+  }
+
+  async getAuditLog(limit = 50, offset = 0) {
+    const [entries, total] = await this.auditLogRepo.findAndCount({
+      order: { createdAt: "DESC" },
+      take: limit,
+      skip: offset,
+    });
+    return { entries, total, limit, offset };
+  }
+
+  async getStudioGames(studioId: string) {
+    const games = await this.gameRepo.find({
+      where: { studio: { id: studioId } },
+      order: { createdAt: "DESC" },
+    });
+    return games;
+  }
+
+  async getAllGames() {
+    const games = await this.gameRepo.find({
+      relations: ["studio"],
+      order: { createdAt: "DESC" },
+    });
+    return games.map((g) => ({
+      id: g.id,
+      name: g.name,
+      slug: g.slug,
+      status: g.status,
+      studioId: g.studio?.id ?? null,
+      studioName: g.studio?.name ?? null,
+      createdAt: g.createdAt,
+    }));
+  }
+
+  async setGameStatus(id: string, status: "active" | "inactive") {
+    const game = await this.gameRepo.findOne({ where: { id } });
+    if (!game) throw new NotFoundException(`Game ${id} not found`);
+    await this.gameRepo.update(id, { status });
+    return { id, status };
   }
 }
