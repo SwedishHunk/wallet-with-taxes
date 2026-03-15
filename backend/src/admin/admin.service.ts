@@ -47,15 +47,20 @@ export class AdminService {
     targetId: string | null,
     details?: Record<string, unknown>,
   ) {
-    const entry = this.auditLogRepo.create({
-      adminId,
-      adminEmail,
-      action,
-      targetType,
-      targetId: targetId ?? undefined,
-      details,
-    });
-    await this.auditLogRepo.save(entry);
+    try {
+      const entry = this.auditLogRepo.create({
+        adminId,
+        adminEmail,
+        action,
+        targetType,
+        targetId: targetId ?? undefined,
+        details,
+      });
+      await this.auditLogRepo.save(entry);
+    } catch (err) {
+      // Audit log failure must never block the actual admin action
+      console.warn("[AdminAuditLog] Failed to write audit entry:", err);
+    }
   }
 
   async getFeeStats(from?: string, to?: string) {
@@ -259,12 +264,17 @@ export class AdminService {
   }
 
   async getAuditLog(limit = 50, offset = 0) {
-    const [entries, total] = await this.auditLogRepo.findAndCount({
-      order: { createdAt: "DESC" },
-      take: limit,
-      skip: offset,
-    });
-    return { entries, total, limit, offset };
+    try {
+      const [entries, total] = await this.auditLogRepo.findAndCount({
+        order: { createdAt: "DESC" },
+        take: limit,
+        skip: offset,
+      });
+      return { entries, total, limit, offset };
+    } catch {
+      // Table may not exist yet if migration hasn't run
+      return { entries: [], total: 0, limit, offset };
+    }
   }
 
   async getStudioGames(studioId: string) {

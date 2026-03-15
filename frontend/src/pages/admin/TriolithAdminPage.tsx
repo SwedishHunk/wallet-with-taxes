@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Page, PageHeader, Card } from "../../components/ui/index";
 
@@ -114,6 +114,7 @@ export default function TriolithAdminPage() {
   const [feeMsg, setFeeMsg] = useState("");
   const [expandedStudioId, setExpandedStudioId] = useState<string | null>(null);
   const [studioGames, setStudioGames] = useState<Record<string, GameRow[]>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const TX_LIMIT = 25;
 
   useEffect(() => {
@@ -145,24 +146,29 @@ export default function TriolithAdminPage() {
   const fmt = (n: number) =>
     n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
+  const handleError = (err: unknown) => {
+    const msg =
+      (err as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message ??
+      (err instanceof Error ? err.message : "Action failed");
+    setActionError(msg);
+    setTimeout(() => setActionError(null), 4000);
+  };
+
   const toggleStudioStatus = (studio: StudioRow) => {
     const next = studio.status === "active" ? "suspended" : "active";
     void api
       .patch<{ id: string; status: string }>(`/admin/studios/${studio.id}/status`, { status: next })
-      .then(() => {
-        setStudios((prev) =>
-          prev.map((s) => (s.id === studio.id ? { ...s, status: next } : s)),
-        );
-      });
+      .then(() => setStudios((prev) => prev.map((s) => (s.id === studio.id ? { ...s, status: next } : s))))
+      .catch(handleError);
   };
 
   const deleteStudio = (studio: StudioRow) => {
     if (!window.confirm(`Delete studio "${studio.name}"? This cannot be undone.`)) return;
     void api
       .delete<{ id: string; deleted: boolean }>(`/admin/studios/${studio.id}`)
-      .then(() => {
-        setStudios((prev) => prev.filter((s) => s.id !== studio.id));
-      });
+      .then(() => setStudios((prev) => prev.filter((s) => s.id !== studio.id)))
+      .catch(handleError);
   };
 
   const toggleStudioGames = (studioId: string) => {
@@ -174,9 +180,8 @@ export default function TriolithAdminPage() {
     if (!studioGames[studioId]) {
       void api
         .get<GameRow[]>(`/admin/studios/${studioId}/games`)
-        .then((r) => {
-          setStudioGames((prev) => ({ ...prev, [studioId]: r.data }));
-        });
+        .then((r) => setStudioGames((prev) => ({ ...prev, [studioId]: r.data })))
+        .catch(handleError);
     }
   };
 
@@ -184,42 +189,32 @@ export default function TriolithAdminPage() {
     const next = !user.isAdmin;
     void api
       .patch<{ id: string; isAdmin: boolean }>(`/admin/users/${user.id}/admin`, { isAdmin: next })
-      .then(() => {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === user.id ? { ...u, isAdmin: next } : u)),
-        );
-      });
+      .then(() => setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isAdmin: next } : u))))
+      .catch(handleError);
   };
 
   const toggleUserSuspended = (user: UserRow) => {
     const next = !user.isSuspended;
     void api
       .patch<{ id: string; isSuspended: boolean }>(`/admin/users/${user.id}/suspended`, { suspended: next })
-      .then(() => {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === user.id ? { ...u, isSuspended: next } : u)),
-        );
-      });
+      .then(() => setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isSuspended: next } : u))))
+      .catch(handleError);
   };
 
   const deleteUser = (user: UserRow) => {
     if (!window.confirm(`Delete user "${user.email}"? This cannot be undone.`)) return;
     void api
       .delete<{ id: string; deleted: boolean }>(`/admin/users/${user.id}`)
-      .then(() => {
-        setUsers((prev) => prev.filter((u) => u.id !== user.id));
-      });
+      .then(() => setUsers((prev) => prev.filter((u) => u.id !== user.id)))
+      .catch(handleError);
   };
 
   const toggleGameStatus = (game: GameRow) => {
     const next: "active" | "inactive" = game.status === "active" ? "inactive" : "active";
     void api
       .patch<{ id: string; status: string }>(`/admin/games/${game.id}/status`, { status: next })
-      .then(() => {
-        setGames((prev) =>
-          prev.map((g) => (g.id === game.id ? { ...g, status: next } : g)),
-        );
-      });
+      .then(() => setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, status: next } : g))))
+      .catch(handleError);
   };
 
   const savePlatformFee = () => {
@@ -234,12 +229,20 @@ export default function TriolithAdminPage() {
         setPlatformFee(r.data.feePercent);
         setFeeMsg("Saved");
         setTimeout(() => setFeeMsg(""), 2000);
-      });
+      })
+      .catch(handleError);
   };
 
   return (
     <Page>
       <PageHeader title="Triolith Admin" subtitle="Platform-wide overview" />
+
+      {actionError && (
+        <div style={{ background: "var(--danger, #ef4444)", color: "#fff", padding: "0.6rem 1rem", borderRadius: "6px", marginBottom: "1rem", fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "1rem", lineHeight: 1 }}>✕</button>
+        </div>
+      )}
 
       {/* ── Stats row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
@@ -335,8 +338,8 @@ export default function TriolithAdminPage() {
               </thead>
               <tbody>
                 {studios.map((s) => (
-                  <>
-                    <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <Fragment key={s.id}>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
                       <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
                         <button
                           onClick={() => toggleStudioGames(s.id)}
@@ -373,7 +376,7 @@ export default function TriolithAdminPage() {
                       </td>
                     </tr>
                     {expandedStudioId === s.id && (
-                      <tr key={`${s.id}-games`} style={{ background: "var(--surface-alt, #f9f9f9)" }}>
+                      <tr style={{ background: "var(--surface-alt, #f9f9f9)" }}>
                         <td colSpan={6} style={{ padding: "0.5rem 1.5rem 0.75rem" }}>
                           {studioGames[s.id] === undefined ? (
                             <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading games...</span>
@@ -391,7 +394,7 @@ export default function TriolithAdminPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
