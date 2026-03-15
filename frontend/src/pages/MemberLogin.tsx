@@ -199,7 +199,10 @@ export default function MemberLogin() {
         authenticatedAt: new Date().toISOString(),
       });
 
-      navigate(ROUTES.dashboard, { replace: true });
+      const isAdmin = loginRes.data?.user?.isAdmin === true;
+      navigate(isAdmin ? ROUTES.triolithAdmin : ROUTES.dashboard, {
+        replace: true,
+      });
     } catch (err) {
       const apiErr = err as ApiError;
       const msg =

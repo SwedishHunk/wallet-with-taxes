@@ -27,10 +27,14 @@ export default function Login() {
   const [studioLoading, setStudioLoading] = useState(false);
 
   useEffect(() => {
+    if (authContext.studioSession?.isTriolithAdmin === true) {
+      navigate(ROUTES.triolithAdmin, { replace: true });
+      return;
+    }
     if (authContext.state === "Studio+MemberActive") {
       navigate(ROUTES.dashboard, { replace: true });
     }
-  }, [authContext.state, navigate]);
+  }, [authContext.state, authContext.studioSession, navigate]);
 
   const handleStudioLogin = async (event?: React.FormEvent) => {
     event?.preventDefault();
