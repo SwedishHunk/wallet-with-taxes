@@ -26,6 +26,7 @@ describe("JwtStrategy", () => {
       email: "u@test.com",
       studioId: "s1",
       role: "owner" as const,
+      isAdmin: false,
     };
     expect(strategy.validate(payload)).toEqual(payload);
   });
