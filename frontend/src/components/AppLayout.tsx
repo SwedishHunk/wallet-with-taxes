@@ -75,7 +75,7 @@ function TriangleMark() {
  */
 function Header() {
   const { authContext, isLoading, membersCount } = useAuthState();
-  const { logoutStudio, logoutMember } = useLogout();
+  const { logoutStudio } = useLogout();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
@@ -96,9 +96,13 @@ function Header() {
           <span className="header-logo-sub">{t("nav.logoSub")}</span>
         </Link>
 
-        {/* ── Center: Nav links (only when member active) ── */}
+        {/* ── Center: Nav links (member active, or triolith admin without member session) ── */}
         <nav className="header-center-nav">
-          {authContext.state === "Studio+MemberActive" && <AdminLinks />}
+          {(authContext.state === "Studio+MemberActive" ||
+            (authContext.state === "StudioAuthenticated" &&
+              authContext.studioSession?.isTriolithAdmin === true)) && (
+            <AdminLinks />
+          )}
         </nav>
 
         {/* ── Right: Auth-state actions ── */}
@@ -115,7 +119,22 @@ function Header() {
             </>
           )}
 
-          {authContext.state === "StudioAuthenticated" && membersCount !== null && membersCount > 1 && (
+          {authContext.state === "StudioAuthenticated" &&
+            authContext.studioSession?.isTriolithAdmin === true && (
+            <>
+              <div className="studio-info">
+                <span className="studio-name">{authContext.studioSession?.studioName}</span>
+                <span className="status-badge">Admin</span>
+              </div>
+              <button className="btn-ghost-danger" onClick={logoutStudio} title="Logout">
+                <LogOut size={16} />
+              </button>
+            </>
+          )}
+
+          {authContext.state === "StudioAuthenticated" &&
+            authContext.studioSession?.isTriolithAdmin !== true &&
+            membersCount !== null && membersCount > 1 && (
             <>
               <div className="studio-info">
                 <span className="studio-name">{authContext.studioSession?.studioName}</span>
@@ -161,11 +180,23 @@ function AdminLinks() {
   const { authContext } = useAuthState();
   const canManageMembers = useCanManageMembers();
   const { t } = useLanguage();
-  const hasManageGames   = authContext.memberSession?.permissions.includes("ManageGames")   ?? false;
-  const hasManageSettings = authContext.memberSession?.permissions.includes("ManageSettings") ?? false;
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     "nav-link" + (isActive ? " nav-link-active" : "");
+
+  // Triolith platform admin: only show Platform Overview
+  if (authContext.studioSession?.isTriolithAdmin === true) {
+    return (
+      <div className="admin-links">
+        <NavLink to={ROUTES.triolithAdmin} className={linkClass}>
+          <ShieldCheck size={15} /> Platform Overview
+        </NavLink>
+      </div>
+    );
+  }
+
+  const hasManageGames    = authContext.memberSession?.permissions.includes("ManageGames")    ?? false;
+  const hasManageSettings = authContext.memberSession?.permissions.includes("ManageSettings") ?? false;
 
   return (
     <div className="admin-links">
@@ -187,11 +218,6 @@ function AdminLinks() {
       <NavLink to={ROUTES.dashboard} className={linkClass}>
         <LayoutDashboard size={15} /> {t("nav.dashboard")}
       </NavLink>
-      {authContext.studioSession?.isTriolithAdmin === true && (
-        <NavLink to={ROUTES.triolithAdmin} className={linkClass}>
-          <ShieldCheck size={15} /> Admin
-        </NavLink>
-      )}
     </div>
   );
 }
