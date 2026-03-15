@@ -11,6 +11,7 @@ import { Studio } from "../platform/entities/studio.entity";
 import { Game } from "../platform/entities/game.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
+import { AdminAuditLog } from "./admin-audit-log.entity";
 import { UsersModule } from "../users/users.module";
 import { PlatformModule } from "../platform/platform.module";
 
@@ -23,6 +24,7 @@ import { PlatformModule } from "../platform/platform.module";
       Game,
       EconomicEvent,
       PlatformConfig,
+      AdminAuditLog,
     ]),
     TaxModule,
     UsersModule,

@@ -223,6 +223,13 @@ export class UsersService {
       throw new AppException(ERROR_MESSAGES.INVALID_CREDENTIALS, 401);
     }
 
+    if (user.isSuspended === true) {
+      throw new AppException(
+        "Your account has been suspended. Contact support.",
+        403,
+      );
+    }
+
     // If studioId provided, verify user is a member
     let selectedStudio: Studio | null = null;
     let selectedRole: StudioRole | null = null;
@@ -297,6 +304,13 @@ export class UsersService {
 
     if (!selectedStudio) {
       throw new AppException(ERROR_MESSAGES.STUDIO_NOT_FOUND, 404);
+    }
+
+    if (selectedStudio.status === "suspended") {
+      throw new AppException(
+        "This studio has been suspended. Contact support.",
+        403,
+      );
     }
 
     const token = this.jwtService.sign(
