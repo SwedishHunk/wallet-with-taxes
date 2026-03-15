@@ -91,6 +91,7 @@ export class AdminDevService {
       studio: {
         studioId: studio.id,
         studioName: studio.name,
+        isTriolithAdmin: loginResult.user.isAdmin === true,
       },
       member,
       game: {

@@ -101,10 +101,15 @@ export default function MemberLogin() {
       const raw = membersData.data || [];
 
       const normalized = raw.map(
-        (m: { memberId?: string; id?: string; email: string; isOwner: boolean }) => ({
+        (m: {
+          memberId?: string;
+          id?: string;
+          email: string;
+          isOwner: boolean;
+        }) => ({
           ...m,
           memberId: m.memberId ?? m.id,
-        })
+        }),
       );
 
       setMembers(normalized);
@@ -174,6 +179,7 @@ export default function MemberLogin() {
           studioId: nextStudioId,
           studioName: nextStudioName,
           authenticatedAt: new Date().toISOString(),
+          isTriolithAdmin: loginRes.data?.user?.isAdmin === true,
         });
       }
 
@@ -224,7 +230,8 @@ export default function MemberLogin() {
         {error && (
           <div
             className="bright-alert bright-alert-error"
-            style={{ marginBottom: "1rem" }}>
+            style={{ marginBottom: "1rem" }}
+          >
             <div>{error}</div>
             <button
               type="button"
@@ -236,7 +243,8 @@ export default function MemberLogin() {
                 border: "none",
                 color: "inherit",
                 cursor: "pointer",
-              }}>
+              }}
+            >
               ✕
             </button>
           </div>
@@ -247,7 +255,8 @@ export default function MemberLogin() {
           <p>{t("member.noMembersAvailable")}</p>
         ) : (
           <div
-            style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {normalizedMembers.map((member) => {
               const memberKey = member.memberId ?? member.email;
 
@@ -274,7 +283,8 @@ export default function MemberLogin() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                  }}>
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: 500 }}>{member.email}</div>
                     <div
@@ -282,11 +292,15 @@ export default function MemberLogin() {
                         fontSize: "12px",
                         color: "var(--muted)",
                         marginTop: "4px",
-                      }}>
-                      ID: {member.memberId ?? member.id ?? t("member.idMissing")}
+                      }}
+                    >
+                      ID:{" "}
+                      {member.memberId ?? member.id ?? t("member.idMissing")}
                     </div>
                   </div>
-                  {member.isOwner && <Badge variant="owner">{t("common.owner")}</Badge>}
+                  {member.isOwner && (
+                    <Badge variant="owner">{t("common.owner")}</Badge>
+                  )}
                 </button>
               );
             })}
@@ -298,7 +312,8 @@ export default function MemberLogin() {
           <div style={{ marginBottom: "10px", color: "var(--muted)" }}>
             {selectedMember ? (
               <>
-                {t("member.selectedMember")}: <strong>{selectedMember.email}</strong>
+                {t("member.selectedMember")}:{" "}
+                <strong>{selectedMember.email}</strong>
               </>
             ) : (
               t("member.selectFromList")
@@ -314,7 +329,11 @@ export default function MemberLogin() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={!selectedMember || submitting}
-            placeholder={selectedMember ? t("member.enterPw") : t("member.selectMemberFirst")}
+            placeholder={
+              selectedMember
+                ? t("member.enterPw")
+                : t("member.selectMemberFirst")
+            }
             style={{
               width: "100%",
               padding: "10px 12px",
@@ -338,7 +357,8 @@ export default function MemberLogin() {
               color: "white",
               cursor: !selectedMember || submitting ? "not-allowed" : "pointer",
               opacity: !selectedMember || submitting ? 0.6 : 1,
-            }}>
+            }}
+          >
             {submitting ? t("member.loggingIn") : t("member.loginBtn")}
           </button>
         </form>

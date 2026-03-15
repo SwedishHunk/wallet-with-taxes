@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { Request } from "express";
 
 type JwtPayload = {
   id: string;
   email: string;
   studioId: string;
   role: "owner" | "admin" | "member";
+  isAdmin: boolean;
 };
 
 @Injectable()
@@ -31,6 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       studioId: payload.studioId,
       role: payload.role,
+      isAdmin: payload.isAdmin === true,
     };
   }
 }

@@ -57,14 +57,18 @@ export default function Login() {
         console.warn("Could not fetch studios list after login", innerErr);
       }
 
+      const isTriolithAdmin = data.user.isAdmin === true;
+
       loginStudio({
         studioId,
         studioName,
         authenticatedAt: new Date().toISOString(),
-        isTriolithAdmin: data.user.isAdmin === true,
+        isTriolithAdmin,
       });
 
-      navigate(ROUTES.dashboard, { replace: true });
+      navigate(isTriolithAdmin ? ROUTES.triolithAdmin : ROUTES.dashboard, {
+        replace: true,
+      });
     } catch (err) {
       const error = err as ApiError;
       const message =
@@ -109,7 +113,8 @@ export default function Login() {
               <button
                 type="button"
                 className="login-alert-close"
-                onClick={() => setStudioError(null)}>
+                onClick={() => setStudioError(null)}
+              >
                 {t("login.close")}
               </button>
             </motion.div>
@@ -131,7 +136,11 @@ export default function Login() {
                 onChange={(e) => setStudioEmail(e.target.value)}
                 autoComplete="username"
                 required
-                whileFocus={{ borderColor: "#00d4ff", boxShadow: "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)" }}
+                whileFocus={{
+                  borderColor: "#00d4ff",
+                  boxShadow:
+                    "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)",
+                }}
               />
               <motion.input
                 type="password"
@@ -141,7 +150,11 @@ export default function Login() {
                 onChange={(e) => setStudioPassword(e.target.value)}
                 autoComplete="current-password"
                 required
-                whileFocus={{ borderColor: "#00d4ff", boxShadow: "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)" }}
+                whileFocus={{
+                  borderColor: "#00d4ff",
+                  boxShadow:
+                    "0 0 0 3px rgba(0, 212, 255, 0.15), 0 0 20px rgba(0, 212, 255, 0.08)",
+                }}
               />
               <motion.button
                 type="submit"
@@ -186,7 +199,8 @@ export default function Login() {
               {t("login.noAccount")}{" "}
               <span
                 className="signup-link"
-                onClick={() => navigate(ROUTES.createStudio)}>
+                onClick={() => navigate(ROUTES.createStudio)}
+              >
                 {t("login.createStudio")}
               </span>
             </motion.p>
