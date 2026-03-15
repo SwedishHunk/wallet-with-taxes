@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
+import { PlatformConfig } from "./platform-config.entity";
 import { Repository } from "typeorm";
 
 interface FeeStatsRaw {
@@ -25,6 +26,9 @@ export class AdminService {
 
     @InjectRepository(EconomicEvent)
     private readonly economicEventRepo: Repository<EconomicEvent>,
+
+    @InjectRepository(PlatformConfig)
+    private readonly platformConfigRepo: Repository<PlatformConfig>,
   ) {}
 
   async getFeeStats(from?: string, to?: string) {
@@ -131,5 +135,41 @@ export class AdminService {
     });
 
     return { events, total, limit, offset };
+  }
+
+  async setStudioStatus(id: string, status: "active" | "suspended") {
+    const studio = await this.studioRepo.findOne({ where: { id } });
+    if (!studio) throw new NotFoundException(`Studio ${id} not found`);
+    await this.studioRepo.update(id, { status });
+    return { id, status };
+  }
+
+  async setUserAdmin(id: string, isAdmin: boolean) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    await this.userRepo.update(id, { isAdmin });
+    return { id, isAdmin };
+  }
+
+  async setUserSuspended(id: string, isSuspended: boolean) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    await this.userRepo.update(id, { isSuspended });
+    return { id, isSuspended };
+  }
+
+  async getPlatformFee() {
+    const config = await this.platformConfigRepo.findOne({
+      where: { key: "platform_fee_percent" },
+    });
+    return { feePercent: Number(config?.value ?? 2.5) };
+  }
+
+  async setPlatformFee(feePercent: number) {
+    await this.platformConfigRepo.save({
+      key: "platform_fee_percent",
+      value: feePercent,
+    });
+    return { feePercent };
   }
 }

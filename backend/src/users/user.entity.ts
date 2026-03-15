@@ -43,6 +43,9 @@ export class User {
   @Column({ default: false })
   isAdmin: boolean;
 
+  @Column({ default: false })
+  isSuspended: boolean;
+
   @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
   studioMemberships: StudioMember[];
 }

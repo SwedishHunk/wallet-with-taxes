@@ -1,4 +1,12 @@
-import { Controller, Get, UseGuards, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Patch,
+  UseGuards,
+  Query,
+  Param,
+  Body,
+} from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AdminGuard } from "../auth/admin.guard";
 import { TriolithGuard } from "../auth/triolith.guard";
@@ -45,5 +53,44 @@ export class AdminController {
       limit ? parseInt(limit, 10) : 50,
       offset ? parseInt(offset, 10) : 0,
     );
+  }
+
+  @Patch("studios/:id/status")
+  @UseGuards(TriolithGuard)
+  async setStudioStatus(
+    @Param("id") id: string,
+    @Body() body: { status: "active" | "suspended" },
+  ) {
+    return this.adminService.setStudioStatus(id, body.status);
+  }
+
+  @Patch("users/:id/admin")
+  @UseGuards(TriolithGuard)
+  async setUserAdmin(
+    @Param("id") id: string,
+    @Body() body: { isAdmin: boolean },
+  ) {
+    return this.adminService.setUserAdmin(id, body.isAdmin);
+  }
+
+  @Patch("users/:id/suspended")
+  @UseGuards(TriolithGuard)
+  async setUserSuspended(
+    @Param("id") id: string,
+    @Body() body: { suspended: boolean },
+  ) {
+    return this.adminService.setUserSuspended(id, body.suspended);
+  }
+
+  @Get("platform/fee")
+  @UseGuards(TriolithGuard)
+  async getPlatformFee() {
+    return this.adminService.getPlatformFee();
+  }
+
+  @Patch("platform/fee")
+  @UseGuards(TriolithGuard)
+  async setPlatformFee(@Body() body: { feePercent: number }) {
+    return this.adminService.setPlatformFee(body.feePercent);
   }
 }
