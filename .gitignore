@@ -30,6 +30,7 @@ backend/.env
 # OS / Editor / Junk
 # =========================
 .DS_Store
+.claude/
 nul
 *.log
 
