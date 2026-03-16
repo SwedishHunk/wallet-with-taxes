@@ -65,7 +65,7 @@ export function GameControl() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
     const studioId = localStorage.getItem("studioId");
 
     if (!token) {

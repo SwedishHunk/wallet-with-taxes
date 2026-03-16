@@ -4,7 +4,6 @@ import { Repository, DataSource } from "typeorm";
 import { User } from "./user.entity";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
-import * as crypto from "crypto";
 import GenesisWalletFactoryAbiJson from "../shared/constants/abis/GenesisWalletFactory.json";
 import { JwtService } from "@nestjs/jwt";
 import type { InterfaceAbi } from "ethers";
@@ -18,9 +17,14 @@ import {
 import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
+import { encryptPrivateKey } from "../shared/crypto.util";
 
 @Injectable()
 export class UsersService {
+  // Read deployer key once at startup and remove from process.env to
+  // prevent other code paths from accessing it via the global env object.
+  private readonly deployerPrivateKey: string | undefined;
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -31,7 +35,10 @@ export class UsersService {
     private readonly studioMemberService: StudioMemberService,
     private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) {
+    this.deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
+    delete process.env.DEPLOYER_PRIVATE_KEY;
+  }
 
   private isValidEmail(email: string): boolean {
     // Email must contain @ and have a domain
@@ -56,21 +63,18 @@ export class UsersService {
     const wallet = ethers.Wallet.createRandom();
 
     const encryptionKey = process.env.ENCRYPTION_KEY;
-    const encryptionIv = process.env.ENCRYPTION_IV;
-    if (!encryptionKey || !encryptionIv) {
+    if (!encryptionKey) {
       throw new AppException(
-        ERROR_MESSAGES.MISSING_ENV_VAR("ENCRYPTION_KEY or ENCRYPTION_IV"),
+        ERROR_MESSAGES.MISSING_ENV_VAR("ENCRYPTION_KEY"),
         500,
       );
     }
 
-    const cipher = crypto.createCipheriv(
-      "aes-256-cbc",
-      Buffer.from(encryptionKey, "utf8"),
-      Buffer.from(encryptionIv, "utf8"),
+    // AES-256-GCM: random IV per wallet — eliminates static-IV ciphertext reuse
+    const encryptedPrivateKey = encryptPrivateKey(
+      wallet.privateKey,
+      encryptionKey,
     );
-    const encryptedPrivateKey =
-      cipher.update(wallet.privateKey, "utf8", "hex") + cipher.final("hex");
 
     const onChainWallet = await this.tryCreateOnChainWallet(wallet.address);
 
@@ -87,7 +91,7 @@ export class UsersService {
   ): Promise<string | null> {
     const rpcUrl = process.env.RPC_URL;
     const factoryAddress = process.env.FACTORY_ADDRESS;
-    const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
+    const deployerKey = this.deployerPrivateKey;
 
     if (!rpcUrl || !factoryAddress || !deployerKey) {
       console.warn(
@@ -179,7 +183,7 @@ export class UsersService {
         },
         {
           secret: process.env.JWT_SECRET,
-          expiresIn: "7d",
+          expiresIn: "2h",
         },
       );
 
@@ -266,11 +270,9 @@ export class UsersService {
             walletAddress: user.walletAddress,
           });
           studio = await this.studioRepository.save(studio);
-          console.log(`Created new studio ${studio.id} for user ${user.email}`);
+          console.log(`Created new studio ${studio.id} for user ${user.id}`);
         } else {
-          console.log(
-            `Studio ${studio.id} already exists for user ${user.email}`,
-          );
+          console.log(`Studio ${studio.id} already exists for user ${user.id}`);
         }
 
         // Check if membership already exists before creating
@@ -286,12 +288,12 @@ export class UsersService {
             user,
           );
           console.log(
-            `Created bootstrap owner membership for user ${user.email} in studio ${studio.id}`,
+            `Created bootstrap owner membership for user ${user.id} in studio ${studio.id}`,
           );
         } else {
           membership = existingMembership;
           console.log(
-            `Membership already exists for user ${user.email} in studio ${studio.id}`,
+            `Membership already exists for user ${user.id} in studio ${studio.id}`,
           );
         }
       }
@@ -341,7 +343,20 @@ export class UsersService {
     };
   }
 
-  async linkWallet(email: string, walletAddress: string) {
+  async linkWallet(email: string, walletAddress: string, signature: string) {
+    // Verify the caller owns the destination wallet by checking that the
+    // supplied signature was produced by its private key.
+    const message = `Link wallet to Triolith: ${email}`;
+    let recovered: string;
+    try {
+      recovered = ethers.verifyMessage(message, signature);
+    } catch {
+      throw new AppException("Invalid wallet ownership signature", 400);
+    }
+    if (recovered.toLowerCase() !== walletAddress.toLowerCase()) {
+      throw new AppException("Wallet ownership verification failed", 403);
+    }
+
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);

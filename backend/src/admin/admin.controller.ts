@@ -9,15 +9,25 @@ import {
   Body,
   Request,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AdminGuard } from "../auth/admin.guard";
 import { TriolithGuard } from "../auth/triolith.guard";
 import { AdminService } from "../admin/admin.service";
+import {
+  SetStudioStatusDto,
+  SetUserAdminDto,
+  SetUserSuspendedDto,
+  SetPlatformFeeDto,
+  SetGameStatusDto,
+} from "./dto/admin-request.dto";
 
 interface AuthRequest {
   user: { id: string; email: string };
 }
 
+// 30 requests per minute per IP on all admin endpoints
+@Throttle({ auth: { limit: 30, ttl: 60000 } })
 @Controller("admin")
 @UseGuards(JwtAuthGuard)
 export class AdminController {
@@ -65,7 +75,7 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async setStudioStatus(
     @Param("id") id: string,
-    @Body() body: { status: "active" | "suspended" },
+    @Body() body: SetStudioStatusDto,
     @Request() req: AuthRequest,
   ) {
     return this.adminService.setStudioStatus(
@@ -92,7 +102,7 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async setUserAdmin(
     @Param("id") id: string,
-    @Body() body: { isAdmin: boolean },
+    @Body() body: SetUserAdminDto,
     @Request() req: AuthRequest,
   ) {
     return this.adminService.setUserAdmin(
@@ -107,7 +117,7 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async setUserSuspended(
     @Param("id") id: string,
-    @Body() body: { suspended: boolean },
+    @Body() body: SetUserSuspendedDto,
     @Request() req: AuthRequest,
   ) {
     return this.adminService.setUserSuspended(
@@ -133,7 +143,7 @@ export class AdminController {
   @Patch("platform/fee")
   @UseGuards(TriolithGuard)
   async setPlatformFee(
-    @Body() body: { feePercent: number },
+    @Body() body: SetPlatformFeeDto,
     @Request() req: AuthRequest,
   ) {
     return this.adminService.setPlatformFee(
@@ -151,10 +161,7 @@ export class AdminController {
 
   @Patch("games/:id/status")
   @UseGuards(TriolithGuard)
-  async setGameStatus(
-    @Param("id") id: string,
-    @Body() body: { status: "active" | "inactive" },
-  ) {
+  async setGameStatus(@Param("id") id: string, @Body() body: SetGameStatusDto) {
     return this.adminService.setGameStatus(id, body.status);
   }
 

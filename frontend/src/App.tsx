@@ -43,8 +43,17 @@ import "./index.css";
 
 // Set auth token synchronously at module load time so all API calls
 // (including AuthContext hydration) have the Authorization header from the start.
-const _storedToken = localStorage.getItem("token");
-if (_storedToken) setAuthToken(_storedToken);
+// Token is stored in sessionStorage (clears on tab close) for reduced XSS persistence.
+const _storedToken =
+  sessionStorage.getItem("token") ?? localStorage.getItem("token");
+if (_storedToken) {
+  setAuthToken(_storedToken);
+  // Migrate legacy localStorage token to sessionStorage on first load
+  if (localStorage.getItem("token")) {
+    sessionStorage.setItem("token", _storedToken);
+    localStorage.removeItem("token");
+  }
+}
 
 function NotFound() {
   return (

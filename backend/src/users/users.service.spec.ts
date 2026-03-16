@@ -326,10 +326,29 @@ describe("UsersService", () => {
     });
   });
 
+  it("linkWallet rejects mismatched wallet ownership signature", async () => {
+    const wrongWallet = new ethers.Wallet("0x" + "cc".repeat(32));
+    const sig = await wrongWallet.signMessage(
+      "Link wallet to Triolith: user@test.com",
+    );
+    // Signature is valid but for a different address than supplied
+    await expect(
+      service.linkWallet(
+        "user@test.com",
+        "0x" + "dd".repeat(20), // wrong address
+        sig,
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it("linkWallet throws when user does not exist", async () => {
+    const testWallet = new ethers.Wallet("0x" + "bb".repeat(32));
+    const sig = await testWallet.signMessage(
+      "Link wallet to Triolith: missing@test.com",
+    );
     userRepo.findOne.mockResolvedValueOnce(null);
     await expect(
-      service.linkWallet("missing@test.com", "0xnew"),
+      service.linkWallet("missing@test.com", testWallet.address, sig),
     ).rejects.toMatchObject({
       statusCode: 404,
       message: ERROR_MESSAGES.USER_NOT_FOUND,
@@ -337,6 +356,10 @@ describe("UsersService", () => {
   });
 
   it("linkWallet updates custody mode to self", async () => {
+    const testWallet = new ethers.Wallet("0x" + "aa".repeat(32));
+    const sig = await testWallet.signMessage(
+      "Link wallet to Triolith: user@test.com",
+    );
     const user = {
       id: "u1",
       email: "user@test.com",
@@ -346,12 +369,12 @@ describe("UsersService", () => {
     };
     userRepo.findOne.mockResolvedValueOnce(user);
 
-    await expect(service.linkWallet("user@test.com", "0xnew")).resolves.toEqual(
-      {
-        message: "Wallet linked successfully",
-      },
-    );
-    expect(user.walletAddress).toBe("0xnew");
+    await expect(
+      service.linkWallet("user@test.com", testWallet.address, sig),
+    ).resolves.toEqual({
+      message: "Wallet linked successfully",
+    });
+    expect(user.walletAddress).toBe(testWallet.address);
     expect(user.custodyMode).toBe("self");
     expect(user.encryptedPrivateKey).toBeNull();
     expect(userRepo.save).toHaveBeenCalledWith(user);

@@ -33,7 +33,11 @@ export class UsersController {
   @Post("link-wallet")
   @Throttle({ auth: { limit: 10, ttl: 60000 } })
   async linkWallet(@Body() body: LinkWalletDto) {
-    return this.usersService.linkWallet(body.email, body.walletAddress);
+    return this.usersService.linkWallet(
+      body.email,
+      body.walletAddress,
+      body.signature,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

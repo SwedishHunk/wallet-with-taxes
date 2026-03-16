@@ -43,7 +43,8 @@ export default function Login() {
     try {
       const { data } = await login(studioEmail, studioPassword);
       setAuthToken(data.token);
-      localStorage.setItem("token", data.token);
+      // sessionStorage: token clears on tab/browser close, reducing XSS persistence window
+      sessionStorage.setItem("token", data.token);
 
       let studioId = data.user.studioId;
       let studioName = data.user.email;

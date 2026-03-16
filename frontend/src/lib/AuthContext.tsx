@@ -32,6 +32,10 @@ const STUDIO_SESSION_KEY = "studio_session";
 const MEMBER_SESSION_KEY = "member_session";
 const ACTIVE_GAME_KEY = "activeGame";
 
+// Use sessionStorage so auth data is cleared when the browser tab/window closes,
+// reducing the persistence window for XSS-based session theft.
+const store = sessionStorage;
+
 interface ActiveGame {
   gameId: string;
   name: string;
@@ -40,17 +44,35 @@ interface ActiveGame {
 
 // Migration: Move old keys to new ones
 function migrateOldKeys() {
-  const oldStudio = localStorage.getItem("lia_studio_session");
-  const oldMember = localStorage.getItem("lia_member_session");
-  if (oldStudio) {
-    localStorage.setItem(STUDIO_SESSION_KEY, oldStudio);
-    localStorage.removeItem("lia_studio_session");
-    console.log("[AuthContext] Migrated lia_studio_session → studio_session");
+  // Also check localStorage for sessions written before the sessionStorage migration
+  const sources = [localStorage, sessionStorage];
+  for (const src of sources) {
+    const oldStudio = src.getItem("lia_studio_session");
+    const oldMember = src.getItem("lia_member_session");
+    if (oldStudio) {
+      store.setItem(STUDIO_SESSION_KEY, oldStudio);
+      src.removeItem("lia_studio_session");
+    }
+    if (oldMember) {
+      store.setItem(MEMBER_SESSION_KEY, oldMember);
+      src.removeItem("lia_member_session");
+    }
   }
-  if (oldMember) {
-    localStorage.setItem(MEMBER_SESSION_KEY, oldMember);
-    localStorage.removeItem("lia_member_session");
-    console.log("[AuthContext] Migrated lia_member_session → member_session");
+  // Move any leftover localStorage sessions to sessionStorage
+  const lsStudio = localStorage.getItem(STUDIO_SESSION_KEY);
+  const lsMember = localStorage.getItem(MEMBER_SESSION_KEY);
+  const lsGame = localStorage.getItem(ACTIVE_GAME_KEY);
+  if (lsStudio) {
+    store.setItem(STUDIO_SESSION_KEY, lsStudio);
+    localStorage.removeItem(STUDIO_SESSION_KEY);
+  }
+  if (lsMember) {
+    store.setItem(MEMBER_SESSION_KEY, lsMember);
+    localStorage.removeItem(MEMBER_SESSION_KEY);
+  }
+  if (lsGame) {
+    store.setItem(ACTIVE_GAME_KEY, lsGame);
+    localStorage.removeItem(ACTIVE_GAME_KEY);
   }
 }
 
@@ -108,14 +130,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [membersCount, setMembersCount] = useState<number | null>(null);
   const [activeGame, setActiveGameState] = useState<ActiveGame | null>(null);
 
-  // Load sessions from localStorage on mount
+  // Load sessions from sessionStorage on mount
   useEffect(() => {
     try {
-      // Migrate old keys first
+      // Migrate old keys first (also moves localStorage → sessionStorage)
       migrateOldKeys();
 
-      const savedStudio = localStorage.getItem(STUDIO_SESSION_KEY);
-      const savedMember = localStorage.getItem(MEMBER_SESSION_KEY);
+      const savedStudio = store.getItem(STUDIO_SESSION_KEY);
+      const savedMember = store.getItem(MEMBER_SESSION_KEY);
 
       if (savedStudio) {
         try {
@@ -123,11 +145,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (parsedStudio?.studioId) {
             setStudioSessionState(parsedStudio);
           } else {
-            localStorage.removeItem(STUDIO_SESSION_KEY);
+            store.removeItem(STUDIO_SESSION_KEY);
           }
         } catch {
           console.warn("[AuthContext] Corrupted studio_session — clearing");
-          localStorage.removeItem(STUDIO_SESSION_KEY);
+          store.removeItem(STUDIO_SESSION_KEY);
         }
       }
 
@@ -137,30 +159,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (parsedMember?.memberId && parsedMember?.studioId) {
             setMemberSessionState(parsedMember);
           } else {
-            localStorage.removeItem(MEMBER_SESSION_KEY);
+            store.removeItem(MEMBER_SESSION_KEY);
           }
         } catch {
           console.warn("[AuthContext] Corrupted member_session — clearing");
-          localStorage.removeItem(MEMBER_SESSION_KEY);
+          store.removeItem(MEMBER_SESSION_KEY);
         }
       }
 
-      const savedGame = localStorage.getItem(ACTIVE_GAME_KEY);
+      const savedGame = store.getItem(ACTIVE_GAME_KEY);
       if (savedGame) {
         try {
           const parsedGame = JSON.parse(savedGame);
           if (parsedGame?.gameId && parsedGame?.name && parsedGame?.slug) {
             setActiveGameState(parsedGame);
           } else {
-            localStorage.removeItem(ACTIVE_GAME_KEY);
+            store.removeItem(ACTIVE_GAME_KEY);
           }
         } catch {
           console.warn("[AuthContext] Corrupted activeGame — clearing");
-          localStorage.removeItem(ACTIVE_GAME_KEY);
+          store.removeItem(ACTIVE_GAME_KEY);
         }
       }
     } catch (error) {
-      console.error("Failed to load auth sessions from localStorage:", error);
+      console.error("Failed to load auth sessions from sessionStorage:", error);
     } finally {
       setIsLoading(false);
     }
@@ -243,7 +265,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const { data } = await getMemberSession(studioSession.studioId);
           setMemberSessionState(data);
-          localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(data));
+          store.setItem(MEMBER_SESSION_KEY, JSON.stringify(data));
           console.log("[AuthContext] Owner auto-activated");
         } catch (err) {
           console.warn("[AuthContext] Failed to auto-activate owner:", err);
@@ -252,18 +274,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [studioSession, memberSession, membersCount, isLoading]);
 
-  // Persist studio session to localStorage AND load members count
+  // Persist studio session to sessionStorage AND load members count
   const setStudioSession = (session: StudioSession | null) => {
     const previousStudioId = studioSession?.studioId ?? null;
     const nextStudioId = session?.studioId ?? null;
     const studioChanged = previousStudioId !== nextStudioId;
 
     if (session) {
-      localStorage.setItem(STUDIO_SESSION_KEY, JSON.stringify(session));
+      store.setItem(STUDIO_SESSION_KEY, JSON.stringify(session));
       setStudioSessionState(session);
 
       if (studioChanged) {
-        localStorage.removeItem(ACTIVE_GAME_KEY);
+        store.removeItem(ACTIVE_GAME_KEY);
         setActiveGameState(null);
       }
 
@@ -282,22 +304,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       })();
     } else {
-      localStorage.removeItem(STUDIO_SESSION_KEY);
+      store.removeItem(STUDIO_SESSION_KEY);
       setStudioSessionState(null);
       setMembersCount(null); // Reset count when studio is cleared
-      localStorage.removeItem(ACTIVE_GAME_KEY);
+      store.removeItem(ACTIVE_GAME_KEY);
       setActiveGameState(null);
     }
   };
 
-  // Persist member session to localStorage
+  // Persist member session to sessionStorage
   const setMemberSession = (session: MemberSession | null) => {
     console.log("[AuthContext] setMemberSession:", session);
     if (session) {
-      localStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session));
+      store.setItem(MEMBER_SESSION_KEY, JSON.stringify(session));
       setMemberSessionState(session);
     } else {
-      localStorage.removeItem(MEMBER_SESSION_KEY);
+      store.removeItem(MEMBER_SESSION_KEY);
       setMemberSessionState(null);
     }
   };
@@ -307,7 +329,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logoutStudio = () => {
     setStudioSession(null);
     setMemberSession(null);
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setAuthToken(null);
     window.location.href = "/login";
   };
@@ -320,13 +342,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.location.href = "/dashboard";
   };
 
-  // Set active game (persists to localStorage)
+  // Set active game (persists to sessionStorage)
   const setActiveGame = (game: ActiveGame | null) => {
     if (game) {
-      localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify(game));
+      store.setItem(ACTIVE_GAME_KEY, JSON.stringify(game));
       setActiveGameState(game);
     } else {
-      localStorage.removeItem(ACTIVE_GAME_KEY);
+      store.removeItem(ACTIVE_GAME_KEY);
       setActiveGameState(null);
     }
   };

@@ -11,8 +11,8 @@ import { Studio } from "./entities/studio.entity";
 import { User } from "../users/user.entity";
 import { StudioMemberService } from "./studio-member.service";
 import * as bcrypt from "bcryptjs";
-import * as crypto from "crypto";
 import { ethers } from "ethers";
+import { encryptPrivateKey } from "../shared/crypto.util";
 
 export interface CreateMemberRequestDto {
   email: string;
@@ -127,18 +127,15 @@ export class StudiosService {
       const wallet = ethers.Wallet.createRandom();
 
       const encryptionKey = process.env.ENCRYPTION_KEY;
-      const encryptionIv = process.env.ENCRYPTION_IV;
-      if (!encryptionKey || !encryptionIv) {
-        throw new Error("Encryption config missing");
+      if (!encryptionKey) {
+        throw new Error("ENCRYPTION_KEY env var is missing");
       }
 
-      const cipher = crypto.createCipheriv(
-        "aes-256-cbc",
-        Buffer.from(encryptionKey, "utf8"),
-        Buffer.from(encryptionIv, "utf8"),
+      // AES-256-GCM: random IV per wallet — eliminates static-IV ciphertext reuse
+      const encryptedPrivateKey = encryptPrivateKey(
+        wallet.privateKey,
+        encryptionKey,
       );
-      const encryptedPrivateKey =
-        cipher.update(wallet.privateKey, "utf8", "hex") + cipher.final("hex");
 
       user = this.userRepository.create({
         email: dto.email,
