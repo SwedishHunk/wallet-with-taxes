@@ -1,6 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
+import { InjectRepository } from "@nestjs/typeorm";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import { Repository } from "typeorm";
+import { User } from "../users/user.entity";
 
 type JwtPayload = {
   id: string;
@@ -12,7 +15,10 @@ type JwtPayload = {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+  ) {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       throw new Error("JWT_SECRET environment variable is required");
@@ -25,7 +31,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload) {
+    // Check suspension on every request so that admin-suspended users are
+    // blocked immediately rather than only at next login.
+    const user = await this.userRepo.findOne({
+      where: { id: payload.id },
+      select: ["id", "isSuspended"],
+    });
+
+    if (!user || user.isSuspended === true) {
+      throw new UnauthorizedException(
+        "Account is suspended or does not exist",
+      );
+    }
+
     return {
       id: payload.id,
       email: payload.email,

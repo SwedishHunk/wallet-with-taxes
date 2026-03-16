@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { User } from "../users/user.entity";
@@ -211,6 +211,9 @@ export class AdminService {
     adminId: string,
     adminEmail: string,
   ) {
+    if (id === adminId && isSuspended === true) {
+      throw new BadRequestException("Cannot suspend your own admin account");
+    }
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.update(id, { isSuspended });
@@ -248,6 +251,9 @@ export class AdminService {
   }
 
   async deleteUser(id: string, adminId: string, adminEmail: string) {
+    if (id === adminId) {
+      throw new BadRequestException("Cannot delete your own admin account");
+    }
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.delete(id);

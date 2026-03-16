@@ -34,7 +34,7 @@ export default function PersonalAccounts() {
   >({});
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
   const handleLogoutPersonal = () => {
     // Clear form and reset to fresh state
     setEmail("");

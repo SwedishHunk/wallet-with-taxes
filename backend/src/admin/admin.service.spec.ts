@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { AdminService } from "./admin.service";
 
 function makeQuery(raw: unknown) {
@@ -248,6 +248,13 @@ describe("AdminService", () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it("setUserSuspended throws BadRequestException when admin tries to suspend themselves", async () => {
+    const { service } = makeService();
+    await expect(
+      service.setUserSuspended(ADMIN.id, true, ADMIN.id, ADMIN.email),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it("deleteUser removes user and writes audit", async () => {
     const { service, userRepo } = makeService();
     userRepo.findOne.mockResolvedValue({ id: "u1" });
@@ -263,6 +270,13 @@ describe("AdminService", () => {
     await expect(
       service.deleteUser("x", ADMIN.id, ADMIN.email),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it("deleteUser throws BadRequestException when admin tries to delete themselves", async () => {
+    const { service } = makeService();
+    await expect(
+      service.deleteUser(ADMIN.id, ADMIN.id, ADMIN.email),
+    ).rejects.toThrow(BadRequestException);
   });
 
   // ── platform fee ───────────────────────────────────────────

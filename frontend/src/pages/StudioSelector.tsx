@@ -28,7 +28,7 @@ export default function StudioSelector() {
       return;
     }
 
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
     if (!token) {
       navigate(ROUTES.root);
       return;

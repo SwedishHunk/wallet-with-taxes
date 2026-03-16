@@ -1,10 +1,10 @@
 import {
   IsEmail,
+  IsEthereumAddress,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
-  IsEthereumAddress,
 } from "class-validator";
 
 export class SignupDto {
@@ -40,4 +40,15 @@ export class LinkWalletDto {
 
   @IsEthereumAddress()
   walletAddress: string;
+
+  /**
+   * EIP-191 personal_sign of the message:
+   *   "Link wallet to Triolith: <email>"
+   * The signature must be produced by the private key of `walletAddress`.
+   * This proves the caller controls the destination wallet before we destroy
+   * the existing custodial key.
+   */
+  @IsString()
+  @IsNotEmpty()
+  signature: string;
 }
