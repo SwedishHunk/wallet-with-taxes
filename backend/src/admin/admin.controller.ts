@@ -161,10 +161,7 @@ export class AdminController {
 
   @Patch("games/:id/status")
   @UseGuards(TriolithGuard)
-  async setGameStatus(
-    @Param("id") id: string,
-    @Body() body: SetGameStatusDto,
-  ) {
+  async setGameStatus(@Param("id") id: string, @Body() body: SetGameStatusDto) {
     return this.adminService.setGameStatus(id, body.status);
   }
 

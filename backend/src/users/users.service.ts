@@ -272,9 +272,7 @@ export class UsersService {
           studio = await this.studioRepository.save(studio);
           console.log(`Created new studio ${studio.id} for user ${user.id}`);
         } else {
-          console.log(
-            `Studio ${studio.id} already exists for user ${user.id}`,
-          );
+          console.log(`Studio ${studio.id} already exists for user ${user.id}`);
         }
 
         // Check if membership already exists before creating

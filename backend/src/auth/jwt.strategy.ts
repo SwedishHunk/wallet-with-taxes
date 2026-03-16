@@ -40,9 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user || user.isSuspended === true) {
-      throw new UnauthorizedException(
-        "Account is suspended or does not exist",
-      );
+      throw new UnauthorizedException("Account is suspended or does not exist");
     }
 
     return {

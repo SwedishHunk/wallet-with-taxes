@@ -1,3 +1,4 @@
+import * as nodeCrypto from "crypto";
 import { decryptPrivateKey, encryptPrivateKey } from "./crypto.util";
 
 const KEY_32 = "12345678901234567890123456789012"; // 32 UTF-8 bytes
@@ -20,10 +21,9 @@ describe("crypto.util", () => {
 
   it("decrypts legacy AES-CBC ciphertext with legacyIv", () => {
     // Produce a CBC ciphertext manually to test backward compat
-    const crypto = require("crypto") as typeof import("crypto");
     const key = Buffer.from(KEY_32, "utf8");
     const iv = Buffer.from(LEGACY_IV, "utf8");
-    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+    const cipher = nodeCrypto.createCipheriv("aes-256-cbc", key, iv);
     const plaintext = "0x" + "c".repeat(64);
     const cbcCipher =
       cipher.update(plaintext, "utf8", "hex") + cipher.final("hex");
