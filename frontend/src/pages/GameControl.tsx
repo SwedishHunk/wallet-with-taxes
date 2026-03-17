@@ -85,7 +85,7 @@ export function GameControl() {
   }, [gameId, navigate]);
 
   const handlePersonalLogout = () => {
-    localStorage.removeItem("personalUser");
+    sessionStorage.removeItem("personalUser");
     navigate(ROUTES.accountLogin);
   };
 

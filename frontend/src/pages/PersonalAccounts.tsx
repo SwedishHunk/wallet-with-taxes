@@ -43,7 +43,7 @@ export default function PersonalAccounts() {
     setEditingId(null);
     setEditAccessPoints({});
   };
-  const personalUser = localStorage.getItem("personalUser");
+  const personalUser = sessionStorage.getItem("personalUser");
 
   useEffect(() => {
     if (!token) {

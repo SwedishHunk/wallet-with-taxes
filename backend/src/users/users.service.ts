@@ -244,49 +244,7 @@ export class UsersService {
 
       // Auto-migrate old users without studios
       if (!membership) {
-        // Check if a studio with this name already exists
-        let studio = await this.studioRepository.findOne({
-          where: { name: user.email },
-        });
-
-        // If it doesn't exist, create it
-        if (!studio) {
-          studio = this.studioRepository.create({
-            name: user.email,
-            email: user.email,
-            walletAddress: user.walletAddress,
-          });
-          studio = await this.studioRepository.save(studio);
-          this.logger.debug(
-            `Created new studio ${studio.id} for user ${user.id}`,
-          );
-        } else {
-          this.logger.debug(
-            `Studio ${studio.id} already exists for user ${user.id}`,
-          );
-        }
-
-        // Check if membership already exists before creating
-        const existingMembership = await this.studioMemberRepository.findOne({
-          where: { studio: { id: studio.id }, user: { id: user.id } },
-          relations: ["studio"],
-        });
-
-        if (!existingMembership) {
-          // Create membership via StudioMemberService (sets isOwner + permissions)
-          membership = await this.studioMemberService.createBootstrapOwner(
-            studio,
-            user,
-          );
-          this.logger.debug(
-            `Created bootstrap owner membership for user ${user.id} in studio ${studio.id}`,
-          );
-        } else {
-          membership = existingMembership;
-          this.logger.debug(
-            `Membership already exists for user ${user.id} in studio ${studio.id}`,
-          );
-        }
+        membership = await this.autoMigrateOrphanUser(user);
       }
 
       if (membership) {
@@ -355,6 +313,53 @@ export class UsersService {
     await this.userRepository.save(user);
     return { message: "Wallet linked successfully" };
   }
+  /**
+   * Creates a studio + bootstrap-owner membership for legacy users that exist
+   * in the database but were created before the studio model was introduced.
+   * Extracted from login() so that auth stays pure and the migration path
+   * is independently testable and readable.
+   */
+  private async autoMigrateOrphanUser(user: User): Promise<StudioMember> {
+    let studio = await this.studioRepository.findOne({
+      where: { name: user.email },
+    });
+
+    if (!studio) {
+      studio = this.studioRepository.create({
+        name: user.email,
+        email: user.email,
+        walletAddress: user.walletAddress,
+      });
+      studio = await this.studioRepository.save(studio);
+      this.logger.debug(`Created new studio ${studio.id} for user ${user.id}`);
+    } else {
+      this.logger.debug(
+        `Studio ${studio.id} already exists for user ${user.id}`,
+      );
+    }
+
+    const existingMembership = await this.studioMemberRepository.findOne({
+      where: { studio: { id: studio.id }, user: { id: user.id } },
+      relations: ["studio"],
+    });
+
+    if (existingMembership) {
+      this.logger.debug(
+        `Membership already exists for user ${user.id} in studio ${studio.id}`,
+      );
+      return existingMembership;
+    }
+
+    const membership = await this.studioMemberService.createBootstrapOwner(
+      studio,
+      user,
+    );
+    this.logger.debug(
+      `Created bootstrap owner membership for user ${user.id} in studio ${studio.id}`,
+    );
+    return membership;
+  }
+
   async findById(id: string) {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) return null;

@@ -70,8 +70,9 @@ export default function PersonalAccountLogin() {
     try {
       const response = await loginPersonalAccount({ email, password });
 
-      // Store the personal account info in localStorage
-      localStorage.setItem(
+      // Store the personal account info in sessionStorage (never localStorage —
+      // sessionStorage is not readable by XSS payloads in other tabs/windows).
+      sessionStorage.setItem(
         "personalUser",
         JSON.stringify({
           id: response.data.id,

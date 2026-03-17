@@ -72,7 +72,7 @@ export default function HomePage() {
   const handleLogoutAll = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("studioId");
-    localStorage.removeItem("personalUser");
+    sessionStorage.removeItem("personalUser");
     setAuthToken(null);
     navigate(ROUTES.root);
   };

@@ -4,7 +4,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { UsersModule } from "./users/users.module";
 import { WalletsModule } from "./wallets/wallets.module";
-// import { MarketplaceModule } from "./marketplace/marketplace.module";
+import { MarketplaceModule } from "./marketplace/marketplace.module";
 import { TaxModule } from "./tax/tax.module";
 import { PaymentsModule } from "./__payments/payments.module";
 import { AssetsModule } from "./__assets/assets.module";
@@ -56,7 +56,7 @@ const shouldSynchronizeSchema = isTestEnv;
     }),
     UsersModule,
     WalletsModule,
-    // MarketplaceModule, // Temporarily disabled - has TypeScript errors
+    MarketplaceModule,
     TaxModule,
     PaymentsModule,
     AssetsModule,
