@@ -11,7 +11,10 @@ import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { PlatformService } from "./platform.service";
-import { ApiPlatformController, PlatformController } from "./platform.controller";
+import {
+  ApiPlatformController,
+  PlatformController,
+} from "./platform.controller";
 import { StudiosController } from "./studios.controller";
 import { StudioMemberService } from "./studio-member.service";
 import { StudiosService } from "./studios.service";
