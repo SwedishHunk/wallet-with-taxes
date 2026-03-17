@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { ForbiddenException } from "@nestjs/common";
-import { PlatformController } from "./platform.controller";
+import { PlatformController, ApiPlatformController } from "./platform.controller";
 
 function req(user: { id: string; studioId: string; role: string }) {
   return { user } as never;
@@ -222,6 +222,13 @@ describe("PlatformController", () => {
         { accessPoints: ["wallet"] } as never,
       ),
     ).toThrow(ForbiddenException);
+  });
+
+  it("ApiPlatformController.getPublicGames delegates to getPublicGameList", () => {
+    const svc = { getPublicGameList: jest.fn().mockReturnValue([]) };
+    const apiController = new ApiPlatformController(svc as never);
+    apiController.getPublicGames();
+    expect(svc.getPublicGameList).toHaveBeenCalled();
   });
 
   it("delegates personal account endpoints for owner", () => {
