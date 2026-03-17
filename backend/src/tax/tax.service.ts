@@ -40,7 +40,11 @@ export class TaxService {
       saved.assetAddress &&
       (saved.type === "acquisition" || saved.type === "disposal")
     ) {
-      await this.updateCostBasis(saved);
+      try {
+        await this.updateCostBasis(saved);
+      } catch {
+        // Table may not exist yet — skip silently
+      }
     }
 
     return saved;
@@ -56,26 +60,30 @@ export class TaxService {
     const normalizedAddress = userAddress.toLowerCase();
 
     // Try optimized path: read from cost-basis table
-    const bases = await this.costBasisRepo.find({
-      where: { userAddress: normalizedAddress },
-    });
+    try {
+      const bases = await this.costBasisRepo.find({
+        where: { userAddress: normalizedAddress },
+      });
 
-    if (bases.length > 0) {
-      let totalGainsUSD = 0;
-      let totalLossesUSD = 0;
-      for (const b of bases) {
-        totalGainsUSD += Number(b.realizedGains);
-        totalLossesUSD += Number(b.realizedLosses);
+      if (bases.length > 0) {
+        let totalGainsUSD = 0;
+        let totalLossesUSD = 0;
+        for (const b of bases) {
+          totalGainsUSD += Number(b.realizedGains);
+          totalLossesUSD += Number(b.realizedLosses);
+        }
+        const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
+        const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
+
+        return {
+          totalGainsUSD: +totalGainsUSD.toFixed(2),
+          totalLossesUSD: +totalLossesUSD.toFixed(2),
+          adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
+          netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
+        };
       }
-      const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
-      const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
-
-      return {
-        totalGainsUSD: +totalGainsUSD.toFixed(2),
-        totalLossesUSD: +totalLossesUSD.toFixed(2),
-        adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
-        netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
-      };
+    } catch {
+      // Table may not exist yet — fall through to legacy path
     }
 
     // Fallback: legacy in-memory calculation (for pre-existing data)
