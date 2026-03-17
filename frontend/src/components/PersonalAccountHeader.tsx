@@ -22,7 +22,7 @@ export default function PersonalAccountHeader({
   const navigate = useNavigate();
 
   useEffect(() => {
-    const stored = localStorage.getItem("personalUser");
+    const stored = sessionStorage.getItem("personalUser");
     if (stored) {
       try {
         setPersonalUser(JSON.parse(stored));
@@ -56,7 +56,7 @@ export default function PersonalAccountHeader({
   }, [studioName]);
 
   const handleLogout = () => {
-    localStorage.removeItem("personalUser");
+    sessionStorage.removeItem("personalUser");
     setShowNotification(true);
 
     // Wait 1 second to show notification, then redirect

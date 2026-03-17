@@ -14,8 +14,17 @@ type JwtPayload = {
   isAdmin: boolean;
 };
 
+// Per-process suspension cache: reduces one DB query → zero on cache hit.
+// TTL of 60 s means a newly suspended user is blocked within 1 minute —
+// acceptable for most operational scenarios. For immediate propagation
+// (e.g. security incident), a shared Redis cache would be needed.
+type SuspensionEntry = { suspended: boolean; expiresAt: number };
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly suspensionCache = new Map<string, SuspensionEntry>();
+  private readonly CACHE_TTL_MS = 60_000; // 1 minute
+
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -33,15 +42,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Check suspension on every request so that admin-suspended users are
-    // blocked immediately rather than only at next login.
-    const user = await this.userRepo.findOne({
-      where: { id: payload.id },
-      select: ["id", "isSuspended"],
-    });
+    // Check suspension on every request so admin-suspended users are blocked
+    // quickly. The in-process cache avoids one DB round-trip per request;
+    // entries expire after 60 s so suspension takes effect within 1 minute.
+    const now = Date.now();
+    const cached = this.suspensionCache.get(payload.id);
 
-    if (!user || user.isSuspended === true) {
-      throw new UnauthorizedException("Account is suspended or does not exist");
+    let isSuspended: boolean;
+    if (cached && cached.expiresAt > now) {
+      isSuspended = cached.suspended;
+    } else {
+      const user = await this.userRepo.findOne({
+        where: { id: payload.id },
+        select: ["id", "isSuspended"],
+      });
+      if (!user) {
+        throw new UnauthorizedException("Account does not exist");
+      }
+      isSuspended = user.isSuspended === true;
+      this.suspensionCache.set(payload.id, {
+        suspended: isSuspended,
+        expiresAt: now + this.CACHE_TTL_MS,
+      });
+    }
+
+    if (isSuspended) {
+      throw new UnauthorizedException("Account is suspended");
     }
 
     return {

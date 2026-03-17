@@ -52,6 +52,9 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
   private readonly ethUsdSnapshot = this.parsePositiveNumber(
     process.env.TOKENSHOP_ETH_USD,
   );
+  // Timestamp of when this process loaded the env-var snapshot.
+  // Operators should compare this against the current time to judge staleness.
+  private readonly ethUsdSnapshotAt = new Date();
 
   private timer: NodeJS.Timeout | null = null;
   private syncInProgress = false;
@@ -76,6 +79,18 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     if (process.env.NODE_ENV === "test") {
       return;
+    }
+
+    if (this.ethUsdSnapshot !== null) {
+      this.logger.warn(
+        `ETH/USD price snapshot loaded from env: $${this.ethUsdSnapshot} ` +
+          `(set at process start ${this.ethUsdSnapshotAt.toISOString()}). ` +
+          `Update TOKENSHOP_ETH_USD and restart to refresh.`,
+      );
+    } else {
+      this.logger.warn(
+        "TOKENSHOP_ETH_USD is not set — USD-denominated tax events will have no priceUSD.",
+      );
     }
 
     if (!this.provider || !this.contract || !this.tokenShopAddress) {

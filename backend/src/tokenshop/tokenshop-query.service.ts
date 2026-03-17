@@ -8,6 +8,10 @@ import { ERC20_ABI } from "./tokenshop.abi";
 
 @Injectable()
 export class TokenShopQueryService {
+  // Record the process start time so callers can see how stale the env-var
+  // price snapshot is without needing access to the listener service.
+  private readonly ethUsdSnapshotAt = new Date().toISOString();
+
   constructor(
     private readonly chainService: TokenShopChainService,
     @InjectRepository(ShopEvent)
@@ -61,6 +65,7 @@ export class TokenShopQueryService {
           ethUsd !== null || usdSek !== null
             ? "manual_env_snapshot"
             : "unconfigured",
+        snapshotLoadedAt: this.ethUsdSnapshotAt,
       },
       genTotalSupply: totalSupply,
     };
