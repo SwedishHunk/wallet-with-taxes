@@ -5,7 +5,13 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Contract, ethers, JsonRpcProvider, Log, WebSocketProvider } from "ethers";
+import {
+  Contract,
+  ethers,
+  JsonRpcProvider,
+  Log,
+  WebSocketProvider,
+} from "ethers";
 import { DataSource, Repository } from "typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { ShopEvent } from "./entities/shop-event.entity";
@@ -104,9 +110,7 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
         this.schedule();
       }
     } else {
-      this.logger.log(
-        "No WS_RPC_URL configured — using polling mode",
-      );
+      this.logger.log("No WS_RPC_URL configured — using polling mode");
       this.schedule();
     }
   }
@@ -152,28 +156,13 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     });
 
     // Handle disconnection: fall back to polling
-    this.wsProvider.on("error", () => {
-      this.logger.warn(
-        "WebSocket error — falling back to polling",
-      );
+    void this.wsProvider.on("error", () => {
+      this.logger.warn("WebSocket error — falling back to polling");
       this.usingWebSocket = false;
       this.wsContract = null;
       this.wsProvider = null;
       this.schedule();
     });
-
-    // Also listen for the underlying socket close via the provider's destroy
-    const originalDestroy = this.wsProvider.destroy.bind(this.wsProvider);
-    this.wsProvider.destroy = async () => {
-      if (this.usingWebSocket) {
-        this.logger.warn("WebSocket disconnected — falling back to polling");
-        this.usingWebSocket = false;
-        this.wsContract = null;
-        this.wsProvider = null;
-        this.schedule();
-      }
-      return originalDestroy();
-    };
 
     this.usingWebSocket = true;
     this.logger.log(

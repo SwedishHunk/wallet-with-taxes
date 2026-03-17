@@ -464,7 +464,10 @@ export class PlatformService {
 
         const amountNum = parseFloat(intent.amount);
         lockedWallet.balance = safeAdd(lockedWallet.balance, amountNum);
-        lockedWallet.totalDeposited = safeAdd(lockedWallet.totalDeposited, amountNum);
+        lockedWallet.totalDeposited = safeAdd(
+          lockedWallet.totalDeposited,
+          amountNum,
+        );
         const savedWallet = await walletRepo.save(lockedWallet);
 
         intent.status = WalletDepositIntentStatus.CONFIRMED;
@@ -620,12 +623,18 @@ export class PlatformService {
 
       // Update sender wallet
       lockedFromWallet.balance = safeSub(lockedFromWallet.balance, amountNum);
-      lockedFromWallet.totalWithdrawn = safeAdd(lockedFromWallet.totalWithdrawn, amountNum);
+      lockedFromWallet.totalWithdrawn = safeAdd(
+        lockedFromWallet.totalWithdrawn,
+        amountNum,
+      );
       const savedFromWallet = await walletRepo.save(lockedFromWallet);
 
       // Update recipient wallet
       lockedToWallet.balance = safeAdd(lockedToWallet.balance, amountNum);
-      lockedToWallet.totalDeposited = safeAdd(lockedToWallet.totalDeposited, amountNum);
+      lockedToWallet.totalDeposited = safeAdd(
+        lockedToWallet.totalDeposited,
+        amountNum,
+      );
       const savedToWallet = await walletRepo.save(lockedToWallet);
 
       // Create ledger entry for sender

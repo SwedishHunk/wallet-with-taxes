@@ -238,7 +238,9 @@ export class AdminService {
     const config = await this.platformConfigRepo.findOne({
       where: { key: "platform_fee_percent" },
     });
-    return { feePercent: Number(config?.value ?? DEFAULT_PLATFORM_FEE_PERCENT) };
+    return {
+      feePercent: Number(config?.value ?? DEFAULT_PLATFORM_FEE_PERCENT),
+    };
   }
 
   async setPlatformFee(

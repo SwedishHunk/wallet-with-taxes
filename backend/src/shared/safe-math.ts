@@ -33,7 +33,9 @@ function trimTrailingZeros(value: string): string {
 export function safeAdd(balance: string, amount: number): string {
   const balanceInt = Math.round(parseFloat(balance) * PRECISION);
   const amountInt = Math.round(amount * PRECISION);
-  return trimTrailingZeros(((balanceInt + amountInt) / PRECISION).toFixed(DECIMAL_PLACES));
+  return trimTrailingZeros(
+    ((balanceInt + amountInt) / PRECISION).toFixed(DECIMAL_PLACES),
+  );
 }
 
 /**
@@ -43,5 +45,7 @@ export function safeAdd(balance: string, amount: number): string {
 export function safeSub(balance: string, amount: number): string {
   const balanceInt = Math.round(parseFloat(balance) * PRECISION);
   const amountInt = Math.round(amount * PRECISION);
-  return trimTrailingZeros(((balanceInt - amountInt) / PRECISION).toFixed(DECIMAL_PLACES));
+  return trimTrailingZeros(
+    ((balanceInt - amountInt) / PRECISION).toFixed(DECIMAL_PLACES),
+  );
 }
