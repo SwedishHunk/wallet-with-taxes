@@ -227,6 +227,13 @@ describe("PlatformController", () => {
     ).toThrow(ForbiddenException);
   });
 
+  it("ApiPlatformController.getPublicGames delegates to getPublicGameList", () => {
+    const svc = { getPublicGameList: jest.fn().mockReturnValue([]) };
+    const apiController = new ApiPlatformController(svc as never);
+    apiController.getPublicGames();
+    expect(svc.getPublicGameList).toHaveBeenCalled();
+  });
+
   it("delegates personal account endpoints for owner", () => {
     controller.createPersonalAccount(
       req({ id: "u1", studioId: "s1", role: "owner" }),

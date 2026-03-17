@@ -218,14 +218,13 @@ export default function TriolithAdminPage() {
 
     fetchTx();
 
-    // Retry after 2 s to catch the sync-in-progress race condition where a
-    // trade was just confirmed and the listener hadn't finished writing yet.
+    // Retry after 2 s to catch sync-in-progress race condition.
     const retry = setTimeout(fetchTx, 2000);
 
-    // Poll every 15 s so new transactions appear quickly.
+    // Auto-refresh every 15 s.
     const interval = setInterval(fetchTx, 15_000);
 
-    // Refresh immediately whenever the tab becomes visible again.
+    // Refresh when the tab becomes visible again.
     function onVisible() {
       if (document.visibilityState === "visible") fetchTx();
     }

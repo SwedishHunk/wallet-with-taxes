@@ -1351,6 +1351,7 @@ describe("PlatformService", () => {
       "NFT template not found",
     );
   });
+
   it("createGameForUser appends random suffix when scoped slug also collides", async () => {
     studioRepo.findOne.mockResolvedValueOnce({ id: "studio-abcdef12" });
     gameRepo.findOne
@@ -1359,8 +1360,8 @@ describe("PlatformService", () => {
         id: "g-other",
         slug: "game",
         studio: { id: "s2" },
-      }) // global conflict -> build scoped slug
-      .mockResolvedValueOnce({ id: "g-scoped", slug: "game-studio-a" }) // scoped slug taken -> enter while body
+      }) // global conflict → build scoped slug
+      .mockResolvedValueOnce({ id: "g-scoped", slug: "game-studio-a" }) // scoped slug taken → enter while body
       .mockResolvedValueOnce(null); // UUID-suffixed slug is free
     gameRepo.create.mockImplementationOnce((x) => x);
     gameRepo.save.mockImplementationOnce(async (x) => ({ id: "g2", ...x }));

@@ -217,11 +217,6 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async syncNow() {
-    // If a background poll is in progress, wait for it to finish before
-    // running our own sync so we don't miss the latest block.
-    if (this.syncInProgress) {
-      await this.waitForSyncIdle();
-    }
     await this.syncOnce();
     const syncState = await this.getOrCreateSyncState();
 
@@ -229,13 +224,6 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       status: "ok",
       lastSyncedBlock: Number(syncState.lastSyncedBlock),
     };
-  }
-
-  private async waitForSyncIdle(maxWaitMs = 6000): Promise<void> {
-    const deadline = Date.now() + maxWaitMs;
-    while (this.syncInProgress && Date.now() < deadline) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
-    }
   }
 
   private async syncOnce() {
@@ -253,9 +241,8 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       const syncState = await this.getOrCreateSyncState();
       let fromBlock = Number(syncState.lastSyncedBlock) + 1;
 
-      // Detect chain restart (e.g. Anvil was wiped): if the DB says we
-      // already synced past the current chain tip, the chain was reset.
-      // Reset to block 0 so we re-index all events from genesis.
+      // Detect chain restart (e.g. Anvil wiped): DB says we synced past the
+      // current chain tip. Reset to 0 so all events are re-indexed.
       if (Number(syncState.lastSyncedBlock) > latestBlock) {
         this.logger.warn(
           `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +

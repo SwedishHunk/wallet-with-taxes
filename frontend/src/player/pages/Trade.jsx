@@ -90,6 +90,7 @@ export default function Trade() {
         name: game.name,
         slug: game.slug,
       }));
+
       setAvailableGames(mappedGames);
     } catch (error) {
       console.error("Failed to load games for trade scope selector:", error);
@@ -408,8 +409,6 @@ export default function Trade() {
       setQuote(null);
 
       // Sync backend (index new event), then refresh asset data.
-      // triggerSync() waits for any in-progress background poll to finish
-      // before running its own sync, so we get fresh data on first refresh.
       try {
         await triggerSync();
         refreshAssets();
@@ -419,10 +418,9 @@ export default function Trade() {
         // sync failed silently — not critical
       }
 
-      // Second sync after 2 s: catches the edge case where the node needed
-      // an extra moment to make the block available to queryFilter.
-      // This also ensures the Dashboard / Admin page's 2 s mount-retry lands
-      // after fresh data has been written to the DB.
+      // Second sync after 2 s: covers the edge case where the node needed
+      // an extra moment before the block was available to queryFilter, and
+      // ensures Dashboard / Admin 2 s mount-retries land after fresh data.
       setTimeout(() => {
         triggerSync()
           .then(() => {
