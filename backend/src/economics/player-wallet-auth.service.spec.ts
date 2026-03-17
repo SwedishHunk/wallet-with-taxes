@@ -1,21 +1,59 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { HDNodeWallet, Wallet } from "ethers";
 import { PlayerWalletAuthService } from "./player-wallet-auth.service";
+import { PlayerNonce } from "./entities/player-nonce.entity";
+
+/**
+ * In-memory mock repository that mimics the TypeORM Repository<PlayerNonce>
+ * interface used by PlayerWalletAuthService.
+ */
+function makeNonceRepo() {
+  const db = new Map<string, PlayerNonce>();
+
+  return {
+    _db: db,
+    create: jest.fn(
+      (data: Partial<PlayerNonce>) => ({ ...data }) as PlayerNonce,
+    ),
+    save: jest.fn().mockImplementation((nonce: PlayerNonce) => {
+      db.set(nonce.key, nonce);
+      return Promise.resolve(nonce);
+    }),
+    findOne: jest
+      .fn()
+      .mockImplementation(({ where }: { where: { key: string } }) =>
+        Promise.resolve(db.get(where.key) ?? null),
+      ),
+    delete: jest.fn().mockImplementation((keyOrQuery: string | object) => {
+      if (typeof keyOrQuery === "string") {
+        db.delete(keyOrQuery);
+      }
+      // LessThan cleanup queries are no-ops in tests
+      return Promise.resolve();
+    }),
+  };
+}
 
 describe("PlayerWalletAuthService", () => {
   let service: PlayerWalletAuthService;
   let wallet: HDNodeWallet;
+  let nonceRepo: ReturnType<typeof makeNonceRepo>;
 
   beforeEach(() => {
-    service = new PlayerWalletAuthService();
+    nonceRepo = makeNonceRepo();
+    service = new PlayerWalletAuthService(nonceRepo as never);
     wallet = Wallet.createRandom();
   });
 
   it("issues a nonce and verifies a matching signature", async () => {
-    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const issued = await service.issueNonce(
+      wallet.address,
+      "session",
+      "game-1",
+    );
     const signature = await wallet.signMessage(issued.message);
 
-    const verified = service.verifySignedRequest({
+    const verified = await service.verifySignedRequest({
       walletAddress: wallet.address,
       nonce: issued.nonce,
       signature,
@@ -31,14 +69,15 @@ describe("PlayerWalletAuthService", () => {
   });
 
   it("rejects replaying a consumed nonce", async () => {
-    const issued = service.issueNonce(
+    const issued = await service.issueNonce(
       wallet.address,
       "economic_event",
       "game-1",
     );
     const signature = await wallet.signMessage(issued.message);
 
-    service.verifySignedRequest({
+    // First use succeeds
+    await service.verifySignedRequest({
       walletAddress: wallet.address,
       nonce: issued.nonce,
       signature,
@@ -46,7 +85,8 @@ describe("PlayerWalletAuthService", () => {
       gameId: "game-1",
     });
 
-    expect(() =>
+    // Replay is rejected
+    await expect(
       service.verifySignedRequest({
         walletAddress: wallet.address,
         nonce: issued.nonce,
@@ -54,24 +94,23 @@ describe("PlayerWalletAuthService", () => {
         purpose: "economic_event",
         gameId: "game-1",
       }),
-    ).toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it("rejects an expired nonce", async () => {
-    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const issued = await service.issueNonce(
+      wallet.address,
+      "session",
+      "game-1",
+    );
     const signature = await wallet.signMessage(issued.message);
 
-    // Force expiry by manipulating the internal map
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const map = (service as any).pendingNonces as Map<
-      string,
-      { expiresAt: number }
-    >;
-    for (const [k, v] of map.entries()) {
-      map.set(k, { ...v, expiresAt: Date.now() - 1 });
-    }
+    // Manually expire the stored nonce
+    const key = `${wallet.address.toLowerCase()}:session:${issued.nonce}`;
+    const stored = nonceRepo._db.get(key);
+    if (stored) stored.expiresAt = new Date(Date.now() - 1);
 
-    expect(() =>
+    await expect(
       service.verifySignedRequest({
         walletAddress: wallet.address,
         nonce: issued.nonce,
@@ -79,14 +118,18 @@ describe("PlayerWalletAuthService", () => {
         purpose: "session",
         gameId: "game-1",
       }),
-    ).toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it("rejects a game scope mismatch", async () => {
-    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const issued = await service.issueNonce(
+      wallet.address,
+      "session",
+      "game-1",
+    );
     const signature = await wallet.signMessage(issued.message);
 
-    expect(() =>
+    await expect(
       service.verifySignedRequest({
         walletAddress: wallet.address,
         nonce: issued.nonce,
@@ -94,15 +137,19 @@ describe("PlayerWalletAuthService", () => {
         purpose: "session",
         gameId: "game-2",
       }),
-    ).toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it("rejects an invalid signature", async () => {
-    const issued = service.issueNonce(wallet.address, "session", "game-1");
+    const issued = await service.issueNonce(
+      wallet.address,
+      "session",
+      "game-1",
+    );
     const otherWallet = Wallet.createRandom();
     const badSignature = await otherWallet.signMessage(issued.message);
 
-    expect(() =>
+    await expect(
       service.verifySignedRequest({
         walletAddress: wallet.address,
         nonce: issued.nonce,
@@ -110,10 +157,12 @@ describe("PlayerWalletAuthService", () => {
         purpose: "session",
         gameId: "game-1",
       }),
-    ).toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedException);
   });
 
-  it("rejects an invalid wallet address", () => {
-    expect(() => service.issueNonce("not-an-address", "session")).toThrow();
+  it("rejects an invalid wallet address", async () => {
+    await expect(
+      service.issueNonce("not-an-address", "session"),
+    ).rejects.toThrow();
   });
 });

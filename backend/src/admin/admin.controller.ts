@@ -66,8 +66,8 @@ export class AdminController {
     @Query("offset") offset?: string,
   ) {
     return this.adminService.getAllTransactions(
-      limit ? parseInt(limit, 10) : 50,
-      offset ? parseInt(offset, 10) : 0,
+      Math.min(limit ? parseInt(limit, 10) : 50, 200),
+      offset ? Math.max(parseInt(offset, 10), 0) : 0,
     );
   }
 
@@ -172,8 +172,8 @@ export class AdminController {
     @Query("offset") offset?: string,
   ) {
     return this.adminService.getAuditLog(
-      limit ? parseInt(limit, 10) : 50,
-      offset ? parseInt(offset, 10) : 0,
+      Math.min(limit ? parseInt(limit, 10) : 50, 200),
+      offset ? Math.max(parseInt(offset, 10), 0) : 0,
     );
   }
 }

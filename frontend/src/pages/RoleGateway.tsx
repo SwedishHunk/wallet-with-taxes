@@ -41,7 +41,7 @@ export default function RoleGateway() {
       setBootstrapError(null);
 
       const { data } = await devBootstrap();
-      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
       setAuthToken(data.token);
       setStudioSession(data.studio);
       setMemberSession(data.member);

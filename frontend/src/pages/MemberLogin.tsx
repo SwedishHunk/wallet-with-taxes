@@ -126,11 +126,6 @@ export default function MemberLogin() {
     setSelectedMember(member);
     setPassword("");
 
-    console.log("[MemberLogin] PICK member:", {
-      email: member.email,
-      memberId: member.memberId ?? member.id,
-      isOwner: member.isOwner,
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,11 +145,6 @@ export default function MemberLogin() {
       setSubmitting(true);
       setError(null);
 
-      console.log("[MemberLogin] LOGIN attempt:", {
-        studioId,
-        email: selectedMember.email,
-      });
-
       // 1) Logga in som den valda usern i denna studio → få ny token
       const loginRes = await login(selectedMember.email, password, studioId);
 
@@ -163,7 +153,7 @@ export default function MemberLogin() {
         throw new Error(t("member.missingToken"));
       }
 
-      localStorage.setItem("token", token);
+      sessionStorage.setItem("token", token);
       setAuthToken(token);
 
       // Uppdatera studiosession om vi faktiskt har giltiga värden
@@ -185,8 +175,6 @@ export default function MemberLogin() {
 
       // 2) Hämta member-session baserat på nya token-usern
       const memberRes = await getMemberSession(studioId);
-
-      console.log("[MemberLogin] member-session after login:", memberRes.data);
 
       setMemberSession({
         memberId: memberRes.data.memberId,

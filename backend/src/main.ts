@@ -24,7 +24,12 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(passport.initialize());
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // strip unknown fields from request bodies
+      transform: true, // auto-coerce query/param primitives to declared types
+    }),
+  );
   app.useGlobalFilters(new AppExceptionFilter());
 
   // Swagger — interactive API docs at /api/docs
