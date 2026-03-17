@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { ForbiddenException } from "@nestjs/common";
-import { PlatformController, ApiPlatformController } from "./platform.controller";
+import {
+  PlatformController,
+  ApiPlatformController,
+} from "./platform.controller";
 
 function req(user: { id: string; studioId: string; role: string }) {
   return { user } as never;

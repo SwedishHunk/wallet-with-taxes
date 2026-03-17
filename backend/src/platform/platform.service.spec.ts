@@ -1356,7 +1356,11 @@ describe("PlatformService", () => {
     studioRepo.findOne.mockResolvedValueOnce({ id: "studio-abcdef12" });
     gameRepo.findOne
       .mockResolvedValueOnce(null) // no same-studio conflict
-      .mockResolvedValueOnce({ id: "g-other", slug: "game", studio: { id: "s2" } }) // global conflict → build scoped slug
+      .mockResolvedValueOnce({
+        id: "g-other",
+        slug: "game",
+        studio: { id: "s2" },
+      }) // global conflict → build scoped slug
       .mockResolvedValueOnce({ id: "g-scoped", slug: "game-studio-a" }) // scoped slug taken → enter while body
       .mockResolvedValueOnce(null); // UUID-suffixed slug is free
     gameRepo.create.mockImplementationOnce((x) => x);
