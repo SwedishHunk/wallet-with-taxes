@@ -147,4 +147,206 @@ describe("TaxService", () => {
     );
     expect(res.send.mock.calls[0][0]).toContain(",reward,0xasset,1,3,5,0.25");
   });
+
+  // ─── Cost-basis coverage tests ──────────────────────────────
+
+  it("logEvent updates cost-basis for acquisition events", async () => {
+    const saved = makeEvent({
+      id: 10,
+      type: "acquisition",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 5,
+      priceUSD: 100,
+    });
+    repo.save.mockResolvedValueOnce(saved);
+    costBasisRepo.findOne.mockResolvedValueOnce(null);
+
+    await service.logEvent({
+      type: "acquisition",
+      userAddress: "0xUser",
+      assetAddress: "0xAsset",
+      tokenId: 1,
+      amount: 5,
+      priceUSD: 100,
+    });
+
+    // Should have created a new cost-basis entry (mock mutates in-place)
+    expect(costBasisRepo.create).toHaveBeenCalledTimes(1);
+    // Should save with updated quantity and cost
+    expect(costBasisRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantity: 5,
+        totalCost: 500,
+        lastProcessedEventId: 10,
+      }),
+    );
+  });
+
+  it("logEvent updates cost-basis for disposal with gain", async () => {
+    const saved = makeEvent({
+      id: 20,
+      type: "disposal",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 2,
+      priceUSD: 150,
+    });
+    repo.save.mockResolvedValueOnce(saved);
+    // Existing basis: bought 5 at $100 each = totalCost 500
+    costBasisRepo.findOne.mockResolvedValueOnce({
+      userAddress: "0xuser",
+      assetKey: "0xasset:1",
+      quantity: 5,
+      totalCost: 500,
+      realizedGains: 0,
+      realizedLosses: 0,
+      lastProcessedEventId: 10,
+    });
+
+    await service.logEvent({
+      type: "disposal",
+      userAddress: "0xUser",
+      assetAddress: "0xAsset",
+      tokenId: 1,
+      amount: 2,
+      priceUSD: 150,
+    });
+
+    // Average cost = 500/5 = $100, selling at $150, gain = (150-100)*2 = 100
+    expect(costBasisRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantity: 3,
+        totalCost: 300,
+        realizedGains: 100,
+        lastProcessedEventId: 20,
+      }),
+    );
+  });
+
+  it("logEvent updates cost-basis for disposal with loss", async () => {
+    const saved = makeEvent({
+      id: 30,
+      type: "disposal",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 1,
+      priceUSD: 50,
+    });
+    repo.save.mockResolvedValueOnce(saved);
+    costBasisRepo.findOne.mockResolvedValueOnce({
+      userAddress: "0xuser",
+      assetKey: "0xasset:1",
+      quantity: 3,
+      totalCost: 300,
+      realizedGains: 100,
+      realizedLosses: 0,
+      lastProcessedEventId: 20,
+    });
+
+    await service.logEvent({
+      type: "disposal",
+      userAddress: "0xUser",
+      assetAddress: "0xAsset",
+      tokenId: 1,
+      amount: 1,
+      priceUSD: 50,
+    });
+
+    // Average cost = 300/3 = $100, selling at $50, loss = (50-100)*1 = -50
+    expect(costBasisRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantity: 2,
+        realizedLosses: -50,
+        lastProcessedEventId: 30,
+      }),
+    );
+  });
+
+  it("getSummary uses optimized path when cost-basis data exists", async () => {
+    // Return cost-basis entries instead of empty array
+    costBasisRepo.find.mockResolvedValueOnce([
+      {
+        realizedGains: 100,
+        realizedLosses: -50,
+      },
+      {
+        realizedGains: 25,
+        realizedLosses: -10,
+      },
+    ]);
+
+    const result = await service.getSummary("0xuser");
+
+    // totalGains = 100 + 25 = 125
+    // totalLosses = -50 + -10 = -60
+    // adjustedLosses = -60 * 0.7 = -42
+    // netTaxable = 125 + (-42) = 83
+    expect(result).toEqual({
+      totalGainsUSD: 125,
+      totalLossesUSD: -60,
+      adjustedLossesUSD: -42,
+      netTaxableGainUSD: 83,
+    });
+
+    // Should NOT have loaded events from the main repo
+    expect(repo.find).not.toHaveBeenCalled();
+  });
+
+  it("updateCostBasis skips already-processed events (idempotency)", async () => {
+    const saved = makeEvent({
+      id: 5,
+      type: "acquisition",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 10,
+      priceUSD: 100,
+    });
+    repo.save.mockResolvedValueOnce(saved);
+    // Basis already processed event id=5
+    costBasisRepo.findOne.mockResolvedValueOnce({
+      userAddress: "0xuser",
+      assetKey: "0xasset:1",
+      quantity: 5,
+      totalCost: 500,
+      realizedGains: 0,
+      realizedLosses: 0,
+      lastProcessedEventId: 5,
+    });
+
+    await service.logEvent({
+      type: "acquisition",
+      userAddress: "0xUser",
+      assetAddress: "0xAsset",
+      tokenId: 1,
+      amount: 10,
+      priceUSD: 100,
+    });
+
+    // costBasisRepo.save should NOT be called (event already processed)
+    expect(costBasisRepo.save).not.toHaveBeenCalled();
+  });
+
+  it("logEvent does not update cost-basis for non-acquisition/disposal types", async () => {
+    const saved = makeEvent({
+      id: 1,
+      type: "reward",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+    });
+    repo.save.mockResolvedValueOnce(saved);
+
+    await service.logEvent({
+      type: "reward",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+    });
+
+    expect(costBasisRepo.findOne).not.toHaveBeenCalled();
+    expect(costBasisRepo.save).not.toHaveBeenCalled();
+  });
 });
