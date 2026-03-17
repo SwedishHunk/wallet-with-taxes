@@ -23,14 +23,38 @@ export default function Dashboard() {
 
   const [syncing, setSyncing] = useState(false);
 
-  // Auto-refresh every 15 seconds so new trades show up
+  // Retry after 2 s to catch the race where sync was still writing when
+  // the component first fetched (e.g. navigated here right after a trade).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      refreshSummary();
+      refreshActivity();
+      refreshLiq();
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [refreshSummary, refreshActivity, refreshLiq]);
+
+  // Auto-refresh every 8 seconds so new trades appear quickly.
   useEffect(() => {
     const interval = setInterval(() => {
       refreshSummary();
       refreshActivity();
       refreshLiq();
-    }, 15000);
+    }, 8000);
     return () => clearInterval(interval);
+  }, [refreshSummary, refreshActivity, refreshLiq]);
+
+  // Refresh immediately when the tab becomes visible again.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        refreshSummary();
+        refreshActivity();
+        refreshLiq();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [refreshSummary, refreshActivity, refreshLiq]);
 
   // Combine errors

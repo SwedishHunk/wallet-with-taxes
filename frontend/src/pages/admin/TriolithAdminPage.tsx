@@ -205,14 +205,36 @@ export default function TriolithAdminPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    void api
-      .get<TransactionsResponse>(
-        `/admin/transactions?limit=${TX_LIMIT}&offset=${txOffset}`,
-      )
-      .then((r) => {
-        setTransactions(r.data.events);
-        setTxTotal(r.data.total);
-      });
+    const fetchTx = () => {
+      void api
+        .get<TransactionsResponse>(
+          `/admin/transactions?limit=${TX_LIMIT}&offset=${txOffset}`,
+        )
+        .then((r) => {
+          setTransactions(r.data.events);
+          setTxTotal(r.data.total);
+        });
+    };
+
+    fetchTx();
+
+    // Retry after 2 s to catch sync-in-progress race condition.
+    const retry = setTimeout(fetchTx, 2000);
+
+    // Auto-refresh every 15 s.
+    const interval = setInterval(fetchTx, 15_000);
+
+    // Refresh when the tab becomes visible again.
+    function onVisible() {
+      if (document.visibilityState === "visible") fetchTx();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearTimeout(retry);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [txOffset]);
 
   // GSAP entrance: stats row (stagger children)
