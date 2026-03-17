@@ -5,6 +5,7 @@ import {
   MeshTransmissionMaterial,
   Environment,
   Sparkles,
+  RoundedBox,
 } from "@react-three/drei";
 import {
   EffectComposer,
@@ -42,8 +43,15 @@ function GlassPanel({
 
   return (
     <Float speed={speed * 0.5} rotationIntensity={0.15} floatIntensity={0.3}>
-      <mesh ref={ref} position={position} rotation={rotation} scale={scale}>
-        <roundedBoxGeometry args={[1, 1, 0.02, 4, 0.02]} />
+      <RoundedBox
+        ref={ref}
+        args={[1, 1, 0.02]}
+        radius={0.02}
+        smoothness={4}
+        position={position}
+        rotation={rotation}
+        scale={scale}
+      >
         <MeshTransmissionMaterial
           backside
           thickness={0.1}
@@ -58,7 +66,7 @@ function GlassPanel({
           ior={1.5}
           toneMapped
         />
-      </mesh>
+      </RoundedBox>
     </Float>
   );
 }
