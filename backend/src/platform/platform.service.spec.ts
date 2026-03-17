@@ -1351,4 +1351,41 @@ describe("PlatformService", () => {
       "NFT template not found",
     );
   });
+  it("createGameForUser appends random suffix when scoped slug also collides", async () => {
+    studioRepo.findOne.mockResolvedValueOnce({ id: "studio-abcdef12" });
+    gameRepo.findOne
+      .mockResolvedValueOnce(null) // no same-studio conflict
+      .mockResolvedValueOnce({
+        id: "g-other",
+        slug: "game",
+        studio: { id: "s2" },
+      }) // global conflict -> build scoped slug
+      .mockResolvedValueOnce({ id: "g-scoped", slug: "game-studio-a" }) // scoped slug taken -> enter while body
+      .mockResolvedValueOnce(null); // UUID-suffixed slug is free
+    gameRepo.create.mockImplementationOnce((x) => x);
+    gameRepo.save.mockImplementationOnce(async (x) => ({ id: "g2", ...x }));
+
+    const game = await service.createGameForUser("u1", "studio-abcdef12", {
+      name: "Game",
+      slug: "game",
+    });
+
+    expect(game.slug).toMatch(/^game-studio-a-[0-9a-f]{4}$/);
+  });
+
+  it("getPublicGameList returns id/name/slug ordered by name", async () => {
+    const games = [
+      { id: "g1", name: "Alpha", slug: "alpha" },
+      { id: "g2", name: "Beta", slug: "beta" },
+    ];
+    gameRepo.find.mockResolvedValueOnce(games);
+
+    const result = await service.getPublicGameList();
+
+    expect(result).toBe(games);
+    expect(gameRepo.find).toHaveBeenCalledWith({
+      select: ["id", "name", "slug"],
+      order: { name: "ASC" },
+    });
+  });
 });
