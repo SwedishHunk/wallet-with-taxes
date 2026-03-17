@@ -45,12 +45,14 @@ export class WalletsService {
     }
   }
   getAssets(address: string) {
-    // Mocked token holdings response
+    console.warn(
+      "[PoC MOCK] getAssets() returns hardcoded data — not connected to blockchain",
+    );
     return {
       address,
       assets: [
-        { name: "TIX_HARDKODED!!!", symbol: "TIX", balance: 500 },
-        { name: "USDC_HARDKODED!!!", symbol: "USDC", balance: 1250 },
+        { name: "[MOCK] TIX Token", symbol: "TIX", balance: 500 },
+        { name: "[MOCK] USD Coin", symbol: "USDC", balance: 1250 },
       ],
     };
   }

@@ -30,6 +30,10 @@ api.interceptors.response.use(
 
     if (status === 401 && !isAuthEndpoint) {
       try {
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("studio_session");
+        sessionStorage.removeItem("member_session");
+        sessionStorage.removeItem("activeGame");
         localStorage.removeItem("token");
         localStorage.removeItem("studio_session");
         localStorage.removeItem("member_session");

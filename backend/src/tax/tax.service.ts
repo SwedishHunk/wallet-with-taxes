@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { TaxEvent } from "./entities/tax-event.entity";
 import { Response } from "express";
+import { SWEDISH_LOSS_DEDUCTION_RATE } from "../shared/constants/business.constants";
 
 interface TaxCsvRow {
   Date: string;
@@ -93,7 +94,6 @@ export class TaxService {
 
     // Swedish tax law: capital losses on financial assets are 70% deductible
     // (Inkomstskattelagen 48 kap. 20-24 §§)
-    const SWEDISH_LOSS_DEDUCTION_RATE = 0.7;
     const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
     const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
 

@@ -18,6 +18,7 @@ import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { parseAmount } from "./parse-amount";
+import { safeAdd, safeSub } from "../shared/safe-math";
 
 @Injectable()
 export class PlatformService {
@@ -339,12 +340,10 @@ export class PlatformService {
       const walletRepo = manager.getRepository(GameWallet);
       const ledgerRepo = manager.getRepository(LedgerEntry);
 
-      const newBalance = (parseFloat(wallet.balance) + amountNum).toString();
+      const newBalance = safeAdd(wallet.balance, amountNum);
 
       wallet.balance = newBalance;
-      wallet.totalDeposited = (
-        parseFloat(wallet.totalDeposited) + amountNum
-      ).toString();
+      wallet.totalDeposited = safeAdd(wallet.totalDeposited, amountNum);
       const savedWallet = await walletRepo.save(wallet);
 
       const ledgerEntry = ledgerRepo.create({
@@ -464,12 +463,8 @@ export class PlatformService {
         }
 
         const amountNum = parseFloat(intent.amount);
-        lockedWallet.balance = (
-          parseFloat(lockedWallet.balance) + amountNum
-        ).toString();
-        lockedWallet.totalDeposited = (
-          parseFloat(lockedWallet.totalDeposited) + amountNum
-        ).toString();
+        lockedWallet.balance = safeAdd(lockedWallet.balance, amountNum);
+        lockedWallet.totalDeposited = safeAdd(lockedWallet.totalDeposited, amountNum);
         const savedWallet = await walletRepo.save(lockedWallet);
 
         intent.status = WalletDepositIntentStatus.CONFIRMED;
@@ -538,11 +533,9 @@ export class PlatformService {
       const walletRepo = manager.getRepository(GameWallet);
       const ledgerRepo = manager.getRepository(LedgerEntry);
 
-      const newBalance = (balanceNum - amountNum).toString();
+      const newBalance = safeSub(wallet.balance, amountNum);
       wallet.balance = newBalance;
-      wallet.totalWithdrawn = (
-        parseFloat(wallet.totalWithdrawn) + amountNum
-      ).toString();
+      wallet.totalWithdrawn = safeAdd(wallet.totalWithdrawn, amountNum);
       const savedWallet = await walletRepo.save(wallet);
 
       const ledgerEntry = ledgerRepo.create({
@@ -626,18 +619,13 @@ export class PlatformService {
       }
 
       // Update sender wallet
-      lockedFromWallet.balance = (fromBalance - amountNum).toString();
-      lockedFromWallet.totalWithdrawn = (
-        parseFloat(lockedFromWallet.totalWithdrawn) + amountNum
-      ).toString();
+      lockedFromWallet.balance = safeSub(lockedFromWallet.balance, amountNum);
+      lockedFromWallet.totalWithdrawn = safeAdd(lockedFromWallet.totalWithdrawn, amountNum);
       const savedFromWallet = await walletRepo.save(lockedFromWallet);
 
       // Update recipient wallet
-      const toBalance = parseFloat(lockedToWallet.balance);
-      lockedToWallet.balance = (toBalance + amountNum).toString();
-      lockedToWallet.totalDeposited = (
-        parseFloat(lockedToWallet.totalDeposited) + amountNum
-      ).toString();
+      lockedToWallet.balance = safeAdd(lockedToWallet.balance, amountNum);
+      lockedToWallet.totalDeposited = safeAdd(lockedToWallet.totalDeposited, amountNum);
       const savedToWallet = await walletRepo.save(lockedToWallet);
 
       // Create ledger entry for sender

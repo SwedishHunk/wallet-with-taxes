@@ -12,6 +12,13 @@ import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
 import { Repository } from "typeorm";
+import {
+  REVENUE_SPLIT_DEV,
+  REVENUE_SPLIT_TRIOLITH,
+  REVENUE_SPLIT_STAKERS,
+  SAFU_CUT_FROM_TRIOLITH,
+  DEFAULT_PLATFORM_FEE_PERCENT,
+} from "../shared/constants/business.constants";
 
 interface FeeStatsRaw {
   totalFeesUSD: string;
@@ -113,11 +120,11 @@ export class AdminService {
       .getRawOne<{ totalFeesUSD: string }>();
 
     const totalFees = Number(raw?.totalFeesUSD ?? "0");
-    const devShare = totalFees * 0.6;
-    const triolithGross = totalFees * 0.3;
-    const safuCut = triolithGross * 0.05;
+    const devShare = totalFees * REVENUE_SPLIT_DEV;
+    const triolithGross = totalFees * REVENUE_SPLIT_TRIOLITH;
+    const safuCut = triolithGross * SAFU_CUT_FROM_TRIOLITH;
     const triolithNet = triolithGross - safuCut;
-    const stakerShare = totalFees * 0.1;
+    const stakerShare = totalFees * REVENUE_SPLIT_STAKERS;
 
     return {
       totalFeesUSD: totalFees,
@@ -231,7 +238,7 @@ export class AdminService {
     const config = await this.platformConfigRepo.findOne({
       where: { key: "platform_fee_percent" },
     });
-    return { feePercent: Number(config?.value ?? 2.5) };
+    return { feePercent: Number(config?.value ?? DEFAULT_PLATFORM_FEE_PERCENT) };
   }
 
   async setPlatformFee(
