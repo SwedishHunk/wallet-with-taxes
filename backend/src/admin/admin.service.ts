@@ -156,19 +156,31 @@ export class AdminService {
   }
 
   async getAllStudios() {
-    const studios = await this.studioRepo.find({
-      relations: ["members"],
-      order: { createdAt: "DESC" },
-    });
+    // Single query: COUNT members per studio via LEFT JOIN instead of
+    // loading all StudioMember rows into memory with relations: ["members"]
+    const rows = await this.studioRepo
+      .createQueryBuilder("s")
+      .leftJoin("s.members", "m")
+      .select([
+        "s.id           AS id",
+        "s.name         AS name",
+        "s.email        AS email",
+        "s.status       AS status",
+        's.createdAt    AS "createdAt"',
+        'COUNT(m.id)::int AS "memberCount"',
+      ])
+      .groupBy("s.id")
+      .orderBy("s.createdAt", "DESC")
+      .getRawMany<{
+        id: string;
+        name: string;
+        email: string;
+        status: string;
+        createdAt: Date;
+        memberCount: number;
+      }>();
 
-    return studios.map((s) => ({
-      id: s.id,
-      name: s.name,
-      email: s.email,
-      status: s.status,
-      memberCount: s.members?.length ?? 0,
-      createdAt: s.createdAt,
-    }));
+    return rows;
   }
 
   async getAllTransactions(limit = 50, offset = 0) {
@@ -207,6 +219,21 @@ export class AdminService {
     adminId: string,
     adminEmail: string,
   ) {
+    // Prevent an admin from revoking their own admin rights
+    if (id === adminId && isAdmin === false) {
+      throw new BadRequestException("Cannot revoke your own admin privileges");
+    }
+
+    // Prevent removing the last admin — always keep at least one
+    if (isAdmin === false) {
+      const adminCount = await this.userRepo.count({
+        where: { isAdmin: true },
+      });
+      if (adminCount <= 1) {
+        throw new BadRequestException("Cannot remove the last platform admin");
+      }
+    }
+
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.update(id, { isAdmin });
@@ -320,10 +347,18 @@ export class AdminService {
     }));
   }
 
-  async setGameStatus(id: string, status: "active" | "inactive") {
+  async setGameStatus(
+    id: string,
+    status: "active" | "inactive",
+    adminId: string,
+    adminEmail: string,
+  ) {
     const game = await this.gameRepo.findOne({ where: { id } });
     if (!game) throw new NotFoundException(`Game ${id} not found`);
     await this.gameRepo.update(id, { status });
+    await this.writeAudit(adminId, adminEmail, "setGameStatus", "game", id, {
+      status,
+    });
     return { id, status };
   }
 }
