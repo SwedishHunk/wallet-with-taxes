@@ -8,6 +8,7 @@ type MockRepo = {
   create: jest.Mock;
   save: jest.Mock;
   find: jest.Mock;
+  findOne: jest.Mock;
 };
 
 function makeEvent(partial: Partial<TaxEvent>): TaxEvent {
@@ -26,6 +27,7 @@ function makeEvent(partial: Partial<TaxEvent>): TaxEvent {
 
 describe("TaxService", () => {
   let repo: MockRepo;
+  let costBasisRepo: MockRepo;
   let service: TaxService;
 
   beforeEach(() => {
@@ -33,8 +35,15 @@ describe("TaxService", () => {
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
       find: jest.fn(),
+      findOne: jest.fn(),
     };
-    service = new TaxService(repo as never);
+    costBasisRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    service = new TaxService(repo as never, costBasisRepo as never);
   });
 
   it("logEvent creates and saves event", async () => {
