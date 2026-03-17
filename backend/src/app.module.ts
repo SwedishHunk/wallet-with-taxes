@@ -10,6 +10,7 @@ import { PaymentsModule } from "./__payments/payments.module";
 import { AssetsModule } from "./__assets/assets.module";
 import { EventsModule } from "./__events/events.module";
 import { AdminModule } from "./admin/admin.module";
+import { HealthModule } from "./health/health.module";
 import { PlatformModule } from "./platform/platform.module";
 import { TokenShopModule } from "./tokenshop/tokenshop.module";
 import { EconomicsModule } from "./economics/economics.module";
@@ -61,6 +62,7 @@ const shouldSynchronizeSchema = isTestEnv;
     AssetsModule,
     EventsModule,
     AdminModule,
+    HealthModule,
     PlatformModule,
     TokenShopModule,
     EconomicsModule,

@@ -5,8 +5,12 @@ function makeQuery(raw: unknown) {
   return {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
     getRawOne: jest.fn().mockResolvedValue(raw),
+    getRawMany: jest.fn().mockResolvedValue([]),
   };
 }
 
@@ -19,6 +23,7 @@ function makeService(queryRaw?: unknown) {
   const userRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
+    count: jest.fn().mockResolvedValue(2), // default: 2 admins exist
     update: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
   };
@@ -26,6 +31,7 @@ function makeService(queryRaw?: unknown) {
     find: jest.fn(),
     findOne: jest.fn(),
     findAndCount: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(makeQuery(null)),
     update: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
   };
@@ -138,29 +144,23 @@ describe("AdminService", () => {
 
   // ── studios ────────────────────────────────────────────────
   it("getAllStudios returns mapped studio list with memberCount", async () => {
-    const studios = [
-      {
-        id: "s1",
-        name: "Studio A",
-        email: "a@test.com",
-        status: "active",
-        members: [{ id: "m1" }, { id: "m2" }],
-        createdAt: new Date("2026-01-01"),
-      },
-    ];
-    const { service, studioRepo } = makeService();
-    studioRepo.find.mockResolvedValue(studios);
-
-    await expect(service.getAllStudios()).resolves.toEqual([
+    const rows = [
       {
         id: "s1",
         name: "Studio A",
         email: "a@test.com",
         status: "active",
         memberCount: 2,
-        createdAt: studios[0].createdAt,
+        createdAt: new Date("2026-01-01"),
       },
-    ]);
+    ];
+    const { service, studioRepo } = makeService();
+    // getAllStudios uses QueryBuilder; override getRawMany on the shared mock
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const qb = studioRepo.createQueryBuilder("s");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (qb.getRawMany as jest.Mock).mockResolvedValue(rows);
+    await expect(service.getAllStudios()).resolves.toEqual(rows);
   });
 
   it("setStudioStatus updates status and writes audit", async () => {
@@ -229,6 +229,21 @@ describe("AdminService", () => {
     await expect(
       service.setUserAdmin("x", true, ADMIN.id, ADMIN.email),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it("setUserAdmin throws BadRequestException when admin revokes own privileges", async () => {
+    const { service } = makeService();
+    await expect(
+      service.setUserAdmin(ADMIN.id, false, ADMIN.id, ADMIN.email),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it("setUserAdmin throws BadRequestException when removing last admin", async () => {
+    const { service, userRepo } = makeService();
+    userRepo.count.mockResolvedValue(1); // only 1 admin left
+    await expect(
+      service.setUserAdmin("u1", false, ADMIN.id, ADMIN.email),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it("setUserSuspended updates isSuspended and writes audit", async () => {
@@ -348,22 +363,21 @@ describe("AdminService", () => {
     ]);
   });
 
-  it("setGameStatus updates status", async () => {
+  it("setGameStatus updates status and writes audit", async () => {
     const { service, gameRepo } = makeService();
     gameRepo.findOne.mockResolvedValue({ id: "g1" });
-    await expect(service.setGameStatus("g1", "inactive")).resolves.toEqual({
-      id: "g1",
-      status: "inactive",
-    });
+    await expect(
+      service.setGameStatus("g1", "inactive", ADMIN.id, ADMIN.email),
+    ).resolves.toEqual({ id: "g1", status: "inactive" });
     expect(gameRepo.update).toHaveBeenCalledWith("g1", { status: "inactive" });
   });
 
   it("setGameStatus throws NotFoundException when game missing", async () => {
     const { service, gameRepo } = makeService();
     gameRepo.findOne.mockResolvedValue(null);
-    await expect(service.setGameStatus("x", "active")).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.setGameStatus("x", "active", ADMIN.id, ADMIN.email),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it("getStudioGames returns games for a studio", async () => {

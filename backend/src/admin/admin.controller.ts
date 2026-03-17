@@ -161,8 +161,17 @@ export class AdminController {
 
   @Patch("games/:id/status")
   @UseGuards(TriolithGuard)
-  async setGameStatus(@Param("id") id: string, @Body() body: SetGameStatusDto) {
-    return this.adminService.setGameStatus(id, body.status);
+  async setGameStatus(
+    @Param("id") id: string,
+    @Body() body: SetGameStatusDto,
+    @Request() req: AuthRequest,
+  ) {
+    return this.adminService.setGameStatus(
+      id,
+      body.status,
+      req.user.id,
+      req.user.email,
+    );
   }
 
   @Get("audit-log")
