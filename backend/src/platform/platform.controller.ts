@@ -290,6 +290,11 @@ export class PlatformController {
     );
   }
 
+  @Get("public-games")
+  getPublicGames() {
+    return this.platformService.getPublicGameList();
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post("personal-accounts/:userId/permissions")
   updatePersonalAccountPermissions(

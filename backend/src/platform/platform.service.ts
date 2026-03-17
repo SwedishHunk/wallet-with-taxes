@@ -244,6 +244,13 @@ export class PlatformService {
     return this.gameRepo.find({ where: { studio: { id: studioId } } });
   }
 
+  async getPublicGameList() {
+    return this.gameRepo.find({
+      select: ["id", "name", "slug"],
+      order: { name: "ASC" },
+    });
+  }
+
   async getGameById(gameId: string, userId: string, studioId: string) {
     const game = await this.gameRepo.findOne({
       where: { id: gameId, studio: { id: studioId } },

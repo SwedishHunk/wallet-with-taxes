@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../routes";
 import { getPersonalAccounts } from "../lib/platform";
 import { setAuthToken } from "../lib/api";
-import SafeCyberpunkScene from "../components/3d/SafeCyberpunkScene";
+import SafeFlamesScene from "../components/3d/SafeFlamesScene";
 import { useGsapEntrance, useGsapStagger } from "../hooks/useGsapEntrance";
 
 interface PersonalAccount {
@@ -93,7 +93,7 @@ export default function HomePage() {
           zIndex: 1,
         }}
       >
-        <SafeCyberpunkScene intensity="subtle" sacredGeometry="fibonacci" />
+        <SafeFlamesScene />
         <div style={{ color: "var(--text-muted)", fontSize: "1.1rem" }}>
           Loading...
         </div>
@@ -103,8 +103,8 @@ export default function HomePage() {
 
   return (
     <>
-      {/* 3D Background */}
-      <SafeCyberpunkScene intensity="full" sacredGeometry="flower" />
+      {/* 3D Background — flames.blue inspired */}
+      <SafeFlamesScene />
 
       {/* Content overlay */}
       <div
