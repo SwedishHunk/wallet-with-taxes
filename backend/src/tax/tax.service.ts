@@ -2,7 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { TaxEvent } from "./entities/tax-event.entity";
+import { TaxCostBasis } from "./entities/tax-cost-basis.entity";
 import { Response } from "express";
+import { SWEDISH_LOSS_DEDUCTION_RATE } from "../shared/constants/business.constants";
 
 interface TaxCsvRow {
   Date: string;
@@ -19,6 +21,8 @@ export class TaxService {
   constructor(
     @InjectRepository(TaxEvent)
     private readonly repo: Repository<TaxEvent>,
+    @InjectRepository(TaxCostBasis)
+    private readonly costBasisRepo: Repository<TaxCostBasis>,
   ) {}
 
   async logEvent(data: Partial<TaxEvent>) {
@@ -28,7 +32,18 @@ export class TaxService {
       assetAddress: data.assetAddress?.toLowerCase(),
     };
     const event = this.repo.create(normalizedData);
-    return this.repo.save(event);
+    const saved = await this.repo.save(event);
+
+    // Incrementally update cost-basis table
+    if (
+      saved.userAddress &&
+      saved.assetAddress &&
+      (saved.type === "acquisition" || saved.type === "disposal")
+    ) {
+      await this.updateCostBasis(saved);
+    }
+
+    return saved;
   }
   async getEventsForUser(userAddress: string): Promise<TaxEvent[]> {
     return this.repo.find({
@@ -38,8 +53,41 @@ export class TaxService {
   }
 
   async getSummary(userAddress: string) {
+    const normalizedAddress = userAddress.toLowerCase();
+
+    // Try optimized path: read from cost-basis table
+    const bases = await this.costBasisRepo.find({
+      where: { userAddress: normalizedAddress },
+    });
+
+    if (bases.length > 0) {
+      let totalGainsUSD = 0;
+      let totalLossesUSD = 0;
+      for (const b of bases) {
+        totalGainsUSD += Number(b.realizedGains);
+        totalLossesUSD += Number(b.realizedLosses);
+      }
+      const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
+      const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
+
+      return {
+        totalGainsUSD: +totalGainsUSD.toFixed(2),
+        totalLossesUSD: +totalLossesUSD.toFixed(2),
+        adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
+        netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
+      };
+    }
+
+    // Fallback: legacy in-memory calculation (for pre-existing data)
+    return this.getSummaryLegacy(normalizedAddress);
+  }
+
+  /**
+   * Legacy in-memory calculation — used only as fallback when
+   * cost-basis table hasn't been populated yet.
+   */
+  private async getSummaryLegacy(userAddress: string) {
     const events = await this.getEventsForUser(userAddress);
-    // Track user's average cost per asset (assetAddress + tokenId)
     const acquisitions: Record<
       string,
       { totalCost: number; quantity: number }
@@ -55,10 +103,8 @@ export class TaxService {
         e.priceUSD !== null &&
         e.priceUSD !== undefined
       ) {
-        // Track acquisition cost and quantity
         if (!acquisitions[key])
           acquisitions[key] = { totalCost: 0, quantity: 0 };
-
         acquisitions[key].totalCost += e.priceUSD * Number(e.amount);
         acquisitions[key].quantity += Number(e.amount);
       }
@@ -73,16 +119,12 @@ export class TaxService {
           holding && holding.quantity > 0
             ? holding.totalCost / holding.quantity
             : 0;
-
         const gainOrLoss = (e.priceUSD - avgCost) * Number(e.amount);
-
         if (gainOrLoss >= 0) {
           totalGainsUSD += gainOrLoss;
         } else {
-          totalLossesUSD += gainOrLoss; // will be negative
+          totalLossesUSD += gainOrLoss;
         }
-
-        // Reduce held quantity/cost (FIFO-like behavior)
         if (holding) {
           const deductedCost = avgCost * Number(e.amount);
           holding.quantity -= Number(e.amount);
@@ -91,9 +133,6 @@ export class TaxService {
       }
     }
 
-    // Swedish tax law: capital losses on financial assets are 70% deductible
-    // (Inkomstskattelagen 48 kap. 20-24 §§)
-    const SWEDISH_LOSS_DEDUCTION_RATE = 0.7;
     const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
     const netTaxableGainUSD = totalGainsUSD + adjustedLossesUSD;
 
@@ -103,6 +142,61 @@ export class TaxService {
       adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
       netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
     };
+  }
+
+  /**
+   * Incrementally update the cost-basis table for a single tax event.
+   * Called from logEvent() after persisting the event.
+   */
+  private async updateCostBasis(event: TaxEvent) {
+    const assetKey = `${event.assetAddress}:${event.tokenId}`;
+    let basis = await this.costBasisRepo.findOne({
+      where: { userAddress: event.userAddress, assetKey },
+    });
+
+    if (!basis) {
+      basis = this.costBasisRepo.create({
+        userAddress: event.userAddress,
+        assetKey,
+        quantity: 0,
+        totalCost: 0,
+        realizedGains: 0,
+        realizedLosses: 0,
+        lastProcessedEventId: 0,
+      });
+    }
+
+    // Skip if already processed (idempotency)
+    if (event.id <= basis.lastProcessedEventId) return;
+
+    const amount = Number(event.amount);
+    const price = event.priceUSD ?? 0;
+
+    if (event.type === "acquisition" && price > 0) {
+      basis.quantity = Number(basis.quantity) + amount;
+      basis.totalCost = Number(basis.totalCost) + price * amount;
+    }
+
+    if (event.type === "disposal" && price > 0) {
+      const avgCost =
+        Number(basis.quantity) > 0
+          ? Number(basis.totalCost) / Number(basis.quantity)
+          : 0;
+      const gainOrLoss = (price - avgCost) * amount;
+
+      if (gainOrLoss >= 0) {
+        basis.realizedGains = Number(basis.realizedGains) + gainOrLoss;
+      } else {
+        basis.realizedLosses = Number(basis.realizedLosses) + gainOrLoss;
+      }
+
+      const deductedCost = avgCost * amount;
+      basis.quantity = Number(basis.quantity) - amount;
+      basis.totalCost = Number(basis.totalCost) - deductedCost;
+    }
+
+    basis.lastProcessedEventId = event.id;
+    await this.costBasisRepo.save(basis);
   }
 
   // Prevent CSV formula injection: prefix values starting with =, +, -, @ with a single quote

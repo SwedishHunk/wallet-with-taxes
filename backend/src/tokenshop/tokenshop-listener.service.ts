@@ -5,7 +5,13 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Contract, ethers, JsonRpcProvider, Log } from "ethers";
+import {
+  Contract,
+  ethers,
+  JsonRpcProvider,
+  Log,
+  WebSocketProvider,
+} from "ethers";
 import { DataSource, Repository } from "typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { ShopEvent } from "./entities/shop-event.entity";
@@ -49,6 +55,10 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
 
   private timer: NodeJS.Timeout | null = null;
   private syncInProgress = false;
+  private usingWebSocket = false;
+  private wsProvider: WebSocketProvider | null = null;
+  private wsContract: Contract | null = null;
+  private readonly wsRpcUrl = process.env.WS_RPC_URL?.trim();
   private triTokenAddress: string | null = process.env.TRI_TOKEN_ADDRESS?.trim()
     ? process.env.TRI_TOKEN_ADDRESS.trim().toLowerCase()
     : null;
@@ -86,14 +96,102 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    this.schedule();
+    // Catch up on any missed blocks first
     void this.syncOnce();
+
+    // Try WebSocket for real-time events, fall back to polling
+    if (this.wsRpcUrl) {
+      try {
+        await this.startWebSocket();
+      } catch (error) {
+        this.logger.warn(
+          `WebSocket connection failed, falling back to polling: ${this.formatError(error)}`,
+        );
+        this.schedule();
+      }
+    } else {
+      this.logger.log("No WS_RPC_URL configured — using polling mode");
+      this.schedule();
+    }
   }
 
   onModuleDestroy() {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
+    }
+    if (this.wsContract) {
+      void this.wsContract.removeAllListeners();
+      this.wsContract = null;
+    }
+    if (this.wsProvider) {
+      void this.wsProvider.destroy();
+      this.wsProvider = null;
+    }
+    this.usingWebSocket = false;
+  }
+
+  /**
+   * Start real-time WebSocket event subscriptions.
+   * Falls back to polling if the WS connection drops.
+   */
+  private async startWebSocket() {
+    if (!this.wsRpcUrl || !this.tokenShopAddress) return;
+
+    this.wsProvider = new WebSocketProvider(this.wsRpcUrl);
+    this.wsContract = new Contract(
+      this.tokenShopAddress,
+      TOKENSHOP_ABI,
+      this.wsProvider,
+    );
+
+    // Subscribe to Bought and Sold events in real-time
+    await this.wsContract.on("Bought", (...args: unknown[]) => {
+      const event = args[args.length - 1] as { log: Log };
+      void this.handleWebSocketEvent(event.log);
+    });
+    await this.wsContract.on("Sold", (...args: unknown[]) => {
+      const event = args[args.length - 1] as { log: Log };
+      void this.handleWebSocketEvent(event.log);
+    });
+
+    // Handle disconnection: fall back to polling
+    void this.wsProvider.on("error", () => {
+      this.logger.warn("WebSocket error — falling back to polling");
+      this.usingWebSocket = false;
+      this.wsContract = null;
+      this.wsProvider = null;
+      this.schedule();
+    });
+
+    this.usingWebSocket = true;
+    this.logger.log(
+      `WebSocket connected to ${this.wsRpcUrl} — real-time event subscriptions active`,
+    );
+  }
+
+  /**
+   * Handle an individual event received via WebSocket subscription.
+   * Parses the log and persists it, then updates the sync state.
+   */
+  private async handleWebSocketEvent(log: Log) {
+    const parsed = this.parseLog(log);
+    if (!parsed) return;
+
+    try {
+      await this.persistParsedEvent(parsed);
+
+      // Update sync state so polling catch-up knows where we left off
+      const syncState = await this.getOrCreateSyncState();
+      const currentBlock = Number(syncState.lastSyncedBlock);
+      if (log.blockNumber > currentBlock) {
+        syncState.lastSyncedBlock = String(log.blockNumber);
+        await this.syncStateRepo.save(syncState);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to process WebSocket event: ${this.formatError(error)}`,
+      );
     }
   }
 

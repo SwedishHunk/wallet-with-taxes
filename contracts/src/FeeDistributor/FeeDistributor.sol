@@ -23,6 +23,9 @@ contract FeeDistributor is AccessControl {
     /// @notice Role identifier for admin privileges
     bytes32 public constant ADMIN_ROLE = DEFAULT_ADMIN_ROLE;
 
+    /// @notice Role that is allowed to trigger fee distribution (e.g. Marketplace)
+    bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
+
     /// @notice TRI token used for fee distribution
     IERC20 public immutable tri;
 
@@ -86,7 +89,7 @@ contract FeeDistributor is AccessControl {
 
     /// @notice Distributes TRI tokens held by the contract to receivers based on BPS
     /// @param amount The amount of TRI tokens to distribute
-    function distribute(uint256 amount) external {
+    function distribute(uint256 amount) external onlyRole(DISTRIBUTOR_ROLE) {
         require(tri.balanceOf(address(this)) >= amount, "Insufficient TRI sent");
 
         uint256 toDev = (amount * devBps) / BPS_DENOMINATOR;

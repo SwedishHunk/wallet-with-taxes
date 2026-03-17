@@ -18,6 +18,7 @@ import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { encryptPrivateKey } from "../shared/crypto.util";
+import { assertValidEmail } from "../shared/validators/email.validator";
 
 @Injectable()
 export class UsersService {
@@ -40,17 +41,7 @@ export class UsersService {
     delete process.env.DEPLOYER_PRIVATE_KEY;
   }
 
-  private isValidEmail(email: string): boolean {
-    // Email must contain @ and have a domain
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  private assertValidEmail(email: string): void {
-    if (!this.isValidEmail(email)) {
-      throw new AppException(ERROR_MESSAGES.INVALID_EMAIL_FORMAT, 400);
-    }
-  }
+  // Email validation is provided by shared/validators/email.validator.ts
 
   private async buildCustodialCredentials(password: string): Promise<{
     passwordHash: string;
@@ -130,7 +121,7 @@ export class UsersService {
   }
 
   async signup(email: string, password: string, studioName?: string) {
-    this.assertValidEmail(email);
+    assertValidEmail(email);
 
     const existingUser = await this.userRepository.findOne({
       where: { email },
@@ -183,7 +174,7 @@ export class UsersService {
         },
         {
           secret: process.env.JWT_SECRET,
-          expiresIn: "2h",
+          expiresIn: "7d",
         },
       );
 
@@ -214,7 +205,7 @@ export class UsersService {
   }
 
   async login(email: string, password: string, studioId?: string) {
-    this.assertValidEmail(email);
+    assertValidEmail(email);
 
     const user = await this.userRepository.findOne({ where: { email } });
 

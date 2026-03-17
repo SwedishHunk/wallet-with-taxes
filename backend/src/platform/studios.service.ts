@@ -13,6 +13,8 @@ import { StudioMemberService } from "./studio-member.service";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
 import { encryptPrivateKey } from "../shared/crypto.util";
+import * as crypto from "crypto";
+import { assertValidEmail } from "../shared/validators/email.validator";
 
 export interface CreateMemberRequestDto {
   email: string;
@@ -108,11 +110,7 @@ export class StudiosService {
       );
     }
 
-    // Check email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(dto.email)) {
-      throw new BadRequestException("Invalid email format.");
-    }
+    assertValidEmail(dto.email);
 
     // Get or create user
     let user = await this.userRepository.findOne({
@@ -195,7 +193,7 @@ export class StudiosService {
   }
 
   private generateTempPassword(): string {
-    return Math.random().toString(36).slice(-12);
+    return crypto.randomBytes(16).toString("hex");
   }
 
   private permissionsToMask(permissions: string[]): bigint {

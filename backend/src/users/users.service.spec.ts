@@ -6,6 +6,7 @@
 import * as bcrypt from "bcryptjs";
 import { UsersService } from "./users.service";
 import { AppException } from "../common/exceptions/app-exception";
+import { BadRequestException } from "@nestjs/common";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { ethers } from "ethers";
 
@@ -117,10 +118,9 @@ describe("UsersService", () => {
   });
 
   it("signup validates email", async () => {
-    await expect(service.signup("bad-email", "pw")).rejects.toMatchObject({
-      statusCode: 400,
-      message: ERROR_MESSAGES.INVALID_EMAIL_FORMAT,
-    });
+    await expect(service.signup("bad-email", "pw")).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it("signup rejects existing user", async () => {
@@ -182,10 +182,9 @@ describe("UsersService", () => {
   });
 
   it("login validates email format", async () => {
-    await expect(service.login("bad-email", "pw")).rejects.toMatchObject({
-      statusCode: 400,
-      message: ERROR_MESSAGES.INVALID_EMAIL_FORMAT,
-    });
+    await expect(service.login("bad-email", "pw")).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it("login rejects missing user", async () => {
