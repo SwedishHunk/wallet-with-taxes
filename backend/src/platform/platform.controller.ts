@@ -309,3 +309,18 @@ export class PlatformController {
     );
   }
 }
+
+/**
+ * Public endpoints under /api/platform/... for the player frontend.
+ * The player useApi hook prepends /api (proxied to the backend), so these
+ * routes must live under the api/platform prefix.
+ */
+@Controller("api/platform")
+export class ApiPlatformController {
+  constructor(private platformService: PlatformService) {}
+
+  @Get("public-games")
+  getPublicGames() {
+    return this.platformService.getPublicGameList();
+  }
+}

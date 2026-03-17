@@ -239,7 +239,19 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     try {
       const latestBlock = await this.provider.getBlockNumber();
       const syncState = await this.getOrCreateSyncState();
-      const fromBlock = Number(syncState.lastSyncedBlock) + 1;
+      let fromBlock = Number(syncState.lastSyncedBlock) + 1;
+
+      // Detect chain restart (e.g. Anvil wiped): DB says we synced past the
+      // current chain tip. Reset to 0 so all events are re-indexed.
+      if (Number(syncState.lastSyncedBlock) > latestBlock) {
+        this.logger.warn(
+          `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +
+            `latest=${latestBlock}). Resetting sync state to block 0.`,
+        );
+        syncState.lastSyncedBlock = "0";
+        await this.syncStateRepo.save(syncState);
+        fromBlock = 1;
+      }
 
       if (fromBlock > latestBlock) {
         return;
