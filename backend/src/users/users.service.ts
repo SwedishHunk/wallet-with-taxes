@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { User } from "./user.entity";
@@ -8,7 +8,6 @@ import GenesisWalletFactoryAbiJson from "../shared/constants/abis/GenesisWalletF
 import { JwtService } from "@nestjs/jwt";
 import type { InterfaceAbi } from "ethers";
 import { ContractTransactionResponse } from "ethers";
-import console from "console";
 import { Studio } from "../platform/entities/studio.entity";
 import {
   StudioMember,
@@ -22,6 +21,8 @@ import { assertValidEmail } from "../shared/validators/email.validator";
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   // Read deployer key once at startup and remove from process.env to
   // prevent other code paths from accessing it via the global env object.
   private readonly deployerPrivateKey: string | undefined;
@@ -164,19 +165,14 @@ export class UsersService {
 
       await queryRunner.commitTransaction();
 
-      const token = this.jwtService.sign(
-        {
-          id: user.id,
-          email: user.email,
-          studioId: savedStudio.id,
-          role: membership.role,
-          isAdmin: user.isAdmin,
-        },
-        {
-          secret: process.env.JWT_SECRET,
-          expiresIn: "7d",
-        },
-      );
+      const token = this.jwtService.sign({
+        id: user.id,
+        email: user.email,
+        walletAddress: user.walletAddress,
+        studioId: savedStudio.id,
+        role: membership.role,
+        isAdmin: user.isAdmin,
+      });
 
       return {
         token,
@@ -261,9 +257,13 @@ export class UsersService {
             walletAddress: user.walletAddress,
           });
           studio = await this.studioRepository.save(studio);
-          console.log(`Created new studio ${studio.id} for user ${user.id}`);
+          this.logger.debug(
+            `Created new studio ${studio.id} for user ${user.id}`,
+          );
         } else {
-          console.log(`Studio ${studio.id} already exists for user ${user.id}`);
+          this.logger.debug(
+            `Studio ${studio.id} already exists for user ${user.id}`,
+          );
         }
 
         // Check if membership already exists before creating
@@ -278,12 +278,12 @@ export class UsersService {
             studio,
             user,
           );
-          console.log(
+          this.logger.debug(
             `Created bootstrap owner membership for user ${user.id} in studio ${studio.id}`,
           );
         } else {
           membership = existingMembership;
-          console.log(
+          this.logger.debug(
             `Membership already exists for user ${user.id} in studio ${studio.id}`,
           );
         }
@@ -306,19 +306,14 @@ export class UsersService {
       );
     }
 
-    const token = this.jwtService.sign(
-      {
-        id: user.id,
-        email: user.email,
-        studioId: selectedStudio.id,
-        role: selectedRole,
-        isAdmin: user.isAdmin,
-      },
-      {
-        secret: process.env.JWT_SECRET,
-        expiresIn: "7d",
-      },
-    );
+    const token = this.jwtService.sign({
+      id: user.id,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      studioId: selectedStudio.id,
+      role: selectedRole,
+      isAdmin: user.isAdmin,
+    });
 
     return {
       token,

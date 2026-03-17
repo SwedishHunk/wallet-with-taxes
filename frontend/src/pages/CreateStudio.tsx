@@ -70,7 +70,7 @@ export default function CreateStudio() {
 
       // Save token
       setAuthToken(data.token);
-      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
 
       // Set studio session
       loginStudio({

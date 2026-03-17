@@ -8,6 +8,7 @@ import { User } from "../users/user.entity";
 type JwtPayload = {
   id: string;
   email: string;
+  walletAddress?: string;
   studioId: string;
   role: "owner" | "admin" | "member";
   isAdmin: boolean;
@@ -46,6 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: payload.id,
       email: payload.email,
+      walletAddress: payload.walletAddress,
       studioId: payload.studioId,
       role: payload.role,
       isAdmin: payload.isAdmin === true,

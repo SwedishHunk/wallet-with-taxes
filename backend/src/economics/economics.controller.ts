@@ -53,7 +53,7 @@ export class EconomicsController {
   ) {}
 
   @Get("api/player/nonce")
-  getPlayerNonce(
+  async getPlayerNonce(
     @Query("walletAddress") walletAddress?: string,
     @Query("purpose") purpose?: PlayerWalletAuthPurpose,
     @Query("gameId") gameId?: string,
@@ -76,7 +76,7 @@ export class EconomicsController {
   }
 
   @Post("api/player/session")
-  createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {
+  async createOrLoadPlayerSession(@Body() body?: PlayerSessionBody) {
     if (
       !body?.gameId ||
       !body?.walletAddress ||
@@ -88,7 +88,7 @@ export class EconomicsController {
       );
     }
 
-    this.playerWalletAuthService.verifySignedRequest({
+    await this.playerWalletAuthService.verifySignedRequest({
       walletAddress: body.walletAddress,
       nonce: body.nonce,
       signature: body.signature,
@@ -103,7 +103,7 @@ export class EconomicsController {
   }
 
   @Post("api/player/game-economic-event")
-  logGameScopedPlayerEvent(@Body() body?: LogPlayerEventBody) {
+  async logGameScopedPlayerEvent(@Body() body?: LogPlayerEventBody) {
     if (
       !body?.gameId ||
       !body?.walletAddress ||
@@ -119,7 +119,7 @@ export class EconomicsController {
       );
     }
 
-    this.playerWalletAuthService.verifySignedRequest({
+    await this.playerWalletAuthService.verifySignedRequest({
       walletAddress: body.walletAddress,
       nonce: body.nonce,
       signature: body.signature,

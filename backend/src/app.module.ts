@@ -15,8 +15,9 @@ import { TokenShopModule } from "./tokenshop/tokenshop.module";
 import { EconomicsModule } from "./economics/economics.module";
 
 const isTestEnv = process.env.NODE_ENV === "test";
-const shouldSynchronizeSchema =
-  isTestEnv || process.env.TYPEORM_SYNCHRONIZE === "true";
+// Only auto-synchronize in test. Never in production or staging —
+// use explicit migrations instead to prevent accidental schema drops.
+const shouldSynchronizeSchema = isTestEnv;
 
 @Module({
   imports: [
