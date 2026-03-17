@@ -9,7 +9,6 @@ import ErrorBanner from "../components/ErrorBanner";
 import { Zap, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../lib/LanguageContext";
 import { useAuthState } from "../../lib/AuthContext";
-import { getGames } from "../../lib/platform";
 
 /**
  * The ETH "zero address" — this is how the contract represents ETH
@@ -85,13 +84,12 @@ export default function Trade() {
 
   const loadAvailableGames = useCallback(async () => {
     try {
-      const response = await getGames();
-      const mappedGames = (response.data || []).map((game) => ({
+      const games = await apiGet("/platform/public-games");
+      const mappedGames = (games || []).map((game) => ({
         gameId: game.id,
         name: game.name,
         slug: game.slug,
       }));
-
       setAvailableGames(mappedGames);
     } catch (error) {
       console.error("Failed to load games for trade scope selector:", error);
@@ -409,16 +407,30 @@ export default function Trade() {
       setAmount("");
       setQuote(null);
 
-      // Sync backend (index new event), then refresh asset data
+      // Sync backend (index new event), then refresh asset data.
+      // triggerSync() waits for any in-progress background poll to finish
+      // before running its own sync, so we get fresh data on first refresh.
       try {
         await triggerSync();
         refreshAssets();
         refreshTokenBalance();
-        // Re-fetch config too (supply may have changed)
         apiGet("/shop/config").then(setConfig).catch(console.error);
       } catch {
         // sync failed silently — not critical
       }
+
+      // Second sync after 2 s: catches the edge case where the node needed
+      // an extra moment to make the block available to queryFilter.
+      // This also ensures the Dashboard / Admin page's 2 s mount-retry lands
+      // after fresh data has been written to the DB.
+      setTimeout(() => {
+        triggerSync()
+          .then(() => {
+            refreshAssets();
+            refreshTokenBalance();
+          })
+          .catch(() => {});
+      }, 2000);
 
       if (gameId && address) {
         try {
