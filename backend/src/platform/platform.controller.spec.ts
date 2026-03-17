@@ -267,3 +267,12 @@ describe("PlatformController", () => {
     );
   });
 });
+
+describe("ApiPlatformController", () => {
+  it("getPublicGames delegates to getPublicGameList", () => {
+    const svc = { getPublicGameList: jest.fn().mockReturnValue([]) };
+    const apiController = new ApiPlatformController(svc as never);
+    apiController.getPublicGames();
+    expect(svc.getPublicGameList).toHaveBeenCalled();
+  });
+});
