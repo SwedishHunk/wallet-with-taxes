@@ -5,6 +5,7 @@ import { AdminDevService } from "./admin-dev.service";
 import { AdminService } from "./admin.service";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
+import { ShopEvent } from "../tokenshop/entities/shop-event.entity";
 import { TaxModule } from "../tax/tax.module";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
@@ -19,6 +20,7 @@ import { PlatformModule } from "../platform/platform.module";
   imports: [
     TypeOrmModule.forFeature([
       TaxEvent,
+      ShopEvent,
       User,
       Studio,
       Game,

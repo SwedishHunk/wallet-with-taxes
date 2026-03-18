@@ -31,14 +31,13 @@ type StudioRow = {
 
 type TransactionRow = {
   id: number;
-  type: string;
+  type: "BUY" | "SELL";
   userAddress: string;
   assetAddress: string;
-  tokenId: number;
-  amount: number;
-  feeUSD: number;
-  priceUSD: number | null;
-  source: string | null;
+  assetSymbol: string;
+  amountIn: string;
+  amountOut: string;
+  blockNumber: number;
   txHash: string | null;
   timestamp: string;
 };
@@ -797,7 +796,7 @@ export default function TriolithAdminPage() {
               <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Type", "User Address", "Asset", "Token ID", "Amount", "Fee USD", "Tx Hash", "Time"].map((h) => (
+                    {["Type", "User Address", "Asset", "Amount In", "Amount Out", "Block", "Tx Hash", "Time"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -820,23 +819,23 @@ export default function TriolithAdminPage() {
                       onMouseEnter={rowHoverEnter}
                       onMouseLeave={rowHoverLeave}
                     >
-                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>
+                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 700, color: tx.type === "BUY" ? "var(--success)" : "var(--danger)" }}>
                         {tx.type}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {tx.userAddress ? tx.userAddress.slice(0, 10) + "..." : "—"}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                        {tx.assetAddress ? tx.assetAddress.slice(0, 10) + "..." : "—"}
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
-                        {tx.tokenId ?? "—"}
+                        {tx.assetSymbol || (tx.assetAddress ? tx.assetAddress.slice(0, 10) + "..." : "—")}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
-                        {tx.amount}
+                        {tx.amountIn}
+                      </td>
+                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600, color: tx.type === "BUY" ? "var(--success)" : "var(--danger)" }}>
+                        {tx.amountOut}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
-                        {tx.feeUSD != null ? `$${fmt(tx.feeUSD)}` : "—"}
+                        {tx.blockNumber}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {tx.txHash ? tx.txHash.slice(0, 10) + "..." : "—"}
