@@ -40,6 +40,7 @@ function makeService(queryRaw?: unknown) {
     findOne: jest.fn(),
     update: jest.fn().mockResolvedValue({}),
   };
+  const shopEventRepo = { find: jest.fn(), findAndCount: jest.fn() };
   const economicEventRepo = { findAndCount: jest.fn() };
   const platformConfigRepo = {
     findOne: jest.fn().mockResolvedValue(null),
@@ -53,6 +54,7 @@ function makeService(queryRaw?: unknown) {
 
   const service = new AdminService(
     taxRepo as never,
+    shopEventRepo as never,
     userRepo as never,
     studioRepo as never,
     gameRepo as never,
@@ -64,6 +66,7 @@ function makeService(queryRaw?: unknown) {
   return {
     service,
     taxRepo,
+    shopEventRepo,
     userRepo,
     studioRepo,
     gameRepo,
@@ -200,17 +203,28 @@ describe("AdminService", () => {
   });
 
   // ── transactions ───────────────────────────────────────────
-  it("getAllTransactions returns paginated events", async () => {
-    const events = [{ id: "e1" }];
-    const { service, taxRepo } = makeService();
-    taxRepo.findAndCount.mockResolvedValue([events, 1]);
+  it("getAllTransactions returns paginated events with formatted amounts", async () => {
+    const raw = [
+      {
+        id: "e1",
+        type: "BUY",
+        user: "0xabc",
+        asset: "0xdef",
+        assetSymbol: "ETH",
+        amountIn: "2000000000000000000",
+        amountOut: "2000000000000000000000",
+        blockNumber: 10,
+        txHash: "0x123",
+        createdAt: new Date("2026-03-18T00:00:00Z"),
+      },
+    ];
+    const { service, shopEventRepo } = makeService();
+    shopEventRepo.findAndCount.mockResolvedValue([raw, 1]);
 
-    await expect(service.getAllTransactions(10, 0)).resolves.toEqual({
-      events,
-      total: 1,
-      limit: 10,
-      offset: 0,
-    });
+    const result = await service.getAllTransactions(10, 0);
+    expect(result.total).toBe(1);
+    expect(result.events[0].amountIn).toBe("2.0");
+    expect(result.events[0].amountOut).toBe("2000.0");
   });
 
   // ── users ──────────────────────────────────────────────────
