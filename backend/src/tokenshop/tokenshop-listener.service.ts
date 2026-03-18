@@ -12,7 +12,7 @@ import {
   Log,
   WebSocketProvider,
 } from "ethers";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, MoreThan, Repository } from "typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { ShopEvent } from "./entities/shop-event.entity";
 import { TOKENSHOP_ABI } from "./tokenshop.abi";
@@ -247,6 +247,23 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(
           `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +
             `latest=${latestBlock}). Clearing stale events and re-indexing from block 0.`,
+        );
+        await this.shopEventRepo.clear();
+        syncState.lastSyncedBlock = "0";
+        await this.syncStateRepo.save(syncState);
+        fromBlock = 1;
+      }
+
+      // Secondary stale-event check: catch the case where lastSyncedBlock was
+      // already reset to 0 (by a previous run) but events from an old chain
+      // still exist at block numbers beyond the current tip.
+      const staleCount = await this.shopEventRepo.count({
+        where: { blockNumber: MoreThan(latestBlock) },
+      });
+      if (staleCount > 0) {
+        this.logger.warn(
+          `Found ${staleCount} events beyond current tip (block ${latestBlock}). ` +
+            `Clearing all events and re-indexing from block 0.`,
         );
         await this.shopEventRepo.clear();
         syncState.lastSyncedBlock = "0";
