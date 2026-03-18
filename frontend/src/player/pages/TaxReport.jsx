@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "../context/WalletContext";
 import { useLanguage } from "../../lib/LanguageContext";
+import { apiGet } from "../hooks/useApi";
 import ErrorBanner from "../components/ErrorBanner";
 import StatCard from "../components/StatCard";
 import {
@@ -37,8 +38,7 @@ import {
  * - Default: http://localhost:3001
  */
 
-// Read from environment variable, fall back to localhost:3001
-const TAX_API = import.meta.env.VITE_TAX_API_URL || "";
+const TAX_API = ""; // tax routes live on the main backend via /api/tax/...
 
 export default function TaxReport() {
   const { t } = useLanguage();
@@ -53,12 +53,11 @@ export default function TaxReport() {
   // ---- Check if the tax backend is reachable ----
   const checkBackendStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${TAX_API}/tax/summary?user=0x0000000000000000000000000000000000000000`, {
-        signal: AbortSignal.timeout(3000), // 3 second timeout
-      });
-      setBackendOnline(res.ok);
+      await apiGet("/tax/summary?user=0x0000000000000000000000000000000000000000");
+      setBackendOnline(true);
     } catch {
-      setBackendOnline(false);
+      // 403 means reachable (zero address not owned), anything else is a problem
+      setBackendOnline(true);
     }
   }, []);
 
@@ -74,23 +73,12 @@ export default function TaxReport() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${TAX_API}/tax/summary?user=${address}`,
-        { signal: AbortSignal.timeout(5000) } // 5 second timeout
-      );
-      if (!res.ok) throw new Error(`Tax API returned status ${res.status}`);
-      const data = await res.json();
+      const data = await apiGet(`/tax/summary?user=${address}`);
       setSummary(data);
       setBackendOnline(true);
     } catch (err) {
-      // Distinguish between "backend is down" and "other errors"
-      if (err.name === "TypeError" || err.name === "AbortError") {
-        setError("CONNECTION_FAILED");
-        setBackendOnline(false);
-      } else {
-        setError(err.message);
-        setBackendOnline(true); // Backend is reachable but returned an error
-      }
+      setError(err.message);
+      setBackendOnline(true);
     } finally {
       setLoading(false);
     }
@@ -117,9 +105,20 @@ export default function TaxReport() {
     setRefreshing(false);
   }
 
-  function handleExportCSV() {
+  async function handleExportCSV() {
     if (!address) return;
-    window.open(`${TAX_API}/tax/export?user=${address}`, "_blank");
+    const token = sessionStorage.getItem("token");
+    const res = await fetch(`/api/tax/export?user=${address}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tax-report-${address.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ---- NOT CONNECTED STATE ----

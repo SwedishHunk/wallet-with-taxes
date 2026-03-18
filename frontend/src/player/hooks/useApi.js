@@ -7,9 +7,11 @@ const API_BASE = "/api";
  */
 async function apiFetch(path, options = {}) {
   const { headers, ...restOptions } = options;
+  const token = sessionStorage.getItem("token");
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
   const res = await fetch(`${API_BASE}${path}`, {
     ...restOptions,
-    headers: { "Content-Type": "application/json", ...headers },
+    headers: { "Content-Type": "application/json", ...authHeader, ...headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
