@@ -226,6 +226,18 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async reindexFromGenesis() {
+    const syncState = await this.getOrCreateSyncState();
+    syncState.lastSyncedBlock = "0";
+    await this.syncStateRepo.save(syncState);
+    await this.syncOnce();
+    const updated = await this.getOrCreateSyncState();
+    return {
+      status: "ok",
+      lastSyncedBlock: Number(updated.lastSyncedBlock),
+    };
+  }
+
   private async syncOnce() {
     if (!this.provider || !this.contract) {
       return;

@@ -12,6 +12,7 @@ import { Game } from "../platform/entities/game.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
+import { ethers } from "ethers";
 import { Repository } from "typeorm";
 import {
   REVENUE_SPLIT_DEV,
@@ -194,14 +195,22 @@ export class AdminService {
       skip: offset,
     });
 
+    const fmt18 = (raw: string) => {
+      try {
+        return ethers.formatUnits(BigInt(raw), 18);
+      } catch {
+        return raw;
+      }
+    };
+
     const mapped = events.map((e) => ({
       id: e.id,
       type: e.type,
       userAddress: e.user,
       assetAddress: e.asset,
       assetSymbol: e.assetSymbol,
-      amountIn: e.amountIn,
-      amountOut: e.amountOut,
+      amountIn: fmt18(e.amountIn),
+      amountOut: fmt18(e.amountOut),
       blockNumber: e.blockNumber,
       txHash: e.txHash,
       timestamp: e.createdAt,
