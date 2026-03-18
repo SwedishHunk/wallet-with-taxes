@@ -249,6 +249,7 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
             `latest=${latestBlock}). Clearing stale events and re-indexing from block 0.`,
         );
         await this.shopEventRepo.clear();
+        await this.taxEventRepo.clear();
         syncState.lastSyncedBlock = "0";
         await this.syncStateRepo.save(syncState);
         fromBlock = 1;
