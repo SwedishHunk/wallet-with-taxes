@@ -34,8 +34,10 @@ describe("PlatformService", () => {
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
   let service: PlatformService;
+  const originalDepositFlag = process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS;
 
   beforeEach(() => {
+    process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS = "true";
     dataSource = {
       transaction: jest.fn(),
     };
@@ -113,6 +115,40 @@ describe("PlatformService", () => {
       walletDepositIntentRepo as never,
       userRepo as never,
     );
+  });
+
+  afterAll(() => {
+    if (originalDepositFlag === undefined) {
+      delete process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS;
+    } else {
+      process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS = originalDepositFlag;
+    }
+  });
+
+  it("disables unverified wallet deposit flows by default", async () => {
+    delete process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS;
+
+    await expect(
+      service.depositToGameWallet("g1", "u1", "s1", 5),
+    ).rejects.toMatchObject({
+      statusCode: 501,
+      message:
+        "Wallet deposit APIs are disabled until on-chain verification is implemented.",
+    });
+    await expect(
+      service.createWalletDepositIntent("g1", "u1", "s1", 5),
+    ).rejects.toMatchObject({
+      statusCode: 501,
+      message:
+        "Wallet deposit APIs are disabled until on-chain verification is implemented.",
+    });
+    await expect(
+      service.confirmWalletDepositIntent("g1", "u1", "s1", "i1", "0xabc"),
+    ).rejects.toMatchObject({
+      statusCode: 501,
+      message:
+        "Wallet deposit APIs are disabled until on-chain verification is implemented.",
+    });
   });
 
   it("createWalletDepositIntent creates pending intent with deterministic fake address", async () => {

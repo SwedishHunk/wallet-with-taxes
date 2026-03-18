@@ -1,4 +1,5 @@
-import { Body, Controller, Headers, Post } from "@nestjs/common";
+import { Body, Controller, Headers, Post, Req } from "@nestjs/common";
+import { Request } from "express";
 import { AdminDevService } from "./admin-dev.service";
 
 interface DevBootstrapBody {
@@ -15,9 +16,13 @@ export class AdminDevController {
 
   @Post("bootstrap")
   async bootstrap(
+    @Req() req: Request,
     @Body() body: DevBootstrapBody,
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
-    return this.adminDevService.bootstrap(body ?? {}, devBootstrapKey);
+    return this.adminDevService.bootstrap(body ?? {}, devBootstrapKey, {
+      ip: req.ip,
+      remoteAddress: req.socket.remoteAddress,
+    });
   }
 }

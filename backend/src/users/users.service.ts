@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { Repository, DataSource, QueryFailedError } from "typeorm";
 import { User } from "./user.entity";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
@@ -18,6 +18,7 @@ import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { encryptPrivateKey } from "../shared/crypto.util";
 import { assertValidEmail } from "../shared/validators/email.validator";
+import { UserProfileDto } from "./dto/users-response.dto";
 
 @Injectable()
 export class UsersService {
@@ -75,6 +76,56 @@ export class UsersService {
       wallet,
       encryptedPrivateKey,
       onChainWallet: onChainWallet ?? undefined,
+    };
+  }
+
+  private buildLinkWalletMessage(userId: string, email: string): string {
+    return `Link wallet to Triolith account ${userId}: ${email}`;
+  }
+
+  private mapSignupQueryError(error: unknown): AppException | null {
+    if (!(error instanceof QueryFailedError)) {
+      return null;
+    }
+
+    const driverError = (
+      error as QueryFailedError & {
+        driverError?: { code?: string; detail?: string };
+      }
+    ).driverError;
+
+    if (driverError?.code !== "23505") {
+      return null;
+    }
+
+    const detail = driverError.detail ?? "";
+    if (detail.includes("(name)=")) {
+      return new AppException(ERROR_MESSAGES.STUDIO_NAME_ALREADY_EXISTS, 409);
+    }
+
+    if (detail.includes("(email)=")) {
+      return new AppException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS, 409);
+    }
+
+    return new AppException(ERROR_MESSAGES.DATABASE_ERROR, 409);
+  }
+
+  private toUserProfileView(
+    user: User,
+    studioId: string | null,
+  ): UserProfileDto {
+    return {
+      id: user.id,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      custodyMode: user.custodyMode,
+      kycStatus: user.kycStatus,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      onChainWallet: user.onChainWallet ?? null,
+      isAdmin: user.isAdmin,
+      isSuspended: user.isSuspended,
+      studioId,
     };
   }
 
@@ -194,6 +245,10 @@ export class UsersService {
       };
     } catch (err) {
       await queryRunner.rollbackTransaction();
+      const mappedError = this.mapSignupQueryError(err);
+      if (mappedError) {
+        throw mappedError;
+      }
       throw err;
     } finally {
       await queryRunner.release();
@@ -287,10 +342,28 @@ export class UsersService {
     };
   }
 
-  async linkWallet(email: string, walletAddress: string, signature: string) {
+  async linkWallet(
+    userId: string,
+    currentPassword: string,
+    walletAddress: string,
+    signature: string,
+  ) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+    if (!isPasswordValid) {
+      throw new AppException(ERROR_MESSAGES.INVALID_CREDENTIALS, 401);
+    }
+
     // Verify the caller owns the destination wallet by checking that the
     // supplied signature was produced by its private key.
-    const message = `Link wallet to Triolith: ${email}`;
+    const message = this.buildLinkWalletMessage(user.id, user.email);
     let recovered: string;
     try {
       recovered = ethers.verifyMessage(message, signature);
@@ -299,11 +372,6 @@ export class UsersService {
     }
     if (recovered.toLowerCase() !== walletAddress.toLowerCase()) {
       throw new AppException("Wallet ownership verification failed", 403);
-    }
-
-    const user = await this.userRepository.findOne({ where: { email } });
-    if (!user) {
-      throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
     }
 
     user.walletAddress = walletAddress;
@@ -360,8 +428,22 @@ export class UsersService {
     return membership;
   }
 
-  async findById(id: string) {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async findById(id: string): Promise<UserProfileDto | null> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        walletAddress: true,
+        custodyMode: true,
+        kycStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        onChainWallet: true,
+        isAdmin: true,
+        isSuspended: true,
+      },
+    });
     if (!user) return null;
 
     const membership = await this.studioMemberRepository.findOne({
@@ -369,9 +451,7 @@ export class UsersService {
       relations: ["studio"],
     });
 
-    return { ...user, studioId: membership?.studio.id ?? null } as User & {
-      studioId: string | null;
-    };
+    return this.toUserProfileView(user as User, membership?.studio.id ?? null);
   }
 
   async getStudiosForUser(userId: string) {

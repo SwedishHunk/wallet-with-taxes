@@ -9,6 +9,7 @@ import { AppException } from "../common/exceptions/app-exception";
 import { BadRequestException } from "@nestjs/common";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { ethers } from "ethers";
+import { QueryFailedError } from "typeorm";
 
 type Repo = {
   findOne: jest.Mock;
@@ -181,6 +182,39 @@ describe("UsersService", () => {
     );
   });
 
+  it("signup maps duplicate studio name to a 409 app error", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    userRepo.findOne.mockResolvedValueOnce(null);
+    studioMemberService.createBootstrapOwner.mockResolvedValueOnce({
+      id: "m1",
+      role: "owner",
+      isOwner: true,
+      permissionsMask: 1n,
+      gameAccessIds: [],
+    });
+    queryRunner.manager.save
+      .mockResolvedValueOnce({
+        id: "u1",
+        email: "user@test.com",
+      })
+      .mockRejectedValueOnce(
+        Object.assign(new QueryFailedError("INSERT", [], new Error("duplicate")), {
+          driverError: {
+            code: "23505",
+            detail: 'Key (name)=(Dev Studio) already exists.',
+          },
+        }),
+      );
+
+    await expect(
+      service.signup("user@test.com", "pw", "Dev Studio"),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: ERROR_MESSAGES.STUDIO_NAME_ALREADY_EXISTS,
+    });
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
   it("login validates email format", async () => {
     await expect(service.login("bad-email", "pw")).rejects.toBeInstanceOf(
       BadRequestException,
@@ -326,42 +360,66 @@ describe("UsersService", () => {
   });
 
   it("linkWallet rejects mismatched wallet ownership signature", async () => {
+    const passwordHash = await bcrypt.hash("correct", 4);
     const wrongWallet = new ethers.Wallet("0x" + "cc".repeat(32));
     const sig = await wrongWallet.signMessage(
-      "Link wallet to Triolith: user@test.com",
+      "Link wallet to Triolith account u1: user@test.com",
     );
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+      passwordHash,
+    });
     // Signature is valid but for a different address than supplied
     await expect(
-      service.linkWallet(
-        "user@test.com",
-        "0x" + "dd".repeat(20), // wrong address
-        sig,
-      ),
+      service.linkWallet("u1", "correct", "0x" + "dd".repeat(20), sig),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("linkWallet throws when user does not exist", async () => {
     const testWallet = new ethers.Wallet("0x" + "bb".repeat(32));
     const sig = await testWallet.signMessage(
-      "Link wallet to Triolith: missing@test.com",
+      "Link wallet to Triolith account u404: missing@test.com",
     );
     userRepo.findOne.mockResolvedValueOnce(null);
     await expect(
-      service.linkWallet("missing@test.com", testWallet.address, sig),
+      service.linkWallet("u404", "pw", testWallet.address, sig),
     ).rejects.toMatchObject({
       statusCode: 404,
       message: ERROR_MESSAGES.USER_NOT_FOUND,
     });
   });
 
-  it("linkWallet updates custody mode to self", async () => {
+  it("linkWallet rejects invalid current password", async () => {
+    const passwordHash = await bcrypt.hash("correct", 4);
     const testWallet = new ethers.Wallet("0x" + "aa".repeat(32));
     const sig = await testWallet.signMessage(
-      "Link wallet to Triolith: user@test.com",
+      "Link wallet to Triolith account u1: user@test.com",
+    );
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+      passwordHash,
+    });
+
+    await expect(
+      service.linkWallet("u1", "wrong", testWallet.address, sig),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+      message: ERROR_MESSAGES.INVALID_CREDENTIALS,
+    });
+  });
+
+  it("linkWallet updates custody mode to self", async () => {
+    const passwordHash = await bcrypt.hash("correct", 4);
+    const testWallet = new ethers.Wallet("0x" + "aa".repeat(32));
+    const sig = await testWallet.signMessage(
+      "Link wallet to Triolith account u1: user@test.com",
     );
     const user = {
       id: "u1",
       email: "user@test.com",
+      passwordHash,
       walletAddress: "0xold",
       custodyMode: "custodial",
       encryptedPrivateKey: "enc",
@@ -369,7 +427,7 @@ describe("UsersService", () => {
     userRepo.findOne.mockResolvedValueOnce(user);
 
     await expect(
-      service.linkWallet("user@test.com", testWallet.address, sig),
+      service.linkWallet("u1", "correct", testWallet.address, sig),
     ).resolves.toEqual({
       message: "Wallet linked successfully",
     });
@@ -385,11 +443,25 @@ describe("UsersService", () => {
   });
 
   it("findById enriches with studioId when membership exists", async () => {
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1", email: "u@test.com" });
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "u@test.com",
+      passwordHash: "secret",
+      encryptedPrivateKey: "enc",
+      walletAddress: "0xwallet",
+      custodyMode: "custodial",
+      kycStatus: "pending",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      onChainWallet: null,
+      isAdmin: false,
+      isSuspended: false,
+    });
     studioMemberRepo.findOne.mockResolvedValueOnce({ studio: { id: "s1" } });
-    await expect(service.findById("u1")).resolves.toEqual(
-      expect.objectContaining({ id: "u1", studioId: "s1" }),
-    );
+    const profile = await service.findById("u1");
+    expect(profile).toEqual(expect.objectContaining({ id: "u1", studioId: "s1" }));
+    expect(profile).not.toHaveProperty("passwordHash");
+    expect(profile).not.toHaveProperty("encryptedPrivateKey");
   });
 
   it("getStudiosForUser maps memberships to studios with role", async () => {

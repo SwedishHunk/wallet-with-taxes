@@ -1,0 +1,30 @@
+Skipping on-chain wallet creation (RPC unavailable?): Error: execution reverted (no data present; likely require(false) occurred (action="estimateGas", data="0x", reason="require(false)", transaction={ "data": "0xb054a9e800000000000000000000000018e896871cfd5eaf019b1bd8d2565f46c069877d", "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "to": "0x5FbDB2315678afecb367f032d93F642f64180aa3" }, invocation=null, revert=null, code=CALL_EXCEPTION, version=6.13.7)
+    at makeError (C:\Users\mhdas\OneDrive\Desktop\wallet-with-taxes\backend\node_modules\ethers\src.ts\utils\errors.ts:694:21)
+    at getBuiltinCallException (C:\Users\mhdas\OneDrive\Desktop\wallet-with-taxes\backend\node_modules\ethers\src.ts\abi\abi-coder.ts:118:21)
+    at Function.getBuiltinCallException (C:\Users\mhdas\OneDrive\Desktop\wallet-with-taxes\backend\node_modules\ethers\src.ts\abi\abi-coder.ts:235:16)
+    at JsonRpcProvider.getRpcError (C:\Users\mhdas\OneDrive\Desktop\wallet-with-taxes\backend\node_modules\ethers\src.ts\providers\provider-jsonrpc.ts:989:32)
+    at <anonymous> (C:\Users\mhdas\OneDrive\Desktop\wallet-with-taxes\backend\node_modules\ethers\src.ts\providers\provider-jsonrpc.ts:563:45)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  code: 'CALL_EXCEPTION',
+  action: 'estimateGas',
+  data: '0x',
+  reason: 'require(false)',
+  transaction: {
+    to: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+    data: '0xb054a9e800000000000000000000000018e896871cfd5eaf019b1bd8d2565f46c069877d',
+    from: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+  },
+  invocation: null,
+  revert: null,
+  shortMessage: 'execution reverted (no data present; likely require(false) occurred',
+  info: {
+    error: { code: 3, message: 'execution reverted', data: '0x' },
+    payload: {
+      method: 'eth_estimateGas',
+      params: [Array],
+      id: 3,
+      jsonrpc: '2.0'
+    }
+  }
+}
+^C^C^C

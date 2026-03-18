@@ -18,8 +18,11 @@ export const getMembersCount = (studioId: string) =>
 export const getStudioMembers = (studioId: string) =>
   api.get(`/studios/${studioId}/members`);
 
-export const linkWallet = (email: string, walletAddress: string) =>
-  api.post("/users/link-wallet", { email, walletAddress });
+export const linkWallet = (
+  walletAddress: string,
+  currentPassword: string,
+  signature: string,
+) => api.post("/users/link-wallet", { walletAddress, currentPassword, signature });
 
 export const getMe = () => api.get<User>("/users/me");
 

@@ -23,6 +23,8 @@ import { safeAdd, safeSub } from "../shared/safe-math";
 @Injectable()
 export class PlatformService {
   private static readonly DEPOSIT_INTENT_TTL_MS = 15 * 60 * 1000;
+  private static readonly UNVERIFIED_WALLET_DEPOSITS_DISABLED_MESSAGE =
+    "Wallet deposit APIs are disabled until on-chain verification is implemented.";
 
   private buildStudioScopedSlug(baseSlug: string, studioId: string): string {
     return `${baseSlug}-${studioId.slice(0, 8)}`;
@@ -51,6 +53,17 @@ export class PlatformService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
   ) {}
+
+  private assertUnverifiedWalletDepositsEnabled() {
+    if (process.env.ENABLE_UNVERIFIED_WALLET_DEPOSITS === "true") {
+      return;
+    }
+
+    throw new AppException(
+      PlatformService.UNVERIFIED_WALLET_DEPOSITS_DISABLED_MESSAGE,
+      501,
+    );
+  }
 
   private generateFakeDepositAddress(
     gameId: string,
@@ -332,6 +345,7 @@ export class PlatformService {
     amount: unknown,
     description?: string,
   ) {
+    this.assertUnverifiedWalletDepositsEnabled();
     const amountNum = parseAmount(amount);
 
     const { wallet } = await this.ensureGameWalletForPlayer(
@@ -372,6 +386,7 @@ export class PlatformService {
     studioId: string,
     amount: unknown,
   ) {
+    this.assertUnverifiedWalletDepositsEnabled();
     const amountNum = parseAmount(amount);
 
     const game = await this.assertGameBelongsToStudio(gameId, studioId);
@@ -416,6 +431,7 @@ export class PlatformService {
     intentId: string,
     txHash: string,
   ) {
+    this.assertUnverifiedWalletDepositsEnabled();
     if (!this.isValidFakeTxHash(txHash)) {
       throw new AppException("Invalid txHash", 400);
     }

@@ -10,8 +10,10 @@ import {
 import { Throttle } from "@nestjs/throttler";
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { JwtUser } from "../auth/jwt-user.interface";
 import { Request } from "express";
 import { LinkWalletDto, LoginDto, SignupDto } from "./dto/users-request.dto";
+import { UserProfileDto } from "./dto/users-response.dto";
 
 @Controller("users")
 export class UsersController {
@@ -30,11 +32,14 @@ export class UsersController {
     return this.usersService.login(body.email, body.password, body.studioId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post("link-wallet")
   @Throttle({ auth: { limit: 10, ttl: 60000 } })
-  async linkWallet(@Body() body: LinkWalletDto) {
+  async linkWallet(@Req() req: Request, @Body() body: LinkWalletDto) {
+    const jwtUser = req.user as JwtUser;
     return this.usersService.linkWallet(
-      body.email,
+      jwtUser.id,
+      body.currentPassword,
       body.walletAddress,
       body.signature,
     );
@@ -42,10 +47,9 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get("me")
-  async getProfile(@Req() req: Request) {
+  async getProfile(@Req() req: Request): Promise<UserProfileDto | null> {
     const jwtUser = req.user as { id: string };
-    const fullUser = await this.usersService.findById(jwtUser.id);
-    return fullUser;
+    return this.usersService.findById(jwtUser.id);
   }
 
   @UseGuards(JwtAuthGuard)

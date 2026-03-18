@@ -1,43 +1,11 @@
-=== DATE ===
-Thu, Feb 12, 2026  3:45:27 PM
+Sanitized on 2026-03-18.
 
-=== NODE / NPM ===
-stdout is not a tty
-10.9.2
+This file previously contained environment dumps and test-chain secrets.
+Those values have been removed from the repository because they should not be
+tracked in source control.
 
-=== ENV (test) ===
-TEST_DATABASE_HOST=localhost
-TEST_DATABASE_PORT=5432
-TEST_DATABASE_NAME=inner_wallet_test
-TEST_DATABASE_USER=postgres
-TEST_DATABASE_PASSWORD=LX7z8CGm^ZByd8KGsG48
-JWT_SECRET=test_jwt_secret_key
-PORT=3001
-
-# Encryption for custodial wallets (32 chars for key, 16 for IV)
-ENCRYPTION_KEY=12345678901234567890123456789012
-ENCRYPTION_IV=1234567890123456
-
-# Blockchain configuration
-RPC_URL=http://localhost:8545
-FACTORY_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-=== GREP sqlite/postgres/typeorm ===
-src\app.module.ts:3:import { TypeOrmModule } from "@nestjs/typeorm";
-src\app.module.ts:20:    TypeOrmModule.forRoot({
-src\app.module.ts:21:      type: "postgres",
-src\admin\admin.module.ts:4:import { TypeOrmModule } from '@nestjs/typeorm';
-src\admin\admin.module.ts:10:  imports: [TypeOrmModule.forFeature([TaxEvent, User]), TaxModule],
-src\wallets\wallets.module.ts:2:import { TypeOrmModule } from '@nestjs/typeorm';
-src\wallets\wallets.module.ts:8:  imports: [TypeOrmModule.forFeature([Wallet])],
-src\tax\tax.module.ts:2:import { TypeOrmModule } from '@nestjs/typeorm';
-src\tax\tax.module.ts:7:  imports: [TypeOrmModule.forFeature([TaxEvent])],
-src\platform\platform.module.ts:2:import { TypeOrmModule } from "@nestjs/typeorm";
-src\platform\platform.module.ts:21:    TypeOrmModule.forFeature([
-src\platform\platform.module.ts:37:    TypeOrmModule,
-src\users\users.module.ts:2:import { TypeOrmModule } from "@nestjs/typeorm";
-src\users\users.module.ts:13:    TypeOrmModule.forFeature([User, Studio, StudioMember]),
+If a full local diagnostic log is needed again, generate it locally and keep it
+out of git.
 
 === RUN E2E ===
 

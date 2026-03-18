@@ -42,24 +42,25 @@ export class LoginDto {
 }
 
 export class LinkWalletDto {
-  @ApiProperty({ example: "user@example.com" })
-  @IsEmail()
-  email: string;
-
   @ApiProperty({ example: "0x..." })
   @IsEthereumAddress()
   walletAddress: string;
 
+  @ApiProperty({ description: "Current account password for re-authentication" })
+  @IsString()
+  @IsNotEmpty()
+  currentPassword: string;
+
   /**
    * EIP-191 personal_sign of the message:
-   *   "Link wallet to Triolith: <email>"
+   *   "Link wallet to Triolith account <userId>: <email>"
    * The signature must be produced by the private key of `walletAddress`.
-   * This proves the caller controls the destination wallet before we destroy
-   * the existing custodial key.
+   * This proves the authenticated caller controls the destination wallet
+   * before we destroy the existing custodial key.
    */
   @ApiProperty({
     description:
-      'EIP-191 personal_sign of "Link wallet to Triolith: <email>" — proves wallet ownership',
+      'EIP-191 personal_sign of "Link wallet to Triolith account <userId>: <email>"',
   })
   @IsString()
   @IsNotEmpty()

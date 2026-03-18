@@ -12,6 +12,8 @@ export const ERROR_MESSAGES = {
   // Studio & Access
   NOT_STUDIO_MEMBER: "You do not have access to this studio.",
   STUDIO_NOT_FOUND: "Studio not found or has been deleted.",
+  STUDIO_NAME_ALREADY_EXISTS:
+    "This studio name is already in use. Please choose a different studio name.",
   ACCESS_DENIED: "You do not have permission to perform this action.",
 
   // Personal Accounts

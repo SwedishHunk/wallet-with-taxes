@@ -46,17 +46,13 @@ describe("UsersController", () => {
   it("delegates link wallet", async () => {
     service.linkWallet.mockResolvedValueOnce({ ok: true });
     await expect(
-      controller.linkWallet({
-        email: "a@b.com",
+      controller.linkWallet(req({ id: "u1" }), {
         walletAddress: "0xabc",
+        currentPassword: "pw",
         signature: "0xsig",
       } as never),
     ).resolves.toEqual({ ok: true });
-    expect(service.linkWallet).toHaveBeenCalledWith(
-      "a@b.com",
-      "0xabc",
-      "0xsig",
-    );
+    expect(service.linkWallet).toHaveBeenCalledWith("u1", "pw", "0xabc", "0xsig");
   });
 
   it("delegates profile/studios/member-session reads", async () => {
