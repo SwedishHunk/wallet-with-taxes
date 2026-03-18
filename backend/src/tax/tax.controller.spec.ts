@@ -1,5 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
-import { TaxController } from "./tax.controller";
+import { ApiTaxController, TaxController } from "./tax.controller";
 
 // Helper: build a mock Express Request with optional JwtUser on req.user
 function mockReq(
@@ -115,5 +115,47 @@ describe("TaxController", () => {
       ),
     ).rejects.toThrow(ForbiddenException);
     expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
+  });
+});
+
+describe("ApiTaxController", () => {
+  it("getSummary returns error object when user is missing", async () => {
+    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const controller = new ApiTaxController(service as never);
+    const result = await controller.getSummary("");
+    expect(result).toEqual({ error: "Missing user address in query." });
+    expect(service.getSummary).not.toHaveBeenCalled();
+  });
+
+  it("getSummary delegates to tax service with lowercased address", async () => {
+    const service = {
+      getSummary: jest.fn().mockResolvedValue({ gains: 0 }),
+      exportEventsAsCSV: jest.fn(),
+    };
+    const controller = new ApiTaxController(service as never);
+    const result = await controller.getSummary("0xABC");
+    expect(service.getSummary).toHaveBeenCalledWith("0xabc");
+    expect(result).toEqual({ gains: 0 });
+  });
+
+  it("exportCSV returns 400 when user is missing", async () => {
+    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+    const controller = new ApiTaxController(service as never);
+    await controller.exportCSV("", res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith("Missing user address");
+    expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
+  });
+
+  it("exportCSV delegates to tax service with lowercased address", async () => {
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn().mockResolvedValue(undefined),
+    };
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+    const controller = new ApiTaxController(service as never);
+    await controller.exportCSV("0xABC", res as never);
+    expect(service.exportEventsAsCSV).toHaveBeenCalledWith("0xabc", res);
   });
 });
