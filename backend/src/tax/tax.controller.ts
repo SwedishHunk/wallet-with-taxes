@@ -72,10 +72,7 @@ export class ApiTaxController {
   }
 
   @Get("export")
-  async exportCSV(
-    @Query("user") user: string,
-    @Res() res: Response,
-  ) {
+  async exportCSV(@Query("user") user: string, @Res() res: Response) {
     if (!user) {
       res.status(400).send("Missing user address");
       return;
