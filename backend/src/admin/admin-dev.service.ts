@@ -68,7 +68,7 @@ export class AdminDevService {
       );
       await q.query(
         `DELETE FROM nft_instances
-         WHERE "gamePlayerId" IN (
+         WHERE "ownerId" IN (
            SELECT gp.id FROM game_players gp
            JOIN games g ON g.id = gp."gameId"
            WHERE g."studioId" = $1
