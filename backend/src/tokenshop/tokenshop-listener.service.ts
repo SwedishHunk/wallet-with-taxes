@@ -246,8 +246,9 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       if (Number(syncState.lastSyncedBlock) > latestBlock) {
         this.logger.warn(
           `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +
-            `latest=${latestBlock}). Resetting sync state to block 0.`,
+            `latest=${latestBlock}). Clearing stale events and re-indexing from block 0.`,
         );
+        await this.shopEventRepo.clear();
         syncState.lastSyncedBlock = "0";
         await this.syncStateRepo.save(syncState);
         fromBlock = 1;
