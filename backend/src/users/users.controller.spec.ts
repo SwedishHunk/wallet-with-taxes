@@ -52,7 +52,12 @@ describe("UsersController", () => {
         signature: "0xsig",
       } as never),
     ).resolves.toEqual({ ok: true });
-    expect(service.linkWallet).toHaveBeenCalledWith("u1", "pw", "0xabc", "0xsig");
+    expect(service.linkWallet).toHaveBeenCalledWith(
+      "u1",
+      "pw",
+      "0xabc",
+      "0xsig",
+    );
   });
 
   it("delegates profile/studios/member-session reads", async () => {

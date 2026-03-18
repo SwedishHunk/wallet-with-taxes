@@ -46,7 +46,9 @@ export class LinkWalletDto {
   @IsEthereumAddress()
   walletAddress: string;
 
-  @ApiProperty({ description: "Current account password for re-authentication" })
+  @ApiProperty({
+    description: "Current account password for re-authentication",
+  })
   @IsString()
   @IsNotEmpty()
   currentPassword: string;

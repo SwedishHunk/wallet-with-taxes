@@ -451,7 +451,7 @@ export class UsersService {
       relations: ["studio"],
     });
 
-    return this.toUserProfileView(user as User, membership?.studio.id ?? null);
+    return this.toUserProfileView(user, membership?.studio.id ?? null);
   }
 
   async getStudiosForUser(userId: string) {

@@ -198,12 +198,15 @@ describe("UsersService", () => {
         email: "user@test.com",
       })
       .mockRejectedValueOnce(
-        Object.assign(new QueryFailedError("INSERT", [], new Error("duplicate")), {
-          driverError: {
-            code: "23505",
-            detail: 'Key (name)=(Dev Studio) already exists.',
+        Object.assign(
+          new QueryFailedError("INSERT", [], new Error("duplicate")),
+          {
+            driverError: {
+              code: "23505",
+              detail: "Key (name)=(Dev Studio) already exists.",
+            },
           },
-        }),
+        ),
       );
 
     await expect(
@@ -459,7 +462,9 @@ describe("UsersService", () => {
     });
     studioMemberRepo.findOne.mockResolvedValueOnce({ studio: { id: "s1" } });
     const profile = await service.findById("u1");
-    expect(profile).toEqual(expect.objectContaining({ id: "u1", studioId: "s1" }));
+    expect(profile).toEqual(
+      expect.objectContaining({ id: "u1", studioId: "s1" }),
+    );
     expect(profile).not.toHaveProperty("passwordHash");
     expect(profile).not.toHaveProperty("encryptedPrivateKey");
   });

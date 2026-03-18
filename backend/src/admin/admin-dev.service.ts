@@ -43,7 +43,10 @@ export class AdminDevService {
       return false;
     }
 
-    const normalized = value.trim().split(",")[0].replace(/^\[|\]$/g, "");
+    const normalized = value
+      .trim()
+      .split(",")[0]
+      .replace(/^\[|\]$/g, "");
     return (
       normalized === "127.0.0.1" ||
       normalized === "::1" ||
@@ -51,7 +54,9 @@ export class AdminDevService {
     );
   }
 
-  private isLocalDevelopmentRequest(requestMeta?: DevBootstrapRequestMeta): boolean {
+  private isLocalDevelopmentRequest(
+    requestMeta?: DevBootstrapRequestMeta,
+  ): boolean {
     return (
       this.isLoopbackAddress(requestMeta?.ip) ||
       this.isLoopbackAddress(requestMeta?.remoteAddress)
@@ -175,12 +180,17 @@ export class AdminDevService {
 
     if (existingUser) {
       try {
-        const existingLogin = await this.usersService.login(requestedEmail, password);
+        const existingLogin = await this.usersService.login(
+          requestedEmail,
+          password,
+        );
         bootstrapEmail = requestedEmail;
         const userId = existingLogin.user.id;
         const studioId = existingLogin.user.studioId;
 
-        const studio = await this.studioRepo.findOne({ where: { id: studioId } });
+        const studio = await this.studioRepo.findOne({
+          where: { id: studioId },
+        });
         if (!studio) {
           throw new AppException("Studio not found after bootstrap login", 404);
         }
@@ -194,13 +204,20 @@ export class AdminDevService {
           }));
 
         if (!game) {
-          game = await this.platformService.createGameForUser(userId, studioId, {
-            name: gameName,
-            slug: gameSlug,
-          });
+          game = await this.platformService.createGameForUser(
+            userId,
+            studioId,
+            {
+              name: gameName,
+              slug: gameSlug,
+            },
+          );
         }
 
-        const member = await this.usersService.getMemberSession(userId, studioId);
+        const member = await this.usersService.getMemberSession(
+          userId,
+          studioId,
+        );
 
         return {
           token: existingLogin.token,
