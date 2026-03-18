@@ -60,6 +60,7 @@ export class AdminDevService {
         where: { name: studioName },
       });
       if (orphanedStudio) {
+        await this.gameRepo.delete({ studio: { id: orphanedStudio.id } });
         await this.studioRepo.remove(orphanedStudio);
       }
       await this.usersService.signup(email, password, studioName);
