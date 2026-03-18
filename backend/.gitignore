@@ -4,3 +4,8 @@ node_modules
 .env.test
 *.log
 *-full-log.txt
+.tmp-types/
+startdev*.out
+startdev*.err
+startup*.out
+startup*.err
