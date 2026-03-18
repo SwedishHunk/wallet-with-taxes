@@ -5,12 +5,14 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
+import { ShopEvent } from "../tokenshop/entities/shop-event.entity";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
 import { Game } from "../platform/entities/game.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
+import { ethers } from "ethers";
 import { Repository } from "typeorm";
 import {
   REVENUE_SPLIT_DEV,
@@ -30,6 +32,9 @@ export class AdminService {
   constructor(
     @InjectRepository(TaxEvent)
     private readonly taxRepo: Repository<TaxEvent>,
+
+    @InjectRepository(ShopEvent)
+    private readonly shopEventRepo: Repository<ShopEvent>,
 
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -184,13 +189,34 @@ export class AdminService {
   }
 
   async getAllTransactions(limit = 50, offset = 0) {
-    const [events, total] = await this.taxRepo.findAndCount({
-      order: { timestamp: "DESC" },
+    const [events, total] = await this.shopEventRepo.findAndCount({
+      order: { blockNumber: "DESC", logIndex: "DESC" },
       take: limit,
       skip: offset,
     });
 
-    return { events, total, limit, offset };
+    const fmt18 = (raw: string) => {
+      try {
+        return ethers.formatUnits(BigInt(raw), 18);
+      } catch {
+        return raw;
+      }
+    };
+
+    const mapped = events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      userAddress: e.user,
+      assetAddress: e.asset,
+      assetSymbol: e.assetSymbol,
+      amountIn: fmt18(e.amountIn),
+      amountOut: fmt18(e.amountOut),
+      blockNumber: e.blockNumber,
+      txHash: e.txHash,
+      timestamp: e.createdAt,
+    }));
+
+    return { events: mapped, total, limit, offset };
   }
 
   async setStudioStatus(

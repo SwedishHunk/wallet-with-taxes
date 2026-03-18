@@ -114,7 +114,7 @@ export class TokenShopAnalyticsService {
 
   async getRecentActivity(limit = 15) {
     const events = await this.shopEventRepo.find({
-      order: { blockNumber: "DESC", logIndex: "DESC" },
+      order: { blockNumber: "DESC", logIndex: "DESC", createdAt: "DESC" },
       take: limit,
     });
 

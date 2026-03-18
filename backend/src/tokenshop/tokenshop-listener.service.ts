@@ -226,6 +226,18 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async reindexFromGenesis() {
+    const syncState = await this.getOrCreateSyncState();
+    syncState.lastSyncedBlock = "0";
+    await this.syncStateRepo.save(syncState);
+    await this.syncOnce();
+    const updated = await this.getOrCreateSyncState();
+    return {
+      status: "ok",
+      lastSyncedBlock: Number(updated.lastSyncedBlock),
+    };
+  }
+
   private async syncOnce() {
     if (!this.provider || !this.contract) {
       return;
@@ -246,8 +258,10 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       if (Number(syncState.lastSyncedBlock) > latestBlock) {
         this.logger.warn(
           `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +
-            `latest=${latestBlock}). Resetting sync state to block 0.`,
+            `latest=${latestBlock}). Clearing stale events and re-indexing from block 0.`,
         );
+        await this.shopEventRepo.clear();
+        await this.taxEventRepo.clear();
         syncState.lastSyncedBlock = "0";
         await this.syncStateRepo.save(syncState);
         fromBlock = 1;
