@@ -53,6 +53,15 @@ export class AdminDevService {
     const existingUser = await this.userRepo.findOne({ where: { email } });
 
     if (!existingUser) {
+      // Clean up any orphaned studio with the same name left by a previous
+      // failed bootstrap (e.g. on-chain wallet creation reverted after the
+      // DB row was committed, then the user row was rolled back).
+      const orphanedStudio = await this.studioRepo.findOne({
+        where: { name: studioName },
+      });
+      if (orphanedStudio) {
+        await this.studioRepo.remove(orphanedStudio);
+      }
       await this.usersService.signup(email, password, studioName);
     }
 
