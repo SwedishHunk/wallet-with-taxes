@@ -53,3 +53,30 @@ export class TaxController {
     }
   }
 }
+
+/**
+ * Player-facing tax endpoints under /api/tax/...
+ * Players authenticate via MetaMask only (no JWT), so these routes are
+ * unauthenticated. Tax data is derived from public on-chain events and
+ * is keyed by the wallet address supplied in the query string.
+ */
+@Throttle({ auth: { limit: 10, ttl: 60000 } })
+@Controller("api/tax")
+export class ApiTaxController {
+  constructor(private readonly taxService: TaxService) {}
+
+  @Get("summary")
+  async getSummary(@Query("user") user: string) {
+    if (!user) return { error: "Missing user address in query." };
+    return this.taxService.getSummary(user.toLowerCase());
+  }
+
+  @Get("export")
+  async exportCSV(@Query("user") user: string, @Res() res: Response) {
+    if (!user) {
+      res.status(400).send("Missing user address");
+      return;
+    }
+    await this.taxService.exportEventsAsCSV(user.toLowerCase(), res);
+  }
+}
