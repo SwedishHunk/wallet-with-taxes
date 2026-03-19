@@ -25,6 +25,8 @@ export default function StudioEconomicEventsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<"studio" | "game">("studio");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const endpoint = useMemo(() => {
     if (scope === "game" && activeGame?.gameId) {
@@ -62,13 +64,22 @@ export default function StudioEconomicEventsPanel() {
     [events],
   );
 
-  const visibleEvents = useMemo(
-    () =>
-      typeFilter === "all"
-        ? events
-        : events.filter((e) => e.eventType === typeFilter),
-    [events, typeFilter],
-  );
+  const visibleEvents = useMemo(() => {
+    return events.filter((e) => {
+      if (typeFilter !== "all" && e.eventType !== typeFilter) return false;
+      if (fromDate) {
+        const ts = new Date(e.timestamp).getTime();
+        const from = new Date(fromDate).getTime();
+        if (ts < from) return false;
+      }
+      if (toDate) {
+        const ts = new Date(e.timestamp).getTime();
+        const to = new Date(toDate).getTime() + 86400000;
+        if (ts > to) return false;
+      }
+      return true;
+    });
+  }, [events, typeFilter, fromDate, toDate]);
 
   return (
     <div className="border rounded-lg p-4 shadow">
@@ -109,6 +120,18 @@ export default function StudioEconomicEventsPanel() {
           >
             Refresh
           </button>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="rounded border px-3 py-1 text-xs text-gray-700"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="rounded border px-3 py-1 text-xs text-gray-700"
+          />
         </div>
       </div>
 

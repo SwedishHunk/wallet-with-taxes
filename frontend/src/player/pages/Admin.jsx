@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Lock,
+  Layers,
 } from "lucide-react";
 
 function AdminAction({ title, icon: Icon, children, color = "purple" }) {
@@ -70,6 +71,7 @@ export default function Admin() {
   const { isConnected, isAdmin } = useWallet();
   const { getShop, ready } = useContracts();
   const { data: config, refresh: refreshConfig } = useApiData("/shop/config");
+  const { data: liquidity, refresh: refreshLiquidity } = useApiData("/shop/liquidity");
 
   // Form states
   const [feeBps, setFeeBps] = useState("");
@@ -138,6 +140,7 @@ export default function Admin() {
       setStatus("success");
       setMsg(t("player.admin.txConfirmed"));
       refreshConfig();
+      refreshLiquidity();
     } catch (err) {
       setStatus("error");
       const reason = formatTxError(err, "Failed");
@@ -190,6 +193,30 @@ export default function Admin() {
               <p className="text-xs text-gray-500">{t("player.admin.maxTriIn")}</p>
               <p className="text-sm font-mono">
                 {Number(config.maxGenIn) > 0 ? config.maxGenIn : "Unlimited"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shop Reserves */}
+      {liquidity && (
+        <div className="card mb-6 border border-dark-500">
+          <p className="label mb-3 flex items-center gap-2">
+            <Layers size={14} />
+            Shop Reserves
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-dark-700/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">ETH in Contract</p>
+              <p className="text-sm font-mono text-neon-cyan">
+                {liquidity.ETH != null ? Number(liquidity.ETH).toFixed(4) : "—"} ETH
+              </p>
+            </div>
+            <div className="bg-dark-700/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">TRI in Contract</p>
+              <p className="text-sm font-mono text-neon-purple">
+                {liquidity.TRI != null ? Number(liquidity.TRI).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"} TRI
               </p>
             </div>
           </div>

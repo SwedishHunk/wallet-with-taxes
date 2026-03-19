@@ -472,6 +472,49 @@ export class ApiPlatformController {
     );
   }
 
+  // ─── NFT Transfer ────────────────────────────────────────────────────────────
+
+  @Post("player/nft-transfer")
+  async playerNFTTransfer(
+    @Body()
+    body: {
+      gameId: string;
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+      toWalletAddress: string;
+      nftInstanceId: string;
+    },
+  ) {
+    if (
+      !body?.gameId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature ||
+      !body?.toWalletAddress ||
+      !body?.nftInstanceId
+    ) {
+      throw new BadRequestException(
+        "gameId, walletAddress, nonce, signature, toWalletAddress, and nftInstanceId are required",
+      );
+    }
+
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId: body.gameId,
+    });
+
+    return this.platformService.playerTransferNFT(
+      body.gameId,
+      body.walletAddress,
+      body.toWalletAddress,
+      body.nftInstanceId,
+    );
+  }
+
   // ─── NFT Shop ────────────────────────────────────────────────────────────────
 
   @Get("games/:gameId/nft-shop")
@@ -508,6 +551,125 @@ export class ApiPlatformController {
       gameId,
       body.walletAddress,
       templateId,
+    );
+  }
+
+  // ─── Marketplace ─────────────────────────────────────────────────────────────
+
+  @Get("games/:gameId/marketplace")
+  getMarketplaceListings(@Param("gameId") gameId: string) {
+    if (!gameId) return [];
+    return this.platformService.getGameListings(gameId);
+  }
+
+  @Post("games/:gameId/marketplace")
+  async createMarketplaceListing(
+    @Param("gameId") gameId: string,
+    @Body()
+    body: {
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+      nftInstanceId: string;
+      askPrice: string;
+    },
+  ) {
+    if (
+      !gameId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature ||
+      !body?.nftInstanceId ||
+      !body?.askPrice
+    ) {
+      throw new BadRequestException(
+        "gameId, walletAddress, nonce, signature, nftInstanceId, and askPrice are required",
+      );
+    }
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId,
+    });
+    return this.platformService.createNFTListing(
+      gameId,
+      body.walletAddress,
+      body.nftInstanceId,
+      body.askPrice,
+    );
+  }
+
+  @Post("games/:gameId/marketplace/:listingId/cancel")
+  async cancelMarketplaceListing(
+    @Param("gameId") gameId: string,
+    @Param("listingId") listingId: string,
+    @Body()
+    body: {
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+    },
+  ) {
+    if (
+      !gameId ||
+      !listingId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature
+    ) {
+      throw new BadRequestException(
+        "gameId, listingId, walletAddress, nonce, and signature are required",
+      );
+    }
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId,
+    });
+    return this.platformService.cancelNFTListing(
+      gameId,
+      body.walletAddress,
+      listingId,
+    );
+  }
+
+  @Post("games/:gameId/marketplace/:listingId/purchase")
+  async purchaseMarketplaceListing(
+    @Param("gameId") gameId: string,
+    @Param("listingId") listingId: string,
+    @Body()
+    body: {
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+    },
+  ) {
+    if (
+      !gameId ||
+      !listingId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature
+    ) {
+      throw new BadRequestException(
+        "gameId, listingId, walletAddress, nonce, and signature are required",
+      );
+    }
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId,
+    });
+    return this.platformService.purchaseNFTListing(
+      gameId,
+      body.walletAddress,
+      listingId,
     );
   }
 }

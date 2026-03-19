@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt, ShoppingBag } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt, Store } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
 import { useLanguage } from "../../lib/LanguageContext";
@@ -17,7 +17,7 @@ export default function Navbar() {
     { to: `${base}/trade`, label: t("player.nav.trade"), icon: ArrowLeftRight },
     { to: `${base}/portfolio`, label: t("player.nav.portfolio"), icon: Briefcase },
     ...(gameId
-      ? [{ to: `${base}/shop`, label: t("player.nav.shop") || "Shop", icon: ShoppingBag }]
+      ? [{ to: `${base}/market`, label: "Market", icon: Store }]
       : []),
     { to: `${base}/tax`, label: t("player.nav.tax"), icon: Receipt },
   ];
@@ -77,14 +77,6 @@ export default function Navbar() {
 
           {/* Nav links */}
           <div className="flex items-center gap-1">
-            {gameId && (
-              <NavLink
-                to="/player/trade"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-700"
-              >
-                Global
-              </NavLink>
-            )}
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -102,7 +94,7 @@ export default function Navbar() {
                   boxShadow: '0 0 15px rgba(0, 212, 255, 0.1)',
                   color: '#00d4ff',
                 } : {}}
-                end={to === "/player"}
+                end={to === base}
               >
                 <Icon size={16} />
                 {label}

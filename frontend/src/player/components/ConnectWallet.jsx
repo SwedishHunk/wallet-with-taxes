@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { useWallet } from "../context/WalletContext";
-import { Wallet, LogOut, Shield } from "lucide-react";
+import { Wallet, LogOut } from "lucide-react";
 import { useLanguage } from "../../lib/LanguageContext";
 
 export default function ConnectWallet() {
-  const { address, isConnected, isAdmin, connecting, connect, disconnect } =
+  const { address, isConnected, connecting, connect, disconnect } =
     useWallet();
   const { t } = useLanguage();
 
@@ -16,18 +16,6 @@ export default function ConnectWallet() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
-        {isAdmin && (
-          <motion.span
-            className="badge bg-neon-purple/10 text-neon-purple border border-neon-purple/20"
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.1 }}
-            whileHover={{ scale: 1.08 }}
-          >
-            <Shield size={12} className="mr-1" />
-            Admin
-          </motion.span>
-        )}
         <motion.span
           className="font-mono text-xs text-gray-400 px-3 py-1.5 rounded-lg"
           style={{

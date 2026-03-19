@@ -4,7 +4,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Trade from "./pages/Trade";
 import Portfolio from "./pages/Portfolio";
-import Shop from "./pages/Shop";
+import Market from "./pages/Market";
 import TaxReport from "./pages/TaxReport";
 import Admin from "./pages/Admin";
 import "./index.css";
@@ -20,7 +20,7 @@ export default function PlayerPortal() {
           <Route path="/game/:gameId/trade" element={<Trade />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/game/:gameId/portfolio" element={<Portfolio />} />
-          <Route path="/game/:gameId/shop" element={<Shop />} />
+          <Route path="/game/:gameId/market" element={<Market />} />
           <Route path="/tax" element={<TaxReport />} />
           <Route path="/game/:gameId/tax" element={<TaxReport />} />
           <Route path="/admin" element={<Admin />} />

@@ -144,8 +144,10 @@ export default function WalletInfo() {
     setSubmitting("deposit"); setError(null); setSuccessMsg(null);
     try {
       await depositToWallet(activeGame.gameId, depositAmount, depositDesc || undefined);
-      setSuccessMsg(t("dash.successDeposit")); setDepositAmount(""); setDepositDesc("");
-      await loadWalletData(); setTimeout(() => setSuccessMsg(null), 3000);
+      setSuccessMsg(t("dash.successDeposit"));
+      setDepositAmount(""); setDepositDesc("");
+      await loadWalletData();
+      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || t("dash.errDepositFailed"));
     } finally { setSubmitting(null); }
@@ -285,7 +287,7 @@ export default function WalletInfo() {
                   </div>
                   <div>
                     <label className={labelCls}>{t("dash.descriptionOptional")}</label>
-                    <input type="text" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} placeholder="e.g., Initial deposit" disabled={submitting === "deposit"} className={inputCls} />
+                    <input type="text" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} placeholder="e.g., Top-up" disabled={submitting === "deposit"} className={inputCls} />
                   </div>
                   <div style={{ flex: 1 }} />
                   <button type="submit" disabled={submitting === "deposit"} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: `1px solid ${card.accent}70`, background: `${card.accent}15`, color: card.accent, fontWeight: 600, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", opacity: submitting === "deposit" ? 0.5 : 1, backdropFilter: "blur(8px)" }}>

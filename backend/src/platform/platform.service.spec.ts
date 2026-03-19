@@ -36,6 +36,7 @@ describe("PlatformService", () => {
   let nftInstanceRepo: Repo;
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
+  let marketplaceListingRepo: Repo;
   let economicsService: { logEvent: jest.Mock };
   let service: PlatformService;
 
@@ -104,6 +105,12 @@ describe("PlatformService", () => {
       create: jest.fn((x) => x),
       save: jest.fn(),
     };
+    marketplaceListingRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
 
     economicsService = {
       logEvent: jest.fn().mockResolvedValue(undefined),
@@ -121,6 +128,7 @@ describe("PlatformService", () => {
       nftInstanceRepo as never,
       walletDepositIntentRepo as never,
       userRepo as never,
+      marketplaceListingRepo as never,
       economicsService as never,
     );
   });
@@ -1912,5 +1920,64 @@ describe("PlatformService", () => {
       expect.objectContaining({ type: "withdraw", amount: "5" }),
     );
     expect(template.currentMintCount).toBe(1);
+  });
+
+  it("playerTransferNFT rejects self-transfer", async () => {
+    await expect(
+      service.playerTransferNFT("g1", "0xABC", "0xabc", "n1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Cannot transfer to yourself",
+    });
+  });
+
+  it("playerTransferNFT throws asset not found when NFT not owned by sender", async () => {
+    jest
+      .spyOn(service as never, "resolvePlayerGameWallet")
+      .mockResolvedValueOnce({
+        user: { id: "u1" },
+        gamePlayer: { id: "gp-from" },
+        wallet: {},
+      } as never);
+    nftInstanceRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.playerTransferNFT("g1", "0xfrom", "0xto", "missing-nft"),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: ERROR_MESSAGES.ASSET_NOT_FOUND,
+    });
+  });
+
+  it("playerTransferNFT transfers NFT ownership to recipient", async () => {
+    const fromPlayer = { id: "gp-from" };
+    const toPlayer = { id: "gp-to" };
+    jest
+      .spyOn(service as never, "resolvePlayerGameWallet")
+      .mockResolvedValueOnce({
+        user: { id: "u1" },
+        gamePlayer: fromPlayer,
+        wallet: {},
+      } as never)
+      .mockResolvedValueOnce({
+        user: { id: "u2" },
+        gamePlayer: toPlayer,
+        wallet: {},
+      } as never);
+
+    const nftInstance = { id: "n1", owner: fromPlayer, template: {} };
+    nftInstanceRepo.findOne.mockResolvedValueOnce(nftInstance);
+    nftInstanceRepo.save.mockImplementationOnce(async (x: unknown) => x);
+
+    const result = await service.playerTransferNFT(
+      "g1",
+      "0xfrom",
+      "0xto",
+      "n1",
+    );
+    expect((result as { owner: { id: string } }).owner.id).toBe("gp-to");
+    expect(nftInstanceRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: toPlayer }),
+    );
   });
 });

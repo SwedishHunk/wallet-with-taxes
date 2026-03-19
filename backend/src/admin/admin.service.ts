@@ -387,4 +387,27 @@ export class AdminService {
     });
     return { id, status };
   }
+
+  async getEconomicsSummaryPerStudio() {
+    const rows = await this.economicEventRepo
+      .createQueryBuilder("ev")
+      .where("ev.studioId IS NOT NULL")
+      .select([
+        'ev.studioId AS "studioId"',
+        'COUNT(*) AS "eventCount"',
+        `SUM(CASE WHEN ev.direction = 'in' THEN CAST(ev.amount AS numeric) ELSE 0 END) AS "totalIn"`,
+        `SUM(CASE WHEN ev.direction = 'out' THEN CAST(ev.amount AS numeric) ELSE 0 END) AS "totalOut"`,
+        'MAX(ev.timestamp) AS "lastSeen"',
+      ])
+      .groupBy("ev.studioId")
+      .getRawMany();
+
+    return rows.map((r) => ({
+      studioId: r.studioId as string,
+      eventCount: Number(r.eventCount),
+      totalIn: parseFloat(r.totalIn ?? "0"),
+      totalOut: parseFloat(r.totalOut ?? "0"),
+      lastSeen: r.lastSeen as string | null,
+    }));
+  }
 }

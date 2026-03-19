@@ -185,4 +185,10 @@ export class AdminController {
       offset ? Math.max(parseInt(offset, 10), 0) : 0,
     );
   }
+
+  @Get("economics/studios")
+  @UseGuards(TriolithGuard)
+  async getEconomicsSummaryPerStudio() {
+    return this.adminService.getEconomicsSummaryPerStudio();
+  }
 }
