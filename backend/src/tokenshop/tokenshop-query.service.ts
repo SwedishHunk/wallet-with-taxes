@@ -30,8 +30,10 @@ export class TokenShopQueryService {
   async getShopConfig() {
     const contract = this.chainService.getContract();
     const tokenAddress = await this.chainService.getTokenAddress();
-    const ethUsd = this.runtimeEthUsd ?? this.parseEnvNumber(process.env.TOKENSHOP_ETH_USD);
-    const usdSek = this.runtimeUsdSek ?? this.parseEnvNumber(process.env.TOKENSHOP_USD_SEK);
+    const ethUsd =
+      this.runtimeEthUsd ?? this.parseEnvNumber(process.env.TOKENSHOP_ETH_USD);
+    const usdSek =
+      this.runtimeUsdSek ?? this.parseEnvNumber(process.env.TOKENSHOP_USD_SEK);
 
     const [
       feeBps,

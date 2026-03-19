@@ -400,14 +400,20 @@ export class AdminService {
         'MAX(ev.timestamp) AS "lastSeen"',
       ])
       .groupBy("ev.studioId")
-      .getRawMany();
+      .getRawMany<{
+        studioId: string;
+        eventCount: string;
+        totalIn: string | null;
+        totalOut: string | null;
+        lastSeen: string | null;
+      }>();
 
     return rows.map((r) => ({
-      studioId: r.studioId as string,
+      studioId: r.studioId,
       eventCount: Number(r.eventCount),
       totalIn: parseFloat(r.totalIn ?? "0"),
       totalOut: parseFloat(r.totalOut ?? "0"),
-      lastSeen: r.lastSeen as string | null,
+      lastSeen: r.lastSeen,
     }));
   }
 }

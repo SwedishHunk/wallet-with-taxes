@@ -1090,7 +1090,10 @@ export class PlatformService {
       where: { nftInstance: { id: nftInstanceId }, status: "active" },
     });
     if (existing) {
-      throw new AppException("This NFT is already listed in the marketplace", 409);
+      throw new AppException(
+        "This NFT is already listed in the marketplace",
+        409,
+      );
     }
 
     const game = await this.gameRepo.findOneBy({ id: gameId });

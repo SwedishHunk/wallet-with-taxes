@@ -16,7 +16,8 @@ import { TokenShopModule } from "./tokenshop/tokenshop.module";
 import { EconomicsModule } from "./economics/economics.module";
 
 const isTestEnv = process.env.NODE_ENV === "test";
-const isDevEnv = process.env.NODE_ENV === "development" || process.env.NODE_ENV === undefined;
+const isDevEnv =
+  process.env.NODE_ENV === "development" || process.env.NODE_ENV === undefined;
 // Auto-synchronize in test and dev. Never in production or staging —
 // use explicit migrations instead to prevent accidental schema drops.
 const shouldSynchronizeSchema = isTestEnv || isDevEnv;
