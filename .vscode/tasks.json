@@ -1,25 +1,84 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Run Backend Dev",
-			"type": "shell",
-			"command": "bash",
-			"args": [
-				"-lc",
-				"cd backend && set -a && source .env && set +a && npm run start:dev"
-			],
-			"isBackground": true
-		},
-		{
-			"label": "Run Frontend Dev",
-			"type": "shell",
-			"command": "bash",
-			"args": [
-				"-lc",
-				"cd frontend && npm run dev"
-			],
-			"isBackground": true
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Anvil",
+      "type": "shell",
+      "command": "$USERPROFILE/.foundry/bin/anvil",
+      "isBackground": true,
+      "options": {
+        "shell": {
+          "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": "^$",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^\\s*Anvil",
+            "endsPattern": "Listening on 127\\.0\\.0\\.1:8545"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Deploy Contracts",
+      "type": "shell",
+      "command": "PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 $USERPROFILE/.foundry/bin/forge script script/DeployTokenShopIntegration.s.sol --rpc-url http://127.0.0.1:8545 --broadcast",
+      "dependsOn": ["Anvil"],
+      "options": {
+        "cwd": "${workspaceFolder}/contracts",
+        "shell": {
+          "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend",
+      "type": "shell",
+      "command": "rm -rf dist && npm run start:dev",
+      "isBackground": true,
+      "dependsOn": ["Deploy Contracts"],
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "shell": {
+          "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "dependsOn": ["Deploy Contracts"],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend",
+        "shell": {
+          "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start All",
+      "dependsOn": ["Backend", "Frontend"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    }
+  ]
 }
