@@ -210,6 +210,54 @@ describe("UsersService", () => {
     );
   });
 
+  it("login rejects suspended user", async () => {
+    const passwordHash = await bcrypt.hash("pw", 4);
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+      passwordHash,
+      isSuspended: true,
+    });
+
+    await expect(service.login("user@test.com", "pw")).rejects.toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("login with studioId succeeds when membership exists", async () => {
+    const passwordHash = await bcrypt.hash("pw", 4);
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+      passwordHash,
+      walletAddress: "0xwallet",
+    });
+    studioMemberRepo.findOne.mockResolvedValueOnce({
+      studio: { id: "s1", status: "active" },
+      role: "admin",
+    });
+
+    const result = await service.login("user@test.com", "pw", "s1");
+    expect(result.user.studioId).toBe("s1");
+  });
+
+  it("login rejects suspended studio", async () => {
+    const passwordHash = await bcrypt.hash("pw", 4);
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      email: "user@test.com",
+      passwordHash,
+    });
+    studioMemberRepo.findOne.mockResolvedValueOnce({
+      studio: { id: "s1", status: "suspended" },
+      role: "owner",
+    });
+
+    await expect(service.login("user@test.com", "pw")).rejects.toMatchObject({
+      statusCode: 403,
+    });
+  });
+
   it("login with studioId enforces membership", async () => {
     const passwordHash = await bcrypt.hash("pw", 4);
     userRepo.findOne.mockResolvedValueOnce({
@@ -323,6 +371,12 @@ describe("UsersService", () => {
       statusCode: 404,
       message: ERROR_MESSAGES.STUDIO_NOT_FOUND,
     });
+  });
+
+  it("linkWallet rejects an unparseable signature", async () => {
+    await expect(
+      service.linkWallet("user@test.com", "0x" + "aa".repeat(20), "not-a-sig"),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("linkWallet rejects mismatched wallet ownership signature", async () => {

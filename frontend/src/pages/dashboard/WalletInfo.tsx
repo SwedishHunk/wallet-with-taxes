@@ -121,7 +121,7 @@ export default function WalletInfo() {
     } finally {
       setLoading(false);
     }
-  }, [activeGame, authContext.state]);
+  }, [activeGame, authContext.state, t]);
 
   const loadMembers = useCallback(async () => {
     if (!authContext.studioSession?.studioId) return;

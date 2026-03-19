@@ -41,6 +41,10 @@ api.interceptors.response.use(
       } catch {
         // ignore
       }
+      // Redirect to login so React state is also reset (avoids half-logged-in state)
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   },

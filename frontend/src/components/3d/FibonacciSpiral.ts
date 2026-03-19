@@ -207,7 +207,7 @@ export function animateFibonacciSpiral(group: THREE.Group, elapsed: number) {
     // Flowing particles — wave opacity across phases
     if (child.userData.isFlow) {
       const mat    = (child as THREE.Points).material as THREE.PointsMaterial;
-      const phases = child.userData.phases as number[];
+      // phases data available in child.userData.phases for future per-vertex animation
       // Global wave: particles light up in sequence along each path
       const wave = elapsed * 2.5;
       // Use overall opacity as base; per-vertex color would be ideal but

@@ -36,7 +36,7 @@ export function createFlowerOfLife(scene: THREE.Scene) {
 
   const ringGeo = new THREE.TorusGeometry(radius, ringRadius, 32, 64);
 
-  positions.forEach(([x, y], i) => {
+  positions.forEach(([x, y]) => {
     // Neon wireframe ring
     const neonMat = new THREE.MeshStandardMaterial({
       color: 0xffd700,
@@ -98,11 +98,10 @@ export function animateFlowerOfLife(group: THREE.Group, elapsed: number) {
   group.children.forEach((child) => {
     if (child.userData.isScanLine) {
       child.position.x = Math.sin(elapsed * 0.5) * 4;
-      (child as THREE.Mesh).material &&
-        ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity
-          ? ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity =
-              0.03 + Math.sin(elapsed * 2) * 0.02
-          : null;
+      if ((child as THREE.Mesh).material) {
+        ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity =
+          0.03 + Math.sin(elapsed * 2) * 0.02;
+      }
     }
   });
 

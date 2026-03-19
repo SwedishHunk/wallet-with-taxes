@@ -24,6 +24,7 @@ export default function StudioEconomicEventsPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<"studio" | "game">("studio");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const endpoint = useMemo(() => {
     if (scope === "game" && activeGame?.gameId) {
@@ -53,7 +54,21 @@ export default function StudioEconomicEventsPanel() {
       return;
     }
     loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, scope, activeGame?.gameId]);
+
+  const knownTypes = useMemo(
+    () => Array.from(new Set(events.map((e) => e.eventType))).sort(),
+    [events],
+  );
+
+  const visibleEvents = useMemo(
+    () =>
+      typeFilter === "all"
+        ? events
+        : events.filter((e) => e.eventType === typeFilter),
+    [events, typeFilter],
+  );
 
   return (
     <div className="border rounded-lg p-4 shadow">
@@ -64,7 +79,7 @@ export default function StudioEconomicEventsPanel() {
             Aggregated player-attributed economic events across the current studio.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value as "studio" | "game")}
@@ -74,6 +89,18 @@ export default function StudioEconomicEventsPanel() {
             <option value="game" disabled={!activeGame?.gameId}>
               {activeGame?.name ? `Active game only (${activeGame.name})` : "Active game only"}
             </option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="rounded border px-3 py-1 text-xs text-gray-700"
+          >
+            <option value="all">All event types</option>
+            {knownTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
           <button
             type="button"
@@ -88,12 +115,12 @@ export default function StudioEconomicEventsPanel() {
       {loading ? <p className="text-gray-600">Loading studio events...</p> : null}
       {error ? <p className="text-red-600">{error}</p> : null}
 
-      {!loading && !error && events.length === 0 ? (
+      {!loading && !error && visibleEvents.length === 0 ? (
         <p className="text-gray-600">No studio-attributed economic events yet.</p>
       ) : null}
 
       <div className="space-y-2">
-        {events.map((event) => (
+        {visibleEvents.map((event) => (
           <div
             key={event.id}
             className="flex items-start justify-between rounded border bg-gray-50 px-3 py-2 text-sm"

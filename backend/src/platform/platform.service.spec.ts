@@ -13,12 +13,15 @@ import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { User } from "../users/user.entity";
 import { GamePlayer } from "./entities/game-player.entity";
+import { NFTInstance } from "./entities/nft-instance.entity";
+import { NFTTemplate } from "./entities/nft-template.entity";
 
 type Repo = {
   findOne: jest.Mock;
   find: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
+  createQueryBuilder?: jest.Mock;
 };
 
 describe("PlatformService", () => {
@@ -33,6 +36,7 @@ describe("PlatformService", () => {
   let nftInstanceRepo: Repo;
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
+  let economicsService: { logEvent: jest.Mock };
   let service: PlatformService;
 
   beforeEach(() => {
@@ -80,6 +84,7 @@ describe("PlatformService", () => {
       find: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
     nftInstanceRepo = {
       findOne: jest.fn(),
@@ -100,6 +105,10 @@ describe("PlatformService", () => {
       save: jest.fn(),
     };
 
+    economicsService = {
+      logEvent: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new PlatformService(
       dataSource as never,
       studioRepo as never,
@@ -112,6 +121,7 @@ describe("PlatformService", () => {
       nftInstanceRepo as never,
       walletDepositIntentRepo as never,
       userRepo as never,
+      economicsService as never,
     );
   });
 
@@ -701,6 +711,28 @@ describe("PlatformService", () => {
     const nft = await service.mintNFTToPlayer("g1", "s1", "t1");
     expect(nft.name).toBe("Sword #1");
     expect(template.currentMintCount).toBe(1);
+  });
+
+  it("mintNFTToPlayer still succeeds when economics logEvent rejects", async () => {
+    economicsService.logEvent.mockRejectedValueOnce(new Error("log failed"));
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    const template = {
+      id: "t1",
+      name: "Shield",
+      currentMintCount: 0,
+      maxMintCount: null,
+      game: { id: "g1" },
+    };
+    nftTemplateRepo.findOne.mockResolvedValueOnce(template);
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    nftInstanceRepo.create.mockImplementationOnce((x) => x);
+    nftInstanceRepo.save.mockImplementationOnce(async (x) => x);
+    nftTemplateRepo.save.mockImplementationOnce(async (x) => x);
+
+    const nft = await service.mintNFTToPlayer("g1", "s1", "t1");
+    expect(nft.name).toBe("Shield #1");
+    // Allow the void promise to settle so the catch handler runs
+    await new Promise((r) => setTimeout(r, 0));
   });
 
   it("transferBetweenPlayersInGame returns user-not-found when sender user is missing", async () => {
@@ -1388,5 +1420,497 @@ describe("PlatformService", () => {
       select: ["id", "name", "slug"],
       order: { name: "ASC" },
     });
+  });
+
+  it("getAllNFTsForWallet returns empty array when user not found", async () => {
+    userRepo.findOne.mockResolvedValueOnce(null);
+
+    const result = await service.getAllNFTsForWallet("0xabc");
+
+    expect(result).toEqual([]);
+  });
+
+  it("getAllNFTsForWallet returns NFT instances for known wallet", async () => {
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    const instances = [{ id: "n1" }, { id: "n2" }];
+    nftInstanceRepo.find.mockResolvedValueOnce(instances);
+
+    const result = await service.getAllNFTsForWallet("0xABC");
+
+    expect(userRepo.findOne).toHaveBeenCalledWith({
+      where: { walletAddress: "0xabc" },
+    });
+    expect(result).toBe(instances);
+  });
+
+  it("getGamePlayers returns players for a game", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    const players = [{ id: "p1" }];
+    gamePlayerRepo.find.mockResolvedValueOnce(players);
+
+    const result = await service.getGamePlayers("g1", "s1");
+
+    expect(result).toBe(players);
+  });
+
+  it("getAllNFTInstancesForGame returns instances for a game", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    const instances = [{ id: "n1" }];
+    nftInstanceRepo.find.mockResolvedValueOnce(instances);
+
+    const result = await service.getAllNFTInstancesForGame("g1", "s1");
+
+    expect(result).toBe(instances);
+  });
+
+  // ─── New player-facing wallet operation tests ───────────────────────────────
+
+  it("registerPlayerByWallet throws when game not found", async () => {
+    gameRepo.findOne.mockResolvedValueOnce(null);
+    await expect(
+      service.registerPlayerByWallet(
+        "g404",
+        "0x1234567890123456789012345678901234567890",
+        "s1",
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("registerPlayerByWallet creates user and game player for new wallet", async () => {
+    // assertGameBelongsToStudio
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    // resolvePlayerGameWallet → gameRepo.findOne
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    // user not found → create
+    userRepo.findOne.mockResolvedValueOnce(null);
+    userRepo.save.mockResolvedValueOnce({
+      id: "u-new",
+      walletAddress: "0x1234",
+    });
+    // ensureGamePlayer → not found → create
+    gamePlayerRepo.findOne.mockResolvedValueOnce(null);
+    gamePlayerRepo.save.mockResolvedValueOnce({ id: "gp-new" });
+    // ensureWalletForGamePlayer → not found → create
+    walletRepo.findOne.mockResolvedValueOnce(null);
+    walletRepo.save.mockResolvedValueOnce({ id: "w-new", balance: "0" });
+
+    const result = await service.registerPlayerByWallet(
+      "g1",
+      "0x1234567890123456789012345678901234567890",
+      "s1",
+    );
+
+    expect(userRepo.save).toHaveBeenCalled();
+    expect(result.gamePlayer.id).toBe("gp-new");
+    expect(result.wallet.id).toBe("w-new");
+  });
+
+  it("getPlayerGameWallet returns null when game not found", async () => {
+    gameRepo.findOne.mockResolvedValueOnce(null);
+    await expect(
+      service.getPlayerGameWallet(
+        "g404",
+        "0x1234567890123456789012345678901234567890",
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("getPlayerGameWallet returns null when user not found by wallet", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce(null);
+    const result = await service.getPlayerGameWallet("g1", "0xabc");
+    expect(result).toBeNull();
+  });
+
+  it("getPlayerGameWallet returns wallet when player exists", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({ id: "w1", balance: "5" });
+
+    const result = await service.getPlayerGameWallet("g1", "0xabc");
+    expect(result?.id).toBe("w1");
+  });
+
+  it("playerWithdrawFromGameWallet throws on insufficient balance", async () => {
+    // resolvePlayerGameWallet flow
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "2",
+      totalWithdrawn: "0",
+    });
+
+    await expect(
+      service.playerWithdrawFromGameWallet("g1", "0xabc", 5),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
+  });
+
+  it("playerWithdrawFromGameWallet succeeds and updates balance", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "10",
+      totalWithdrawn: "0",
+    });
+
+    const txWalletRepo = { save: jest.fn(async (x: unknown) => x) };
+    const txLedgerRepo = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return txLedgerRepo;
+            throw new Error("unexpected repository");
+          },
+        }),
+    );
+
+    const result = await service.playerWithdrawFromGameWallet("g1", "0xabc", 4);
+    expect((result as { balance: string }).balance).toBe("6");
+    expect(txLedgerRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "withdraw", amount: "4" }),
+    );
+  });
+
+  it("playerTransferBetweenPlayers rejects self-transfer", async () => {
+    await expect(
+      service.playerTransferBetweenPlayers("g1", "0xabc", "0xABC", 1),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Cannot transfer to yourself",
+    });
+  });
+
+  it("playerTransferBetweenPlayers succeeds and updates both wallets", async () => {
+    // resolvePlayerGameWallet for fromWallet
+    gameRepo.findOne
+      .mockResolvedValueOnce({ id: "g1" })
+      .mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne
+      .mockResolvedValueOnce({ id: "u1" })
+      .mockResolvedValueOnce({ id: "u2" });
+    gamePlayerRepo.findOne
+      .mockResolvedValueOnce({ id: "gp1" })
+      .mockResolvedValueOnce({ id: "gp2" });
+    walletRepo.findOne
+      .mockResolvedValueOnce({ id: "w1", balance: "10", totalWithdrawn: "0" })
+      .mockResolvedValueOnce({ id: "w2", balance: "0", totalDeposited: "0" });
+
+    const lockedFrom = { id: "w1", balance: "10", totalWithdrawn: "0" };
+    const lockedTo = { id: "w2", balance: "0", totalDeposited: "0" };
+    const txWalletRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(lockedFrom)
+        .mockResolvedValueOnce(lockedTo),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    const txLedgerRepo = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return txLedgerRepo;
+            throw new Error("unexpected repository");
+          },
+        }),
+    );
+
+    const result = await service.playerTransferBetweenPlayers(
+      "g1",
+      "0xaaa",
+      "0xbbb",
+      4,
+    );
+    expect(
+      (result as { fromWallet: { balance: string } }).fromWallet.balance,
+    ).toBe("6");
+    expect((result as { toWallet: { balance: string } }).toWallet.balance).toBe(
+      "4",
+    );
+    expect(txLedgerRepo.save).toHaveBeenCalledTimes(2);
+  });
+
+  it("playerTransferBetweenPlayers rejects insufficient balance", async () => {
+    // resolvePlayerGameWallet for fromWallet
+    gameRepo.findOne
+      .mockResolvedValueOnce({ id: "g1" })
+      .mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne
+      .mockResolvedValueOnce({ id: "u1" })
+      .mockResolvedValueOnce({ id: "u2" });
+    gamePlayerRepo.findOne
+      .mockResolvedValueOnce({ id: "gp1" })
+      .mockResolvedValueOnce({ id: "gp2" });
+    walletRepo.findOne
+      .mockResolvedValueOnce({ id: "w1", balance: "1", totalWithdrawn: "0" })
+      .mockResolvedValueOnce({ id: "w2", balance: "0", totalDeposited: "0" });
+
+    // The lock inside transaction
+    const txWalletRepo = {
+      findOne: jest.fn().mockResolvedValueOnce({ id: "w1", balance: "1" }),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry)
+              return { create: jest.fn((x: unknown) => x), save: jest.fn() };
+            throw new Error("unexpected");
+          },
+        }),
+    );
+
+    await expect(
+      service.playerTransferBetweenPlayers("g1", "0xaaa", "0xbbb", 5),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
+  });
+
+  it("playerTransferBetweenPlayers throws in TOCTOU scenario where locked balance < amount", async () => {
+    gameRepo.findOne
+      .mockResolvedValueOnce({ id: "g1" })
+      .mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne
+      .mockResolvedValueOnce({ id: "u1" })
+      .mockResolvedValueOnce({ id: "u2" });
+    gamePlayerRepo.findOne
+      .mockResolvedValueOnce({ id: "gp1" })
+      .mockResolvedValueOnce({ id: "gp2" });
+    // Pre-check: balance "10", amount 5 → passes (5 > 10 is false)
+    walletRepo.findOne
+      .mockResolvedValueOnce({ id: "w1", balance: "10", totalWithdrawn: "0" })
+      .mockResolvedValueOnce({ id: "w2", balance: "0", totalDeposited: "0" });
+
+    // Inside transaction: locked balance is now "4" (TOCTOU — 5 > 4 → throws)
+    const txWalletRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({ id: "w1", balance: "4" })
+        .mockResolvedValueOnce({ id: "w2", balance: "0" }),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry)
+              return { create: jest.fn((x: unknown) => x), save: jest.fn() };
+            throw new Error("unexpected");
+          },
+        }),
+    );
+
+    await expect(
+      service.playerTransferBetweenPlayers("g1", "0xaaa", "0xbbb", 5),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
+  });
+
+  it("getNFTShopTemplates throws when game not found", async () => {
+    gameRepo.findOne.mockResolvedValueOnce(null);
+    await expect(service.getNFTShopTemplates("g404")).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  it("getNFTShopTemplates returns only templates with minting cost > 0", async () => {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    const allTemplates = [
+      { id: "t1", mintingCost: "5" },
+      { id: "t2", mintingCost: "0" },
+      { id: "t3", mintingCost: "10.5" },
+    ];
+    nftTemplateRepo.find.mockResolvedValueOnce(allTemplates);
+
+    const result = await service.getNFTShopTemplates("g1");
+    expect(result).toEqual([
+      { id: "t1", mintingCost: "5" },
+      { id: "t3", mintingCost: "10.5" },
+    ]);
+    expect(nftTemplateRepo.find).toHaveBeenCalledWith({
+      where: { game: { id: "g1" } },
+    });
+  });
+
+  it("purchaseNFTFromShop throws when template not found", async () => {
+    nftTemplateRepo.findOne.mockResolvedValueOnce(null);
+    await expect(
+      service.purchaseNFTFromShop("g1", "0xabc", "t404"),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("purchaseNFTFromShop throws when max mint count reached", async () => {
+    nftTemplateRepo.findOne.mockResolvedValueOnce({
+      id: "t1",
+      name: "Sword",
+      mintingCost: "5",
+      currentMintCount: 2,
+      maxMintCount: 2,
+      game: { id: "g1" },
+    });
+    await expect(
+      service.purchaseNFTFromShop("g1", "0xabc", "t1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Max mint count reached for this NFT",
+    });
+  });
+
+  it("purchaseNFTFromShop throws when insufficient balance", async () => {
+    nftTemplateRepo.findOne.mockResolvedValueOnce({
+      id: "t1",
+      name: "Sword",
+      mintingCost: "10",
+      currentMintCount: 0,
+      maxMintCount: null,
+      game: { id: "g1" },
+    });
+    // resolvePlayerGameWallet
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "3",
+      totalWithdrawn: "0",
+    });
+
+    await expect(
+      service.purchaseNFTFromShop("g1", "0xabc", "t1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
+  });
+
+  it("purchaseNFTFromShop throws when locked wallet has insufficient balance (TOCTOU)", async () => {
+    nftTemplateRepo.findOne.mockResolvedValueOnce({
+      id: "t1",
+      name: "Sword",
+      mintingCost: "5",
+      currentMintCount: 0,
+      maxMintCount: null,
+      game: { id: "g1" },
+    });
+    // resolvePlayerGameWallet
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    // pre-check passes: balance "5" (5 > 5 is false)
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "5",
+      totalWithdrawn: "0",
+    });
+
+    // inside transaction, locked balance is now "4" (TOCTOU)
+    const txWalletRepo = {
+      findOne: jest.fn().mockResolvedValueOnce({ id: "w1", balance: "4" }),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    const noop = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return noop;
+            if (entity === NFTInstance) return noop;
+            if (entity === NFTTemplate) return noop;
+            throw new Error(`unexpected: ${String(entity)}`);
+          },
+        }),
+    );
+
+    await expect(
+      service.purchaseNFTFromShop("g1", "0xabc", "t1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+    });
+  });
+
+  it("purchaseNFTFromShop mints NFT and deducts wallet balance", async () => {
+    const template = {
+      id: "t1",
+      name: "Sword",
+      mintingCost: "5",
+      currentMintCount: 0,
+      maxMintCount: null,
+      game: { id: "g1" },
+    };
+    nftTemplateRepo.findOne.mockResolvedValueOnce(template);
+    // resolvePlayerGameWallet
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "20",
+      totalWithdrawn: "0",
+    });
+
+    const lockedWallet = { id: "w1", balance: "20", totalWithdrawn: "0" };
+    const txWalletRepo = {
+      findOne: jest.fn().mockResolvedValueOnce(lockedWallet),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    const txLedgerRepo = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    const txNftInstanceRepo = {
+      create: jest.fn((x: unknown) => ({ ...(x as object), id: "n-new" })),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    const txNftTemplateRepo = {
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementation(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return txLedgerRepo;
+            if (entity === NFTInstance) return txNftInstanceRepo;
+            if (entity === NFTTemplate) return txNftTemplateRepo;
+            throw new Error(`unexpected repository: ${String(entity)}`);
+          },
+        }),
+    );
+
+    const result = await service.purchaseNFTFromShop("g1", "0xabc", "t1");
+    expect((result as { nft: { name: string } }).nft.name).toBe("Sword #1");
+    expect(txLedgerRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "withdraw", amount: "5" }),
+    );
+    expect(template.currentMintCount).toBe(1);
   });
 });

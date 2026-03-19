@@ -31,7 +31,7 @@ export interface GameContextType {
 const GameCtx = createContext<GameContextType | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
-  const { studioSession } = useSession();
+  const { studioSession, isLoading } = useSession();
   const [activeGame, setActiveGameState] = useState<ActiveGame | null>(() => {
     // Hydrate synchronously so the first render already has the correct game.
     const saved = store.getItem(ACTIVE_GAME_KEY);
@@ -39,19 +39,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       const parsed = JSON.parse(saved);
       if (parsed?.gameId && parsed?.name && parsed?.slug) return parsed;
-    } catch {}
+    } catch { /* noop */ }
     store.removeItem(ACTIVE_GAME_KEY);
     return null;
   });
 
-  // Clear game when studio changes (new studio = different games)
+  // Clear game when studio logs out — but not during initial hydration
   useEffect(() => {
-    // If there's no studio session anymore, clear the game
+    if (isLoading) return; // wait for SessionContext to finish loading
     if (!studioSession) {
       store.removeItem(ACTIVE_GAME_KEY);
       setActiveGameState(null);
     }
-  }, [studioSession]);
+  }, [studioSession, isLoading]);
 
   const setActiveGame = (game: ActiveGame | null) => {
     if (game) {
@@ -70,6 +70,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGame() {
   const ctx = useContext(GameCtx);
   if (!ctx) throw new Error("useGame must be used inside GameProvider");

@@ -36,6 +36,7 @@ export default function StudioSelector() {
     setAuthToken(token);
 
     loadStudios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, authContext.state]);
 
   const loadStudios = async () => {

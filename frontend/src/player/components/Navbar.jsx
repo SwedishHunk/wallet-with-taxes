@@ -1,5 +1,5 @@
-import { NavLink, Link, useParams } from "react-router-dom";
-import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt } from "lucide-react";
+import { NavLink, Link, useLocation } from "react-router-dom";
+import { LayoutDashboard, ArrowLeftRight, Briefcase, Settings, Receipt, ShoppingBag } from "lucide-react";
 import ConnectWallet from "./ConnectWallet";
 import { useWallet } from "../context/WalletContext";
 import { useLanguage } from "../../lib/LanguageContext";
@@ -7,13 +7,18 @@ import { useLanguage } from "../../lib/LanguageContext";
 export default function Navbar() {
   const { isAdmin } = useWallet();
   const { t } = useLanguage();
-  const { gameId } = useParams();
+  const location = useLocation();
+  const gameIdMatch = location.pathname.match(/\/game\/([^/]+)/);
+  const gameId = gameIdMatch?.[1] ?? null;
   const base = gameId ? `/player/game/${gameId}` : "/player";
 
   const navItems = [
     { to: `${base}`, label: t("player.nav.dashboard"), icon: LayoutDashboard },
     { to: `${base}/trade`, label: t("player.nav.trade"), icon: ArrowLeftRight },
     { to: `${base}/portfolio`, label: t("player.nav.portfolio"), icon: Briefcase },
+    ...(gameId
+      ? [{ to: `${base}/shop`, label: t("player.nav.shop") || "Shop", icon: ShoppingBag }]
+      : []),
     { to: `${base}/tax`, label: t("player.nav.tax"), icon: Receipt },
   ];
 

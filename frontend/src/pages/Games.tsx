@@ -36,6 +36,7 @@ export default function Games() {
 
   useEffect(() => {
     loadGames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generateSlug = (name: string): string => {

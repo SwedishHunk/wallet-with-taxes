@@ -82,6 +82,7 @@ export function GameControl() {
 
     if (!gameId) return;
     loadGameData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, navigate]);
 
   const handlePersonalLogout = () => {

@@ -19,6 +19,7 @@ import { StudiosController } from "./studios.controller";
 import { StudioMemberService } from "./studio-member.service";
 import { StudiosService } from "./studios.service";
 import { User } from "../users/user.entity";
+import { EconomicsModule } from "../economics/economics.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { User } from "../users/user.entity";
       WalletDepositIntent,
       User,
     ]),
+    EconomicsModule,
   ],
   controllers: [PlatformController, ApiPlatformController, StudiosController],
   providers: [PlatformService, StudioMemberService, StudiosService],

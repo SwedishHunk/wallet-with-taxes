@@ -10,24 +10,6 @@ import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
 import FilmGrainOverlay from "../components/3d/FilmGrainOverlay";
 import "./RoleGateway.css";
 
-const cardHoverPlayer = {
-  y: -8,
-  scale: 1.02,
-  borderColor: "rgba(0, 212, 255, 0.35)",
-  boxShadow:
-    "0 24px 80px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 212, 255, 0.1), inset 0 1px 0 rgba(0, 212, 255, 0.1)",
-  transition: { type: "spring", stiffness: 300, damping: 20 },
-};
-
-const cardHoverOwner = {
-  y: -8,
-  scale: 1.02,
-  borderColor: "rgba(168, 85, 247, 0.35)",
-  boxShadow:
-    "0 24px 80px rgba(0, 0, 0, 0.4), 0 0 40px rgba(168, 85, 247, 0.1), inset 0 1px 0 rgba(168, 85, 247, 0.1)",
-  transition: { type: "spring", stiffness: 300, damping: 20 },
-};
-
 export default function RoleGateway() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -47,10 +29,11 @@ export default function RoleGateway() {
       setMemberSession(data.member);
       setActiveGame(data.game);
       navigate(data.routes.trade);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { message?: string } }; message?: string };
       setBootstrapError(
-        error?.response?.data?.message ||
-          error?.message ||
+        e?.response?.data?.message ||
+          e?.message ||
           "Dev bootstrap failed",
       );
     } finally {

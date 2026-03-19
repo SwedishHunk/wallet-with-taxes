@@ -42,6 +42,7 @@ export default function Members() {
   useEffect(() => {
     if (!isAuthenticated || !studioSession) return;
     fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studioSession]);
 
   const fetchMembers = async () => {
