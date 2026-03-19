@@ -216,6 +216,7 @@ export class PlatformController {
     @Req() req: Request,
     @Param("gameId") gameId: string,
     @Param("templateId") templateId: string,
+    @Body() body: { gamePlayerId?: string },
   ) {
     const jwtUser = req.user as JwtUser;
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
@@ -225,6 +226,30 @@ export class PlatformController {
       gameId,
       jwtUser.studioId,
       templateId,
+      body.gamePlayerId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("games/:gameId/players")
+  getGamePlayers(@Req() req: Request, @Param("gameId") gameId: string) {
+    const jwtUser = req.user as JwtUser;
+    if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
+      throw new ForbiddenException("Only admins can view player list");
+    }
+    return this.platformService.getGamePlayers(gameId, jwtUser.studioId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("games/:gameId/nft-instances")
+  getNFTInstances(@Req() req: Request, @Param("gameId") gameId: string) {
+    const jwtUser = req.user as JwtUser;
+    if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
+      throw new ForbiddenException("Only admins can view all NFT instances");
+    }
+    return this.platformService.getAllNFTInstancesForGame(
+      gameId,
+      jwtUser.studioId,
     );
   }
 

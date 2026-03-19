@@ -732,7 +732,12 @@ export class PlatformService {
     return this.nftTemplateRepo.save(template);
   }
 
-  async mintNFTToPlayer(gameId: string, studioId: string, templateId: string) {
+  async mintNFTToPlayer(
+    gameId: string,
+    studioId: string,
+    templateId: string,
+    targetGamePlayerId?: string,
+  ) {
     // Verify game belongs to studio
     const game = await this.gameRepo.findOne({
       where: { id: gameId, studio: { id: studioId } },
@@ -754,12 +759,11 @@ export class PlatformService {
       throw new Error("Max mint count reached for this template");
     }
 
-    // For now, always mint to self (targetUserId is for future use)
-    // Later, admin could mint to other players
-    // const targetPlayer = targetUserId ? await this.userRepo.findOne({ where: { id: targetUserId } }) : null;
-
+    // Resolve target player — specific player if provided, otherwise first in game
     const gamePlayer = await this.gamePlayerRepo.findOne({
-      where: { game: { id: gameId } },
+      where: targetGamePlayerId
+        ? { id: targetGamePlayerId, game: { id: gameId } }
+        : { game: { id: gameId } },
     });
 
     if (!gamePlayer) {
@@ -785,6 +789,24 @@ export class PlatformService {
     await this.nftTemplateRepo.save(template);
 
     return nftInstance;
+  }
+
+  async getGamePlayers(gameId: string, studioId: string) {
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    return this.gamePlayerRepo.find({
+      where: { game: { id: gameId } },
+      relations: ["user", "studioUser", "studioUser.user"],
+      order: { joinedAt: "ASC" },
+    });
+  }
+
+  async getAllNFTInstancesForGame(gameId: string, studioId: string) {
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    return this.nftInstanceRepo.find({
+      where: { template: { game: { id: gameId } } },
+      relations: ["template", "owner", "owner.user"],
+      order: { createdAt: "DESC" },
+    });
   }
 
   async updateNFTInstance(

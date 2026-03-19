@@ -86,6 +86,10 @@ export default function Games() {
     navigate(`/player/game/${game.gameId}/trade`);
   };
 
+  const handleManageNFTs = (game: Game) => {
+    navigate(ROUTES.nftManagement(game.gameId));
+  };
+
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGameName.trim()) {
@@ -213,6 +217,11 @@ export default function Games() {
                     <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                       <Button onClick={() => handleOpenTrade(game)}>
                         Open Trade
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleManageNFTs(game)}>
+                        Manage NFTs
                       </Button>
                       <Button
                         onClick={() => handleSetActive(game)}

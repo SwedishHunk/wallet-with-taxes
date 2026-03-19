@@ -14,5 +14,6 @@ export const ROUTES = {
   accountLogin: "/account-login",
   personalAccounts: "/personal-accounts",
   game: (gameId: string) => `/game/${gameId}`,
+  nftManagement: (gameId: string) => `/games/${gameId}/nfts`,
   triolithAdmin: "/triolith-admin",
 };

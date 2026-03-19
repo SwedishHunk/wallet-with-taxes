@@ -186,6 +186,7 @@ describe("PlatformController", () => {
         req({ id: "u1", studioId: "s1", role: "member" }),
         "g1",
         "t1",
+        {},
       ),
     ).toThrow(ForbiddenException);
   });
@@ -200,6 +201,7 @@ describe("PlatformController", () => {
       req({ id: "u1", studioId: "s1", role: "owner" }),
       "g1",
       "t1",
+      { gamePlayerId: "gp1" },
     );
 
     expect(service.createNFTTemplate).toHaveBeenCalledWith(
@@ -207,7 +209,7 @@ describe("PlatformController", () => {
       "s1",
       expect.objectContaining({ name: "nft" }),
     );
-    expect(service.mintNFTToPlayer).toHaveBeenCalledWith("g1", "s1", "t1");
+    expect(service.mintNFTToPlayer).toHaveBeenCalledWith("g1", "s1", "t1", "gp1");
   });
 
   it("blocks personal account creation and permission updates for non-owner", () => {

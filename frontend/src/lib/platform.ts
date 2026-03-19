@@ -55,11 +55,17 @@ export const getPlayerNFTs = (gameId: string) =>
 export const mintNFT = (
   gameId: string,
   templateId: string,
-  targetUserId?: string,
+  gamePlayerId?: string,
 ) =>
   api.post(`/platform/games/${gameId}/nft-templates/${templateId}/mint`, {
-    targetUserId,
+    gamePlayerId,
   });
+
+export const getGamePlayers = (gameId: string) =>
+  api.get(`/platform/games/${gameId}/players`);
+
+export const getAllNFTInstances = (gameId: string) =>
+  api.get(`/platform/games/${gameId}/nft-instances`);
 
 export const updateNFT = (
   gameId: string,
