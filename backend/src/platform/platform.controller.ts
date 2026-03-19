@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Body,
@@ -6,12 +7,14 @@ import {
   Req,
   Get,
   Param,
+  Query,
   ForbiddenException,
 } from "@nestjs/common";
 import { PlatformService } from "./platform.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Request } from "express";
 import { JwtUser } from "../auth/jwt-user.interface";
+import { PlayerWalletAuthService } from "../economics/player-wallet-auth.service";
 import {
   CreateGameDto,
   CreateNftTemplateDto,
@@ -216,6 +219,7 @@ export class PlatformController {
     @Req() req: Request,
     @Param("gameId") gameId: string,
     @Param("templateId") templateId: string,
+    @Body() body: { gamePlayerId?: string },
   ) {
     const jwtUser = req.user as JwtUser;
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
@@ -225,6 +229,51 @@ export class PlatformController {
       gameId,
       jwtUser.studioId,
       templateId,
+      body.gamePlayerId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("games/:gameId/players")
+  registerPlayer(
+    @Req() req: Request,
+    @Param("gameId") gameId: string,
+    @Body() body: { walletAddress: string },
+  ) {
+    const jwtUser = req.user as JwtUser;
+    if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
+      throw new ForbiddenException("Only admins can register players");
+    }
+    if (!body?.walletAddress) {
+      throw new BadRequestException("walletAddress is required");
+    }
+    return this.platformService.registerPlayerByWallet(
+      gameId,
+      body.walletAddress,
+      jwtUser.studioId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("games/:gameId/players")
+  getGamePlayers(@Req() req: Request, @Param("gameId") gameId: string) {
+    const jwtUser = req.user as JwtUser;
+    if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
+      throw new ForbiddenException("Only admins can view player list");
+    }
+    return this.platformService.getGamePlayers(gameId, jwtUser.studioId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("games/:gameId/nft-instances")
+  getNFTInstances(@Req() req: Request, @Param("gameId") gameId: string) {
+    const jwtUser = req.user as JwtUser;
+    if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
+      throw new ForbiddenException("Only admins can view all NFT instances");
+    }
+    return this.platformService.getAllNFTInstancesForGame(
+      gameId,
+      jwtUser.studioId,
     );
   }
 
@@ -317,10 +366,148 @@ export class PlatformController {
  */
 @Controller("api/platform")
 export class ApiPlatformController {
-  constructor(private platformService: PlatformService) {}
+  constructor(
+    private platformService: PlatformService,
+    private playerWalletAuthService: PlayerWalletAuthService,
+  ) {}
 
   @Get("public-games")
   getPublicGames() {
     return this.platformService.getPublicGameList();
+  }
+
+  @Get("player/nfts")
+  getPlayerNFTs(@Query("address") address: string) {
+    if (!address) return [];
+    return this.platformService.getAllNFTsForWallet(address);
+  }
+
+  // ─── Player game-wallet operations (wallet-auth) ────────────────────────────
+
+  @Get("player/wallet")
+  getPlayerWallet(
+    @Query("gameId") gameId: string,
+    @Query("address") address: string,
+  ) {
+    if (!gameId || !address) return null;
+    return this.platformService.getPlayerGameWallet(gameId, address);
+  }
+
+  @Post("player/withdraw")
+  async playerWithdraw(
+    @Body()
+    body: {
+      gameId: string;
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+      amount: number;
+    },
+  ) {
+    if (
+      !body?.gameId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature ||
+      !body?.amount
+    ) {
+      throw new BadRequestException(
+        "gameId, walletAddress, nonce, signature, and amount are required",
+      );
+    }
+
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId: body.gameId,
+    });
+
+    return this.platformService.playerWithdrawFromGameWallet(
+      body.gameId,
+      body.walletAddress,
+      body.amount,
+    );
+  }
+
+  @Post("player/transfer")
+  async playerTransfer(
+    @Body()
+    body: {
+      gameId: string;
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+      toWalletAddress: string;
+      amount: number;
+    },
+  ) {
+    if (
+      !body?.gameId ||
+      !body?.walletAddress ||
+      !body?.nonce ||
+      !body?.signature ||
+      !body?.toWalletAddress ||
+      !body?.amount
+    ) {
+      throw new BadRequestException(
+        "gameId, walletAddress, nonce, signature, toWalletAddress, and amount are required",
+      );
+    }
+
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId: body.gameId,
+    });
+
+    return this.platformService.playerTransferBetweenPlayers(
+      body.gameId,
+      body.walletAddress,
+      body.toWalletAddress,
+      body.amount,
+    );
+  }
+
+  // ─── NFT Shop ────────────────────────────────────────────────────────────────
+
+  @Get("games/:gameId/nft-shop")
+  getNFTShop(@Param("gameId") gameId: string) {
+    return this.platformService.getNFTShopTemplates(gameId);
+  }
+
+  @Post("games/:gameId/nft-shop/:templateId/buy")
+  async purchaseNFT(
+    @Param("gameId") gameId: string,
+    @Param("templateId") templateId: string,
+    @Body()
+    body: {
+      walletAddress: string;
+      nonce: string;
+      signature: string;
+    },
+  ) {
+    if (!body?.walletAddress || !body?.nonce || !body?.signature) {
+      throw new BadRequestException(
+        "walletAddress, nonce, and signature are required",
+      );
+    }
+
+    await this.playerWalletAuthService.verifySignedRequest({
+      walletAddress: body.walletAddress,
+      nonce: body.nonce,
+      signature: body.signature,
+      purpose: "player_action",
+      gameId,
+    });
+
+    return this.platformService.purchaseNFTFromShop(
+      gameId,
+      body.walletAddress,
+      templateId,
+    );
   }
 }

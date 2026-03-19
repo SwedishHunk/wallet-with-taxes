@@ -13,6 +13,7 @@ import {
   Layers,
   Activity,
   ChartNoAxesCombined,
+  Gem,
 } from "lucide-react";
 import { ethers } from "ethers";
 import { useState, useEffect } from "react";
@@ -139,6 +140,11 @@ export default function Portfolio() {
     error: configError,
     refresh: refreshConfig,
   } = useApiData(isConnected ? "/shop/config" : null);
+  const {
+    data: nfts,
+    loading: nftsLoading,
+    refresh: refreshNfts,
+  } = useApiData(isConnected && address ? `/platform/player/nfts?address=${address}` : null);
 
   const apiError = balError || histError || assetsError || configError;
 
@@ -150,9 +156,10 @@ export default function Portfolio() {
       refreshHist();
       refreshAssets();
       refreshConfig();
+      refreshNfts();
     }, 15000);
     return () => clearInterval(interval);
-  }, [isConnected, refreshBal, refreshHist, refreshAssets, refreshConfig]);
+  }, [isConnected, refreshBal, refreshHist, refreshAssets, refreshConfig, refreshNfts]);
 
   useEffect(() => {
     if (!isConnected || !address || !provider) {
@@ -177,7 +184,7 @@ export default function Portfolio() {
     return () => {
       active = false;
     };
-  }, [isConnected, address, provider, syncStatusKey(syncing)]);
+  }, [isConnected, address, provider, syncing]);
 
   useEffect(() => {
     if (!isConnected || !address || !provider || !supportedAssets?.length) {
@@ -237,7 +244,7 @@ export default function Portfolio() {
     setSyncing(true);
     try {
       await triggerSync();
-      await Promise.all([refreshBal(), refreshHist(), refreshAssets(), refreshConfig()]);
+      await Promise.all([refreshBal(), refreshHist(), refreshAssets(), refreshConfig(), refreshNfts()]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -558,6 +565,72 @@ export default function Portfolio() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* NFT Collectibles */}
+      {(nftsLoading || (nfts && nfts.length > 0)) && (
+        <div className="card mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Gem size={16} className="text-gray-400" />
+            <p className="label">My Collectibles</p>
+          </div>
+          {nftsLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-dark-700 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {nfts.map((nft) => {
+                const tierColors = {
+                  1: "text-gray-400",
+                  2: "text-neon-green",
+                  3: "text-neon-cyan",
+                  4: "text-neon-pink",
+                };
+                const tierLabels = { 1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary" };
+                const tier = nft.template?.tier ?? 1;
+                const conditionColor =
+                  nft.condition >= 75
+                    ? "text-neon-green"
+                    : nft.condition >= 40
+                    ? "text-yellow-400"
+                    : "text-neon-pink";
+                return (
+                  <div
+                    key={nft.id}
+                    className="p-3 bg-dark-700/50 rounded-lg border border-dark-600"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-100 leading-tight">
+                        {nft.name}
+                      </p>
+                      {nft.equipped && (
+                        <span className="text-[10px] bg-neon-cyan/10 text-neon-cyan px-1.5 py-0.5 rounded ml-1 shrink-0">
+                          Equipped
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs font-mono mb-1 ${tierColors[tier] ?? "text-gray-400"}`}>
+                      {tierLabels[tier] ?? `Tier ${tier}`} · {nft.template?.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {nft.template?.game?.name && (
+                        <span className="mr-2">🎮 {nft.template.game.name}</span>
+                      )}
+                    </p>
+                    <div className="flex gap-3 mt-2 text-[11px] text-gray-500">
+                      <span>Lvl {nft.level}</span>
+                      <span className={conditionColor}>Cond {nft.condition}%</span>
+                      {nft.power > 0 && <span>PWR {nft.power}</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

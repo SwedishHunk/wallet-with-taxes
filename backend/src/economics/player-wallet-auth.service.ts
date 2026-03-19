@@ -9,7 +9,10 @@ import { randomBytes } from "crypto";
 import { ethers } from "ethers";
 import { PlayerNonce } from "./entities/player-nonce.entity";
 
-export type PlayerWalletAuthPurpose = "session" | "economic_event";
+export type PlayerWalletAuthPurpose =
+  | "session"
+  | "economic_event"
+  | "player_action";
 
 type SignedPlayerWalletRequest = {
   walletAddress: string;

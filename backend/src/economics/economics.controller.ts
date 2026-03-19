@@ -62,9 +62,13 @@ export class EconomicsController {
       throw new BadRequestException("walletAddress and purpose are required");
     }
 
-    if (purpose !== "session" && purpose !== "economic_event") {
+    if (
+      purpose !== "session" &&
+      purpose !== "economic_event" &&
+      purpose !== "player_action"
+    ) {
       throw new BadRequestException(
-        "purpose must be either session or economic_event",
+        "purpose must be session, economic_event, or player_action",
       );
     }
 

@@ -180,6 +180,7 @@ const translations = {
   "player.nav.dashboard":      { en: "Dashboard", sv: "Översikt" },
   "player.nav.trade":          { en: "Trade", sv: "Handel" },
   "player.nav.portfolio":      { en: "Portfolio", sv: "Portfölj" },
+  "player.nav.shop":           { en: "Shop", sv: "Butik" },
   "player.nav.tax":            { en: "Tax", sv: "Skatt" },
   "player.nav.admin":          { en: "Admin", sv: "Admin" },
   "player.logo.sub":           { en: "Player", sv: "Spelare" },

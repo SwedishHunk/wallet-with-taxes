@@ -216,6 +216,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 // ──────────────────────────────────────────────────────────────
 // Hook
 // ──────────────────────────────────────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSession() {
   const ctx = useContext(SessionCtx);
   if (!ctx) throw new Error("useSession must be used inside SessionProvider");

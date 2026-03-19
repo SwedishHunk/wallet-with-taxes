@@ -153,6 +153,7 @@ export default function Trade() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, address, signer]);
 
   async function thisPlayerSignedRequest(purpose, { gameId, walletAddress }) {

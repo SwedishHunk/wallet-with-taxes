@@ -35,6 +35,7 @@ import CreateFirstPersonalAccount from "./pages/CreateFirstPersonalAccount";
 import PersonalAccountLogin from "./pages/PersonalAccountLogin";
 import { GameControl } from "./pages/GameControl";
 import Games from "./pages/Games";
+import NFTManagement from "./pages/NFTManagement";
 import Settings from "./pages/Settings";
 import TriolithAdminPage from "./pages/admin/TriolithAdminPage";
 import PlayerPortal from "./player/PlayerPortal";
@@ -187,6 +188,14 @@ function AppRoutes() {
           element={
             <ProtectedMemberAuth>
               <GameControl />
+            </ProtectedMemberAuth>
+          }
+        />
+        <Route
+          path="/games/:gameId/nfts"
+          element={
+            <ProtectedMemberAuth>
+              <NFTManagement />
             </ProtectedMemberAuth>
           }
         />

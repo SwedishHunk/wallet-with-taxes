@@ -73,6 +73,7 @@ export default function PersonalAccounts() {
     }
 
     fetchAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAccounts = async () => {

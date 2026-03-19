@@ -34,6 +34,9 @@ describe("PlatformController", () => {
       getStudioUsers: jest.fn(),
       loginStudioUser: jest.fn(),
       updatePersonalAccountPermissions: jest.fn(),
+      getGamePlayers: jest.fn(),
+      getAllNFTInstancesForGame: jest.fn(),
+      registerPlayerByWallet: jest.fn(),
     };
     controller = new PlatformController(service as never);
   });
@@ -186,6 +189,7 @@ describe("PlatformController", () => {
         req({ id: "u1", studioId: "s1", role: "member" }),
         "g1",
         "t1",
+        {},
       ),
     ).toThrow(ForbiddenException);
   });
@@ -200,6 +204,7 @@ describe("PlatformController", () => {
       req({ id: "u1", studioId: "s1", role: "owner" }),
       "g1",
       "t1",
+      { gamePlayerId: "gp1" },
     );
 
     expect(service.createNFTTemplate).toHaveBeenCalledWith(
@@ -207,7 +212,12 @@ describe("PlatformController", () => {
       "s1",
       expect.objectContaining({ name: "nft" }),
     );
-    expect(service.mintNFTToPlayer).toHaveBeenCalledWith("g1", "s1", "t1");
+    expect(service.mintNFTToPlayer).toHaveBeenCalledWith(
+      "g1",
+      "s1",
+      "t1",
+      "gp1",
+    );
   });
 
   it("blocks personal account creation and permission updates for non-owner", () => {
@@ -227,11 +237,61 @@ describe("PlatformController", () => {
     ).toThrow(ForbiddenException);
   });
 
-  it("ApiPlatformController.getPublicGames delegates to getPublicGameList", () => {
-    const svc = { getPublicGameList: jest.fn().mockReturnValue([]) };
-    const apiController = new ApiPlatformController(svc as never);
-    apiController.getPublicGames();
-    expect(svc.getPublicGameList).toHaveBeenCalled();
+  it("blocks getGamePlayers for non-admin role", () => {
+    expect(() =>
+      controller.getGamePlayers(
+        req({ id: "u1", studioId: "s1", role: "member" }),
+        "g1",
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
+  it("delegates getGamePlayers for owner/admin", () => {
+    controller.getGamePlayers(
+      req({ id: "u1", studioId: "s1", role: "admin" }),
+      "g1",
+    );
+    expect(service.getGamePlayers).toHaveBeenCalledWith("g1", "s1");
+  });
+
+  it("blocks getNFTInstances for non-admin role", () => {
+    expect(() =>
+      controller.getNFTInstances(
+        req({ id: "u1", studioId: "s1", role: "member" }),
+        "g1",
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
+  it("delegates getNFTInstances for owner/admin", () => {
+    controller.getNFTInstances(
+      req({ id: "u1", studioId: "s1", role: "owner" }),
+      "g1",
+    );
+    expect(service.getAllNFTInstancesForGame).toHaveBeenCalledWith("g1", "s1");
+  });
+
+  it("blocks registerPlayer for non-admin role", () => {
+    expect(() =>
+      controller.registerPlayer(
+        req({ id: "u1", studioId: "s1", role: "member" }),
+        "g1",
+        { walletAddress: "0xabc" },
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
+  it("delegates registerPlayer for owner/admin", () => {
+    controller.registerPlayer(
+      req({ id: "u1", studioId: "s1", role: "owner" }),
+      "g1",
+      { walletAddress: "0xabc" },
+    );
+    expect(service.registerPlayerByWallet).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      "s1",
+    );
   });
 
   it("delegates personal account endpoints for owner", () => {
@@ -269,10 +329,112 @@ describe("PlatformController", () => {
 });
 
 describe("ApiPlatformController", () => {
+  let apiSvc: Record<string, jest.Mock>;
+  let walletAuth: { verifySignedRequest: jest.Mock };
+  let apiController: ApiPlatformController;
+
+  beforeEach(() => {
+    apiSvc = {
+      getPublicGameList: jest.fn().mockReturnValue([]),
+      getAllNFTsForWallet: jest.fn(),
+      getPlayerGameWallet: jest.fn(),
+      playerWithdrawFromGameWallet: jest.fn(),
+      playerTransferBetweenPlayers: jest.fn(),
+      getNFTShopTemplates: jest.fn(),
+      purchaseNFTFromShop: jest.fn(),
+    };
+    walletAuth = {
+      verifySignedRequest: jest.fn().mockResolvedValue(undefined),
+    };
+    apiController = new ApiPlatformController(
+      apiSvc as never,
+      walletAuth as never,
+    );
+  });
+
   it("getPublicGames delegates to getPublicGameList", () => {
-    const svc = { getPublicGameList: jest.fn().mockReturnValue([]) };
-    const apiController = new ApiPlatformController(svc as never);
     apiController.getPublicGames();
-    expect(svc.getPublicGameList).toHaveBeenCalled();
+    expect(apiSvc.getPublicGameList).toHaveBeenCalled();
+  });
+
+  it("getPlayerNFTs returns [] when address is missing", () => {
+    const result = apiController.getPlayerNFTs(undefined as never);
+    expect(result).toEqual([]);
+    expect(apiSvc.getAllNFTsForWallet).not.toHaveBeenCalled();
+  });
+
+  it("getPlayerNFTs delegates to getAllNFTsForWallet", () => {
+    apiController.getPlayerNFTs("0xabc");
+    expect(apiSvc.getAllNFTsForWallet).toHaveBeenCalledWith("0xabc");
+  });
+
+  it("getPlayerWallet returns null when gameId or address missing", () => {
+    const result = apiController.getPlayerWallet("", "");
+    expect(result).toBeNull();
+    expect(apiSvc.getPlayerGameWallet).not.toHaveBeenCalled();
+  });
+
+  it("getPlayerWallet delegates to getPlayerGameWallet", () => {
+    apiController.getPlayerWallet("g1", "0xabc");
+    expect(apiSvc.getPlayerGameWallet).toHaveBeenCalledWith("g1", "0xabc");
+  });
+
+  it("playerWithdraw verifies signature and delegates", async () => {
+    await apiController.playerWithdraw({
+      gameId: "g1",
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+      amount: 5,
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.playerWithdrawFromGameWallet).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      5,
+    );
+  });
+
+  it("playerTransfer verifies signature and delegates", async () => {
+    await apiController.playerTransfer({
+      gameId: "g1",
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+      toWalletAddress: "0xdef",
+      amount: 3,
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action" }),
+    );
+    expect(apiSvc.playerTransferBetweenPlayers).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      "0xdef",
+      3,
+    );
+  });
+
+  it("getNFTShop delegates to getNFTShopTemplates", () => {
+    apiController.getNFTShop("g1");
+    expect(apiSvc.getNFTShopTemplates).toHaveBeenCalledWith("g1");
+  });
+
+  it("purchaseNFT verifies signature and delegates", async () => {
+    await apiController.purchaseNFT("g1", "t1", {
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.purchaseNFTFromShop).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      "t1",
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { cardVariants, hoverGlow } from "../../lib/motionPresets";
+import { cardVariants } from "../../lib/motionPresets";
 import "./ui.css";
 
 type CardProps = {

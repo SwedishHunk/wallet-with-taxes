@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // Backward-compatible hook
 // Returns the exact same shape as the old useAuthState()
 // ──────────────────────────────────────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuthState() {
   const session = useSession();
   const game = useGame();

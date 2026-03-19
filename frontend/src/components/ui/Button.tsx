@@ -24,7 +24,7 @@ export function Button({
       whileTap={disabled ? {} : { scale: 0.97 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       disabled={disabled}
-      {...(rest as any)}
+      {...rest}
     >
       {children}
     </motion.button>

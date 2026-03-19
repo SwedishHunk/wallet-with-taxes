@@ -26,6 +26,6 @@ import { PlayerWalletAuthService } from "./player-wallet-auth.service";
     PlayerEconomicsService,
     PlayerWalletAuthService,
   ],
-  exports: [EconomicsService, TypeOrmModule],
+  exports: [EconomicsService, PlayerWalletAuthService, TypeOrmModule],
 })
 export class EconomicsModule {}

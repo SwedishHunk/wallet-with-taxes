@@ -19,6 +19,11 @@ import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { parseAmount } from "./parse-amount";
 import { safeAdd, safeSub } from "../shared/safe-math";
+import { EconomicsService } from "../economics/economics.service";
+import {
+  EconomicDirection,
+  EconomicScopeType,
+} from "../economics/entities/economic-event.entity";
 
 @Injectable()
 export class PlatformService {
@@ -50,6 +55,7 @@ export class PlatformService {
     private walletDepositIntentRepo: Repository<WalletDepositIntent>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    private economicsService: EconomicsService,
   ) {}
 
   private generateFakeDepositAddress(
@@ -732,7 +738,12 @@ export class PlatformService {
     return this.nftTemplateRepo.save(template);
   }
 
-  async mintNFTToPlayer(gameId: string, studioId: string, templateId: string) {
+  async mintNFTToPlayer(
+    gameId: string,
+    studioId: string,
+    templateId: string,
+    targetGamePlayerId?: string,
+  ) {
     // Verify game belongs to studio
     const game = await this.gameRepo.findOne({
       where: { id: gameId, studio: { id: studioId } },
@@ -754,12 +765,11 @@ export class PlatformService {
       throw new Error("Max mint count reached for this template");
     }
 
-    // For now, always mint to self (targetUserId is for future use)
-    // Later, admin could mint to other players
-    // const targetPlayer = targetUserId ? await this.userRepo.findOne({ where: { id: targetUserId } }) : null;
-
+    // Resolve target player — specific player if provided, otherwise first in game
     const gamePlayer = await this.gamePlayerRepo.findOne({
-      where: { game: { id: gameId } },
+      where: targetGamePlayerId
+        ? { id: targetGamePlayerId, game: { id: gameId } }
+        : { game: { id: gameId } },
     });
 
     if (!gamePlayer) {
@@ -784,7 +794,345 @@ export class PlatformService {
     template.currentMintCount += 1;
     await this.nftTemplateRepo.save(template);
 
+    // Log as economic event (fire-and-forget — don't fail the mint if logging fails)
+    void this.economicsService
+      .logEvent({
+        source: "platform-nft-mint",
+        eventType: "nft_mint",
+        scopeType: EconomicScopeType.GAME,
+        studioId: studioId,
+        gameId: gameId,
+        gamePlayerId: gamePlayer.id,
+        assetKey: `nft:${template.id}`,
+        assetSymbol: "NFT",
+        amount: "1",
+        direction: EconomicDirection.IN,
+        metadata: {
+          templateId: template.id,
+          templateName: template.name,
+          tier: template.tier,
+          instanceId: nftInstance.id,
+          instanceName: nftInstance.name,
+        },
+      })
+      .catch((err) =>
+        console.error("[PlatformService] Failed to log NFT mint event:", err),
+      );
+
     return nftInstance;
+  }
+
+  // ─── Player-facing wallet operations (wallet address based) ───────────────
+
+  private async resolvePlayerGameWallet(
+    gameId: string,
+    walletAddress: string,
+  ): Promise<{ user: User; gamePlayer: GamePlayer; wallet: GameWallet }> {
+    const normalizedWallet = walletAddress.toLowerCase();
+
+    const game = await this.gameRepo.findOne({ where: { id: gameId } });
+    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
+
+    let user = await this.userRepo.findOne({
+      where: { walletAddress: normalizedWallet },
+    });
+    if (!user) {
+      user = this.userRepo.create({
+        email: `wallet-${normalizedWallet.slice(2)}@player.local`,
+        passwordHash: randomUUID(),
+        custodyMode: "self",
+        encryptedPrivateKey: null,
+        walletAddress: normalizedWallet,
+        kycStatus: "pending",
+        onChainWallet: undefined,
+        isAdmin: false,
+      });
+      user = await this.userRepo.save(user);
+    }
+
+    const gamePlayer = await this.ensureGamePlayer(
+      this.gamePlayerRepo,
+      game,
+      user,
+    );
+    const wallet = await this.ensureWalletForGamePlayer(
+      this.walletRepo,
+      gamePlayer,
+    );
+
+    return { user, gamePlayer, wallet };
+  }
+
+  async registerPlayerByWallet(
+    gameId: string,
+    walletAddress: string,
+    studioId: string,
+  ) {
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    return this.resolvePlayerGameWallet(gameId, walletAddress);
+  }
+
+  async getPlayerGameWallet(gameId: string, walletAddress: string) {
+    const game = await this.gameRepo.findOne({ where: { id: gameId } });
+    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
+
+    const normalizedWallet = walletAddress.toLowerCase();
+    const user = await this.userRepo.findOne({
+      where: { walletAddress: normalizedWallet },
+    });
+    if (!user) return null;
+
+    const gamePlayer = await this.gamePlayerRepo.findOne({
+      where: { game: { id: gameId }, user: { id: user.id } },
+    });
+    if (!gamePlayer) return null;
+
+    const wallet = await this.walletRepo.findOne({
+      where: { gamePlayer: { id: gamePlayer.id } },
+    });
+
+    return wallet ?? null;
+  }
+
+  async playerWithdrawFromGameWallet(
+    gameId: string,
+    walletAddress: string,
+    amount: unknown,
+  ) {
+    const amountNum = parseAmount(amount);
+    const { wallet } = await this.resolvePlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
+
+    if (amountNum > parseFloat(wallet.balance)) {
+      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+    }
+
+    const txGroupId = randomUUID();
+    return this.dataSource.transaction(async (manager) => {
+      const walletRepo = manager.getRepository(GameWallet);
+      const ledgerRepo = manager.getRepository(LedgerEntry);
+
+      wallet.balance = safeSub(wallet.balance, amountNum);
+      wallet.totalWithdrawn = safeAdd(wallet.totalWithdrawn, amountNum);
+      const saved = await walletRepo.save(wallet);
+
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: saved,
+          txGroupId,
+          type: "withdraw",
+          amount: amountNum.toString(),
+          description: "Player withdrawal",
+        }),
+      );
+      return saved;
+    });
+  }
+
+  async playerTransferBetweenPlayers(
+    gameId: string,
+    fromWalletAddress: string,
+    toWalletAddress: string,
+    amount: unknown,
+  ) {
+    const amountNum = parseAmount(amount);
+    const normalizedFrom = fromWalletAddress.toLowerCase();
+    const normalizedTo = toWalletAddress.toLowerCase();
+
+    if (normalizedFrom === normalizedTo) {
+      throw new AppException("Cannot transfer to yourself", 400);
+    }
+
+    const { wallet: fromWallet } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalizedFrom,
+    );
+    const { wallet: toWallet } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalizedTo,
+    );
+
+    if (amountNum > parseFloat(fromWallet.balance)) {
+      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+    }
+
+    const txGroupId = randomUUID();
+    return this.dataSource.transaction(async (manager) => {
+      const walletRepo = manager.getRepository(GameWallet);
+      const ledgerRepo = manager.getRepository(LedgerEntry);
+
+      const lockedFrom = await this.lockWalletOrThrow(
+        walletRepo,
+        fromWallet.id,
+        "Sender wallet not found",
+      );
+      const lockedTo = await this.lockWalletOrThrow(
+        walletRepo,
+        toWallet.id,
+        "Recipient wallet not found",
+      );
+
+      if (amountNum > parseFloat(lockedFrom.balance)) {
+        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+      }
+
+      lockedFrom.balance = safeSub(lockedFrom.balance, amountNum);
+      lockedFrom.totalWithdrawn = safeAdd(lockedFrom.totalWithdrawn, amountNum);
+      const savedFrom = await walletRepo.save(lockedFrom);
+
+      lockedTo.balance = safeAdd(lockedTo.balance, amountNum);
+      lockedTo.totalDeposited = safeAdd(lockedTo.totalDeposited, amountNum);
+      const savedTo = await walletRepo.save(lockedTo);
+
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: savedFrom,
+          txGroupId,
+          type: "transfer",
+          amount: amountNum.toString(),
+          description: `Transfer to ${normalizedTo}`,
+        }),
+      );
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: savedTo,
+          txGroupId,
+          type: "transfer",
+          amount: amountNum.toString(),
+          description: `Transfer from ${normalizedFrom}`,
+        }),
+      );
+
+      return { fromWallet: savedFrom, toWallet: savedTo };
+    });
+  }
+
+  // ─── NFT Shop (player-facing) ───────────────────────────────────────────────
+
+  async getNFTShopTemplates(gameId: string) {
+    const game = await this.gameRepo.findOne({ where: { id: gameId } });
+    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
+
+    const all = await this.nftTemplateRepo.find({
+      where: { game: { id: gameId } },
+    });
+    return all.filter((t) => parseFloat(t.mintingCost) > 0);
+  }
+
+  async purchaseNFTFromShop(
+    gameId: string,
+    walletAddress: string,
+    templateId: string,
+  ) {
+    const template = await this.nftTemplateRepo.findOne({
+      where: { id: templateId, game: { id: gameId } },
+      relations: ["game"],
+    });
+    if (!template) throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
+
+    if (
+      template.maxMintCount &&
+      template.currentMintCount >= template.maxMintCount
+    ) {
+      throw new AppException("Max mint count reached for this NFT", 400);
+    }
+
+    const mintingCost = parseFloat(template.mintingCost);
+    const { gamePlayer, wallet } = await this.resolvePlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
+
+    if (mintingCost > parseFloat(wallet.balance)) {
+      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+    }
+
+    const txGroupId = randomUUID();
+
+    return this.dataSource.transaction(async (manager) => {
+      const walletRepo = manager.getRepository(GameWallet);
+      const ledgerRepo = manager.getRepository(LedgerEntry);
+      const nftInstanceRepo = manager.getRepository(NFTInstance);
+      const nftTemplateRepo = manager.getRepository(NFTTemplate);
+
+      const lockedWallet = await this.lockWalletOrThrow(
+        walletRepo,
+        wallet.id,
+        "Player wallet not found",
+      );
+
+      if (mintingCost > parseFloat(lockedWallet.balance)) {
+        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+      }
+
+      lockedWallet.balance = safeSub(lockedWallet.balance, mintingCost);
+      lockedWallet.totalWithdrawn = safeAdd(
+        lockedWallet.totalWithdrawn,
+        mintingCost,
+      );
+      const savedWallet = await walletRepo.save(lockedWallet);
+
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: savedWallet,
+          txGroupId,
+          type: "withdraw",
+          amount: mintingCost.toString(),
+          description: `NFT purchase: ${template.name}`,
+        }),
+      );
+
+      const nftInstance = nftInstanceRepo.create({
+        template,
+        owner: gamePlayer,
+        name: `${template.name} #${template.currentMintCount + 1}`,
+        level: 1,
+        condition: 100,
+        power: 0,
+        customAttributes: {},
+        equipped: false,
+      });
+      const savedInstance = await nftInstanceRepo.save(nftInstance);
+
+      template.currentMintCount += 1;
+      await nftTemplateRepo.save(template);
+
+      return { nft: savedInstance, wallet: savedWallet };
+    });
+  }
+
+  async getAllNFTsForWallet(walletAddress: string) {
+    // Find the user by wallet address
+    const user = await this.userRepo.findOne({
+      where: { walletAddress: walletAddress.toLowerCase() },
+    });
+    if (!user) return [];
+
+    return this.nftInstanceRepo.find({
+      where: { owner: { user: { id: user.id } } },
+      relations: ["template", "template.game", "owner", "owner.game"],
+      order: { createdAt: "DESC" },
+    });
+  }
+
+  async getGamePlayers(gameId: string, studioId: string) {
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    return this.gamePlayerRepo.find({
+      where: { game: { id: gameId } },
+      relations: ["user", "studioUser"],
+      order: { joinedAt: "ASC" },
+    });
+  }
+
+  async getAllNFTInstancesForGame(gameId: string, studioId: string) {
+    await this.assertGameBelongsToStudio(gameId, studioId);
+    return this.nftInstanceRepo.find({
+      where: { template: { game: { id: gameId } } },
+      relations: ["template", "owner", "owner.user", "owner.studioUser"],
+      order: { createdAt: "DESC" },
+    });
   }
 
   async updateNFTInstance(

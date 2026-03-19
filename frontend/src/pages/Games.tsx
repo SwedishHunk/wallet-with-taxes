@@ -36,6 +36,7 @@ export default function Games() {
 
   useEffect(() => {
     loadGames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generateSlug = (name: string): string => {
@@ -84,6 +85,10 @@ export default function Games() {
 
   const handleOpenTrade = (game: Game) => {
     navigate(`/player/game/${game.gameId}/trade`);
+  };
+
+  const handleManageNFTs = (game: Game) => {
+    navigate(ROUTES.nftManagement(game.gameId));
   };
 
   const handleCreateGame = async (e: React.FormEvent) => {
@@ -213,6 +218,11 @@ export default function Games() {
                     <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                       <Button onClick={() => handleOpenTrade(game)}>
                         Open Trade
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleManageNFTs(game)}>
+                        Manage NFTs
                       </Button>
                       <Button
                         onClick={() => handleSetActive(game)}

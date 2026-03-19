@@ -201,7 +201,7 @@ export default function TriolithAdminPage() {
         setPlatformFee(r.data.feePercent);
         setFeeInput(String(r.data.feePercent));
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const fetchTx = () => {
@@ -285,8 +285,6 @@ export default function TriolithAdminPage() {
     };
   }, []);
 
-  const fmt = (n: number) =>
-    n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
   const handleError = (err: unknown) => {
     const msg =
