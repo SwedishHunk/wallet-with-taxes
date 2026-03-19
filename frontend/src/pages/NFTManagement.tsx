@@ -30,7 +30,7 @@ interface GamePlayer {
   level: number;
   joinedAt: string;
   user?: { id: string; email: string; walletAddress?: string };
-  studioUser?: { id: string; user?: { email: string } };
+  studioUser?: { id: string; email: string };
 }
 
 interface NFTInstance {
@@ -45,7 +45,7 @@ interface NFTInstance {
   owner: {
     id: string;
     user?: { email: string; walletAddress?: string };
-    studioUser?: { user?: { email: string } };
+    studioUser?: { email: string };
   };
 }
 
@@ -65,13 +65,13 @@ function tierBadgeStyle(tier: number): React.CSSProperties {
 
 function playerLabel(p: GamePlayer) {
   if (p.user?.email) return `${p.user.email}${p.user.walletAddress ? ` (${p.user.walletAddress.slice(0, 8)}…)` : ""}`;
-  if (p.studioUser?.user?.email) return `Studio: ${p.studioUser.user.email}`;
+  if (p.studioUser?.email) return `Studio: ${p.studioUser.email}`;
   return `Player #${p.id.slice(0, 8)}`;
 }
 
 function ownerLabel(inst: NFTInstance) {
   if (inst.owner.user?.email) return inst.owner.user.email;
-  if (inst.owner.studioUser?.user?.email) return inst.owner.studioUser.user.email;
+  if (inst.owner.studioUser?.email) return inst.owner.studioUser.email;
   return `Player #${inst.owner.id.slice(0, 8)}`;
 }
 

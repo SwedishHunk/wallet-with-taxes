@@ -795,7 +795,7 @@ export class PlatformService {
     await this.assertGameBelongsToStudio(gameId, studioId);
     return this.gamePlayerRepo.find({
       where: { game: { id: gameId } },
-      relations: ["user", "studioUser", "studioUser.user"],
+      relations: ["user", "studioUser"],
       order: { joinedAt: "ASC" },
     });
   }
@@ -804,7 +804,7 @@ export class PlatformService {
     await this.assertGameBelongsToStudio(gameId, studioId);
     return this.nftInstanceRepo.find({
       where: { template: { game: { id: gameId } } },
-      relations: ["template", "owner", "owner.user"],
+      relations: ["template", "owner", "owner.user", "owner.studioUser"],
       order: { createdAt: "DESC" },
     });
   }
