@@ -10,6 +10,7 @@ import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
+import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 import { PlatformService } from "./platform.service";
 import {
   ApiPlatformController,
@@ -34,6 +35,7 @@ import { EconomicsModule } from "../economics/economics.module";
       NFTTemplate,
       NFTInstance,
       WalletDepositIntent,
+      MarketplaceListing,
       User,
     ]),
     EconomicsModule,

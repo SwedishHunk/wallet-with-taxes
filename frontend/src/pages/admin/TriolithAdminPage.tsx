@@ -88,6 +88,14 @@ type AuditResponse = {
   offset: number;
 };
 
+type StudioEcoRow = {
+  studioId: string;
+  eventCount: number;
+  totalIn: number;
+  totalOut: number;
+  lastSeen: string | null;
+};
+
 const btnStyle = (variant: "danger" | "success" | "neutral"): React.CSSProperties => ({
   padding: "0.3rem 0.7rem",
   fontSize: "0.75rem",
@@ -164,6 +172,7 @@ export default function TriolithAdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [games, setGames] = useState<GameRow[]>([]);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [studioEco, setStudioEco] = useState<StudioEcoRow[]>([]);
   const [txOffset, setTxOffset] = useState(0);
   const [platformFee, setPlatformFee] = useState<number | null>(null);
   const [feeInput, setFeeInput] = useState("");
@@ -177,6 +186,7 @@ export default function TriolithAdminPage() {
   const statsRowRef = useRef<HTMLDivElement>(null);
   const studiosRef = useRef<HTMLDivElement>(null);
   const gamesRef = useRef<HTMLDivElement>(null);
+  const ecoRef = useRef<HTMLDivElement>(null);
   const txRef = useRef<HTMLDivElement>(null);
   const usersRef = useRef<HTMLDivElement>(null);
   const auditRef = useRef<HTMLDivElement>(null);
@@ -194,6 +204,7 @@ export default function TriolithAdminPage() {
     void api.get<StudioRow[]>("/admin/studios").then((r) => setStudios(r.data));
     void api.get<UserRow[]>("/admin/users").then((r) => setUsers(r.data));
     void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
+    void api.get<StudioEcoRow[]>("/admin/economics/studios").then((r) => setStudioEco(r.data));
     fetchAuditLog();
     void api
       .get<{ feePercent: number }>("/admin/platform/fee")
@@ -257,7 +268,7 @@ export default function TriolithAdminPage() {
 
   // GSAP ScrollTrigger for table sections
   useEffect(() => {
-    const sections = [studiosRef, gamesRef, txRef, usersRef, auditRef];
+    const sections = [studiosRef, gamesRef, ecoRef, txRef, usersRef, auditRef];
     const triggers: ScrollTrigger[] = [];
 
     sections.forEach((ref) => {
@@ -541,6 +552,46 @@ export default function TriolithAdminPage() {
             >
               {feeMsg}
             </p>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Economics per Studio ── */}
+      <div ref={ecoRef}>
+        <Card style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
+            Studio Economics Summary
+          </h3>
+          {studioEco.length === 0 ? (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>No economic events logged yet.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    {["Studio", "Events", "Total In", "Total Out", "Net", "Last Event"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem", color: "var(--text-muted)", fontWeight: 500 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {studioEco.map((row) => {
+                    const studioName = studios.find((s) => s.id === row.studioId)?.name ?? row.studioId.slice(0, 8) + "…";
+                    const net = row.totalIn - row.totalOut;
+                    return (
+                      <tr key={row.studioId} style={{ borderBottom: "1px solid var(--border)" }} onMouseEnter={rowHoverEnter} onMouseLeave={rowHoverLeave}>
+                        <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>{studioName}</td>
+                        <td style={{ padding: "0.4rem 0.6rem" }}>{row.eventCount}</td>
+                        <td style={{ padding: "0.4rem 0.6rem", color: "var(--success, #22c55e)" }}>{row.totalIn.toFixed(2)}</td>
+                        <td style={{ padding: "0.4rem 0.6rem", color: "var(--danger, #ef4444)" }}>{row.totalOut.toFixed(2)}</td>
+                        <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600, color: net >= 0 ? "var(--success, #22c55e)" : "var(--danger, #ef4444)" }}>{net >= 0 ? "+" : ""}{net.toFixed(2)}</td>
+                        <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{row.lastSeen ? new Date(row.lastSeen).toLocaleDateString() : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       </div>

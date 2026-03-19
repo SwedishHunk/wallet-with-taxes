@@ -340,8 +340,13 @@ describe("ApiPlatformController", () => {
       getPlayerGameWallet: jest.fn(),
       playerWithdrawFromGameWallet: jest.fn(),
       playerTransferBetweenPlayers: jest.fn(),
+      playerTransferNFT: jest.fn(),
       getNFTShopTemplates: jest.fn(),
       purchaseNFTFromShop: jest.fn(),
+      getGameListings: jest.fn().mockReturnValue([]),
+      createNFTListing: jest.fn(),
+      cancelNFTListing: jest.fn(),
+      purchaseNFTListing: jest.fn(),
     };
     walletAuth = {
       verifySignedRequest: jest.fn().mockResolvedValue(undefined),
@@ -417,6 +422,26 @@ describe("ApiPlatformController", () => {
     );
   });
 
+  it("playerNFTTransfer verifies signature and delegates", async () => {
+    await apiController.playerNFTTransfer({
+      gameId: "g1",
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+      toWalletAddress: "0xdef",
+      nftInstanceId: "nft1",
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.playerTransferNFT).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      "0xdef",
+      "nft1",
+    );
+  });
+
   it("getNFTShop delegates to getNFTShopTemplates", () => {
     apiController.getNFTShop("g1");
     expect(apiSvc.getNFTShopTemplates).toHaveBeenCalledWith("g1");
@@ -436,5 +461,53 @@ describe("ApiPlatformController", () => {
       "0xabc",
       "t1",
     );
+  });
+
+  it("getMarketplaceListings delegates to getGameListings", () => {
+    apiController.getMarketplaceListings("g1");
+    expect(apiSvc.getGameListings).toHaveBeenCalledWith("g1");
+  });
+
+  it("createMarketplaceListing verifies signature and delegates", async () => {
+    await apiController.createMarketplaceListing("g1", {
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+      nftInstanceId: "nft1",
+      askPrice: "50",
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.createNFTListing).toHaveBeenCalledWith(
+      "g1",
+      "0xabc",
+      "nft1",
+      "50",
+    );
+  });
+
+  it("cancelMarketplaceListing verifies signature and delegates", async () => {
+    await apiController.cancelMarketplaceListing("g1", "l1", {
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.cancelNFTListing).toHaveBeenCalledWith("g1", "0xabc", "l1");
+  });
+
+  it("purchaseMarketplaceListing verifies signature and delegates", async () => {
+    await apiController.purchaseMarketplaceListing("g1", "l1", {
+      walletAddress: "0xabc",
+      nonce: "n",
+      signature: "s",
+    });
+    expect(walletAuth.verifySignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "player_action", gameId: "g1" }),
+    );
+    expect(apiSvc.purchaseNFTListing).toHaveBeenCalledWith("g1", "0xabc", "l1");
   });
 });

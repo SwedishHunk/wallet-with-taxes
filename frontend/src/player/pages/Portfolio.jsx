@@ -1,5 +1,6 @@
+import { useParams } from "react-router-dom";
 import { useWallet } from "../context/WalletContext";
-import { useApiData, triggerSync } from "../hooks/useApi";
+import { useApiData, apiGet, apiPost, triggerSync } from "../hooks/useApi";
 import { useLanguage } from "../../lib/LanguageContext";
 import StatCard from "../components/StatCard";
 import ErrorBanner from "../components/ErrorBanner";
@@ -119,10 +120,23 @@ function calculateEventFee(event, feeBps) {
 
 export default function Portfolio() {
   const { t } = useLanguage();
-  const { isConnected, address, provider } = useWallet();
+  const { gameId } = useParams();
+  const { isConnected, address, provider, signer } = useWallet();
   const [syncing, setSyncing] = useState(false);
   const [ethBalance, setEthBalance] = useState(null);
   const [compatibleBalances, setCompatibleBalances] = useState([]);
+
+  // In-game wallet state (game context only)
+  const [gameWallet, setGameWallet] = useState(null);
+  const [gameWalletLoading, setGameWalletLoading] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawStatus, setWithdrawStatus] = useState("");
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferStatus, setTransferStatus] = useState("");
+  const [sendNftId, setSendNftId] = useState(null);
+  const [sendNftTo, setSendNftTo] = useState("");
+  const [sendNftStatus, setSendNftStatus] = useState({});
 
   const { data: balance, loading: balLoading, error: balError, refresh: refreshBal } = useApiData(
     isConnected ? `/user/${address}/balance` : null
@@ -147,6 +161,19 @@ export default function Portfolio() {
   } = useApiData(isConnected && address ? `/platform/player/nfts?address=${address}` : null);
 
   const apiError = balError || histError || assetsError || configError;
+
+  // Fetch in-game wallet balance when in game context
+  useEffect(() => {
+    if (!gameId || !address || !isConnected) {
+      setGameWallet(null);
+      return;
+    }
+    setGameWalletLoading(true);
+    apiGet(`/platform/player/wallet?gameId=${gameId}&address=${address}`)
+      .then(setGameWallet)
+      .catch(() => setGameWallet(null))
+      .finally(() => setGameWalletLoading(false));
+  }, [gameId, address, isConnected]);
 
   // Auto-refresh every 15 seconds so new trades show up
   useEffect(() => {
@@ -239,6 +266,79 @@ export default function Portfolio() {
       active = false;
     };
   }, [isConnected, address, provider, supportedAssets, balance]);
+
+  async function thisPlayerSignedRequest(purpose, walletAddress) {
+    if (!signer) throw new Error("Wallet signer not ready");
+    const noncePayload = await apiGet(
+      `/player/nonce?walletAddress=${encodeURIComponent(walletAddress)}&purpose=${encodeURIComponent(purpose)}&gameId=${encodeURIComponent(gameId ?? "")}`
+    );
+    const signature = await signer.signMessage(noncePayload.message);
+    return { nonce: noncePayload.nonce, signature };
+  }
+
+  async function refreshGameWallet() {
+    if (!gameId || !address) return;
+    const updated = await apiGet(`/platform/player/wallet?gameId=${gameId}&address=${address}`);
+    setGameWallet(updated);
+  }
+
+  async function handleWithdraw() {
+    if (!gameId || !address || !withdrawAmount) return;
+    setWithdrawStatus("pending");
+    try {
+      const auth = await thisPlayerSignedRequest("player_action", address);
+      await apiPost("/platform/player/withdraw", {
+        gameId, walletAddress: address,
+        nonce: auth.nonce, signature: auth.signature,
+        amount: Number(withdrawAmount),
+      });
+      setWithdrawAmount("");
+      setWithdrawStatus("success");
+      await refreshGameWallet();
+    } catch (err) {
+      setWithdrawStatus("error: " + err.message);
+    }
+  }
+
+  async function handleTransfer() {
+    if (!gameId || !address || !transferTo || !transferAmount) return;
+    setTransferStatus("pending");
+    try {
+      const auth = await thisPlayerSignedRequest("player_action", address);
+      await apiPost("/platform/player/transfer", {
+        gameId, walletAddress: address,
+        nonce: auth.nonce, signature: auth.signature,
+        toWalletAddress: transferTo,
+        amount: Number(transferAmount),
+      });
+      setTransferTo("");
+      setTransferAmount("");
+      setTransferStatus("success");
+      await refreshGameWallet();
+    } catch (err) {
+      setTransferStatus("error: " + err.message);
+    }
+  }
+
+  async function handleSendNFT(nftId) {
+    if (!gameId || !address || !sendNftTo) return;
+    setSendNftStatus((s) => ({ ...s, [nftId]: "pending" }));
+    try {
+      const auth = await thisPlayerSignedRequest("player_action", address);
+      await apiPost("/platform/player/nft-transfer", {
+        gameId, walletAddress: address,
+        nonce: auth.nonce, signature: auth.signature,
+        toWalletAddress: sendNftTo,
+        nftInstanceId: nftId,
+      });
+      setSendNftId(null);
+      setSendNftTo("");
+      setSendNftStatus((s) => ({ ...s, [nftId]: "success" }));
+      refreshNfts();
+    } catch (err) {
+      setSendNftStatus((s) => ({ ...s, [nftId]: "error: " + err.message }));
+    }
+  }
 
   async function handleRefresh() {
     setSyncing(true);
@@ -533,6 +633,83 @@ export default function Portfolio() {
         </div>
       </div>
 
+      {/* In-Game Wallet (only shown in game context) */}
+      {gameId && (
+        <div className="card mb-8" style={{ border: "1px solid rgba(0, 212, 255, 0.15)" }}>
+          <p className="label mb-5 text-center">{t("player.portfolio.inGameWallet")}</p>
+          {gameWalletLoading ? (
+            <div className="h-20 bg-dark-700 rounded animate-pulse" />
+          ) : (
+            <div className="space-y-4">
+              {/* Balance */}
+              <div
+                className="p-4 rounded-xl"
+                style={{
+                  background: "rgba(0, 212, 255, 0.04)",
+                  border: "1px solid rgba(0, 212, 255, 0.12)",
+                }}
+              >
+                <p className="label mb-2">{t("player.portfolio.gameBalance")}</p>
+                <p className="text-3xl font-mono font-bold" style={{ color: "#00d4ff" }}>
+                  {gameWallet?.balance ?? "0"}
+                  <span className="text-sm font-normal text-gray-400 ml-2">{t("player.portfolio.inGameTokens")}</span>
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Withdraw */}
+                <div
+                  className="p-4 rounded-xl flex flex-col items-center"
+                  style={{
+                    background: "rgba(255, 51, 102, 0.04)",
+                    border: "1px solid rgba(255, 51, 102, 0.15)",
+                    minHeight: 180,
+                  }}
+                >
+                  <p className="label mb-4 text-center" style={{ color: "#ff3366" }}>{t("player.portfolio.withdraw")}</p>
+                  <div className="w-full space-y-2">
+                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0" className="input-field py-2 text-sm w-full" />
+                    <button onClick={handleWithdraw} disabled={withdrawStatus === "pending" || !withdrawAmount} className="btn-danger w-full py-2">
+                      {withdrawStatus === "pending" ? "…" : t("player.portfolio.withdraw")}
+                    </button>
+                  </div>
+                  {withdrawStatus && withdrawStatus !== "pending" && (
+                    <p className={`text-xs mt-2 text-center ${withdrawStatus === "success" ? "text-neon-green" : "text-neon-pink"}`}>
+                      {withdrawStatus === "success" ? t("player.portfolio.withdrawSuccess") : withdrawStatus}
+                    </p>
+                  )}
+                </div>
+
+                {/* Send tokens */}
+                <div
+                  className="p-4 rounded-xl flex flex-col items-center"
+                  style={{
+                    background: "rgba(0, 255, 128, 0.04)",
+                    border: "1px solid rgba(0, 255, 128, 0.15)",
+                    minHeight: 180,
+                  }}
+                >
+                  <p className="label mb-4 text-center" style={{ color: "#00ff80" }}>{t("player.portfolio.sendTokens")}</p>
+                  <div className="w-full space-y-2">
+                    <input type="text" value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder={t("player.portfolio.recipientPlaceholder")} className="input-field py-2 text-sm w-full" />
+                    <input type="number" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} placeholder="0" className="input-field py-2 text-sm w-full" />
+                    <button onClick={handleTransfer} disabled={transferStatus === "pending" || !transferTo || !transferAmount} className="btn-success w-full py-2">
+                      {transferStatus === "pending" ? "…" : t("player.portfolio.send")}
+                    </button>
+                  </div>
+                  {transferStatus && transferStatus !== "pending" && (
+                    <p className={`text-xs mt-2 text-center ${transferStatus === "success" ? "text-neon-green" : "text-neon-pink"}`}>
+                      {transferStatus === "success" ? t("player.portfolio.sendSuccess") : transferStatus}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {(compatibleBalances.length > 0 || supportedAssets?.length > 0) && (
         <div className="card mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -628,6 +805,74 @@ export default function Portfolio() {
                       <span className={conditionColor}>Cond {nft.condition}%</span>
                       {nft.power > 0 && <span>PWR {nft.power}</span>}
                     </div>
+
+                    {/* Send NFT — only in game context */}
+                    {gameId && (
+                      <div className="mt-3">
+                        {sendNftId === nft.id ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={sendNftTo}
+                              onChange={(e) => setSendNftTo(e.target.value)}
+                              placeholder={t("player.portfolio.recipientPlaceholder")}
+                              className="input-field py-1.5 text-xs"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSendNFT(nft.id)}
+                                disabled={sendNftStatus[nft.id] === "pending" || !sendNftTo}
+                                className="btn-secondary text-xs px-3 py-1.5 flex-1"
+                              >
+                                {sendNftStatus[nft.id] === "pending" ? "..." : t("player.portfolio.confirmSend")}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSendNftId(null);
+                                  setSendNftTo("");
+                                  setSendNftStatus((s) => {
+                                    const n = { ...s };
+                                    delete n[nft.id];
+                                    return n;
+                                  });
+                                }}
+                                className="text-xs text-gray-500 hover:text-gray-300 px-2"
+                              >
+                                {t("player.portfolio.cancel")}
+                              </button>
+                            </div>
+                            {sendNftStatus[nft.id] && sendNftStatus[nft.id] !== "pending" && (
+                              <p className={`text-xs ${sendNftStatus[nft.id] === "success" ? "text-neon-green" : "text-neon-pink"}`}>
+                                {sendNftStatus[nft.id] === "success" ? t("player.portfolio.nftSent") : sendNftStatus[nft.id]}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setSendNftId(nft.id)}
+                            className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                            style={{
+                              border: "1px solid rgba(0, 212, 255, 0.2)",
+                              color: "#9ca3af",
+                              background: "transparent",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.5)";
+                              e.currentTarget.style.color = "#00d4ff";
+                              e.currentTarget.style.boxShadow = "0 0 10px rgba(0, 212, 255, 0.1)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.2)";
+                              e.currentTarget.style.color = "#9ca3af";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          >
+                            <ArrowUpRight size={11} />
+                            {t("player.portfolio.sendNFT")}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

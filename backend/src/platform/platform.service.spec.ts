@@ -18,6 +18,7 @@ import { NFTTemplate } from "./entities/nft-template.entity";
 
 type Repo = {
   findOne: jest.Mock;
+  findOneBy?: jest.Mock;
   find: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
@@ -36,6 +37,7 @@ describe("PlatformService", () => {
   let nftInstanceRepo: Repo;
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
+  let marketplaceListingRepo: Repo;
   let economicsService: { logEvent: jest.Mock };
   let service: PlatformService;
 
@@ -57,6 +59,7 @@ describe("PlatformService", () => {
     };
     gameRepo = {
       findOne: jest.fn(),
+      findOneBy: jest.fn(),
       find: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(),
@@ -104,6 +107,12 @@ describe("PlatformService", () => {
       create: jest.fn((x) => x),
       save: jest.fn(),
     };
+    marketplaceListingRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
 
     economicsService = {
       logEvent: jest.fn().mockResolvedValue(undefined),
@@ -121,6 +130,7 @@ describe("PlatformService", () => {
       nftInstanceRepo as never,
       walletDepositIntentRepo as never,
       userRepo as never,
+      marketplaceListingRepo as never,
       economicsService as never,
     );
   });
@@ -1912,5 +1922,289 @@ describe("PlatformService", () => {
       expect.objectContaining({ type: "withdraw", amount: "5" }),
     );
     expect(template.currentMintCount).toBe(1);
+  });
+
+  it("playerTransferNFT rejects self-transfer", async () => {
+    await expect(
+      service.playerTransferNFT("g1", "0xABC", "0xabc", "n1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Cannot transfer to yourself",
+    });
+  });
+
+  it("playerTransferNFT throws asset not found when NFT not owned by sender", async () => {
+    jest
+      .spyOn(service as never, "resolvePlayerGameWallet")
+      .mockResolvedValueOnce({
+        user: { id: "u1" },
+        gamePlayer: { id: "gp-from" },
+        wallet: {},
+      } as never);
+    nftInstanceRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.playerTransferNFT("g1", "0xfrom", "0xto", "missing-nft"),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: ERROR_MESSAGES.ASSET_NOT_FOUND,
+    });
+  });
+
+  it("playerTransferNFT transfers NFT ownership to recipient", async () => {
+    const fromPlayer = { id: "gp-from" };
+    const toPlayer = { id: "gp-to" };
+    jest
+      .spyOn(service as never, "resolvePlayerGameWallet")
+      .mockResolvedValueOnce({
+        user: { id: "u1" },
+        gamePlayer: fromPlayer,
+        wallet: {},
+      } as never)
+      .mockResolvedValueOnce({
+        user: { id: "u2" },
+        gamePlayer: toPlayer,
+        wallet: {},
+      } as never);
+
+    const nftInstance = { id: "n1", owner: fromPlayer, template: {} };
+    nftInstanceRepo.findOne.mockResolvedValueOnce(nftInstance);
+    nftInstanceRepo.save.mockImplementationOnce(async (x: unknown) => x);
+
+    const result = await service.playerTransferNFT(
+      "g1",
+      "0xfrom",
+      "0xto",
+      "n1",
+    );
+    expect((result as { owner: { id: string } }).owner.id).toBe("gp-to");
+    expect(nftInstanceRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: toPlayer }),
+    );
+  });
+
+  // ─── Marketplace ──────────────────────────────────────────────────────────
+
+  /** Set up the mock chain that resolvePlayerGameWallet needs */
+  function mockResolvePlayer(
+    gamePlayer: { id: string },
+    wallet: { balance: string },
+  ) {
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      walletAddress: "0xabc",
+    });
+    gamePlayerRepo.findOne.mockResolvedValueOnce(gamePlayer);
+    walletRepo.findOne.mockResolvedValueOnce(wallet);
+  }
+
+  it("getGameListings returns active listings for a game", async () => {
+    const listings = [{ id: "l1", status: "active" }];
+    marketplaceListingRepo.find.mockResolvedValueOnce(listings);
+    await expect(service.getGameListings("g1")).resolves.toEqual(listings);
+    expect(marketplaceListingRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { game: { id: "g1" }, status: "active" },
+      }),
+    );
+  });
+
+  it("createNFTListing creates and saves a new listing", async () => {
+    const gamePlayer = { id: "gp1" };
+    mockResolvePlayer(gamePlayer, { balance: "50" });
+    nftInstanceRepo.findOne.mockResolvedValueOnce({
+      id: "n1",
+      owner: gamePlayer,
+      template: {},
+    });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(null);
+    gameRepo.findOneBy!.mockResolvedValueOnce({ id: "g1" });
+    marketplaceListingRepo.create.mockImplementationOnce((x) => x);
+    marketplaceListingRepo.save.mockResolvedValueOnce({
+      id: "listing1",
+      status: "active",
+      askPrice: "10",
+    });
+
+    const result = await service.createNFTListing("g1", "0xseller", "n1", "10");
+    expect(result).toMatchObject({ id: "listing1", status: "active" });
+    expect(marketplaceListingRepo.save).toHaveBeenCalled();
+  });
+
+  it("createNFTListing throws 404 when NFT not owned by player", async () => {
+    mockResolvePlayer({ id: "gp1" }, { balance: "50" });
+    nftInstanceRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.createNFTListing("g1", "0xseller", "n1", "10"),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("createNFTListing throws 409 when NFT already listed", async () => {
+    const gamePlayer = { id: "gp1" };
+    mockResolvePlayer(gamePlayer, { balance: "50" });
+    nftInstanceRepo.findOne.mockResolvedValueOnce({
+      id: "n1",
+      owner: gamePlayer,
+      template: {},
+    });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({ id: "existing" });
+
+    await expect(
+      service.createNFTListing("g1", "0xseller", "n1", "10"),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "This NFT is already listed in the marketplace",
+    });
+  });
+
+  it("createNFTListing throws 404 when game not found", async () => {
+    const gamePlayer = { id: "gp1" };
+    mockResolvePlayer(gamePlayer, { balance: "50" });
+    nftInstanceRepo.findOne.mockResolvedValueOnce({
+      id: "n1",
+      owner: gamePlayer,
+      template: {},
+    });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(null);
+    gameRepo.findOneBy!.mockResolvedValueOnce(null);
+
+    await expect(
+      service.createNFTListing("g1", "0xseller", "n1", "10"),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("cancelNFTListing cancels the listing and saves", async () => {
+    const gamePlayer = { id: "gp1" };
+    mockResolvePlayer(gamePlayer, { balance: "0" });
+    const listing = { id: "l1", status: "active", seller: { id: "gp1" } };
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(listing);
+    marketplaceListingRepo.save.mockResolvedValueOnce({
+      ...listing,
+      status: "cancelled",
+    });
+
+    const result = await service.cancelNFTListing("g1", "0xseller", "l1");
+    expect((result as { status: string }).status).toBe("cancelled");
+  });
+
+  it("cancelNFTListing throws 404 when listing not found", async () => {
+    mockResolvePlayer({ id: "gp1" }, { balance: "0" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.cancelNFTListing("g1", "0xseller", "l1"),
+    ).rejects.toMatchObject({ statusCode: 404, message: "Listing not found" });
+  });
+
+  it("cancelNFTListing throws 403 when caller is not the seller", async () => {
+    mockResolvePlayer({ id: "gp1" }, { balance: "0" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      status: "active",
+      seller: { id: "gp-other" },
+    });
+
+    await expect(
+      service.cancelNFTListing("g1", "0xseller", "l1"),
+    ).rejects.toMatchObject({ statusCode: 403, message: "Not your listing" });
+  });
+
+  it("purchaseNFTListing transfers NFT and balances", async () => {
+    const buyerPlayer = { id: "gp-buyer" };
+    const sellerPlayer = { id: "gp-seller" };
+    const buyerWallet = { id: "w-buyer", balance: "100" };
+    const sellerWallet = { id: "w-seller", balance: "0" };
+    const nftInstance = { id: "n1", owner: sellerPlayer };
+    const listing = {
+      id: "l1",
+      status: "active",
+      askPrice: "10",
+      seller: sellerPlayer,
+      nftInstance,
+    };
+
+    mockResolvePlayer(buyerPlayer, buyerWallet);
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(listing);
+    // seller wallet lookup
+    walletRepo.findOne.mockResolvedValueOnce(sellerWallet);
+    walletRepo.save.mockResolvedValue({} as never);
+    nftInstanceRepo.save.mockResolvedValueOnce(nftInstance);
+    marketplaceListingRepo.save.mockResolvedValueOnce({
+      ...listing,
+      status: "sold",
+    });
+
+    const result = await service.purchaseNFTListing("g1", "0xbuyer", "l1");
+    expect((result as { status: string }).status).toBe("sold");
+    expect(listing.nftInstance.owner).toBe(buyerPlayer);
+    expect(listing.status).toBe("sold");
+  });
+
+  it("purchaseNFTListing throws 404 when listing not found", async () => {
+    mockResolvePlayer({ id: "gp-buyer" }, { balance: "100" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.purchaseNFTListing("g1", "0xbuyer", "l404"),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Listing not found or no longer active",
+    });
+  });
+
+  it("purchaseNFTListing throws 400 when buyer is also the seller", async () => {
+    const player = { id: "gp1" };
+    mockResolvePlayer(player, { balance: "100" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      status: "active",
+      askPrice: "10",
+      seller: { id: "gp1" },
+      nftInstance: { id: "n1" },
+    });
+
+    await expect(
+      service.purchaseNFTListing("g1", "0xbuyer", "l1"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Cannot purchase your own listing",
+    });
+  });
+
+  it("purchaseNFTListing throws 402 when buyer has insufficient balance", async () => {
+    mockResolvePlayer({ id: "gp-buyer" }, { balance: "5" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      status: "active",
+      askPrice: "10",
+      seller: { id: "gp-seller" },
+      nftInstance: { id: "n1" },
+    });
+
+    await expect(
+      service.purchaseNFTListing("g1", "0xbuyer", "l1"),
+    ).rejects.toMatchObject({ statusCode: 402 });
+  });
+
+  it("purchaseNFTListing throws 404 when seller wallet is missing", async () => {
+    mockResolvePlayer({ id: "gp-buyer" }, { balance: "100" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      status: "active",
+      askPrice: "10",
+      seller: { id: "gp-seller" },
+      nftInstance: { id: "n1" },
+    });
+    // seller wallet not found
+    walletRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.purchaseNFTListing("g1", "0xbuyer", "l1"),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Seller wallet not found",
+    });
   });
 });

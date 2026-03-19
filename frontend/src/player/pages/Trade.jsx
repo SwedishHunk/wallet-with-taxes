@@ -113,48 +113,8 @@ export default function Trade() {
     };
   }, [loadAvailableGames]);
 
-  useEffect(() => {
-    if (!gameId || !address || !signer) {
-      setGameSession(null);
-      setGameSessionLoading(false);
-      setGameSessionError("");
-      return;
-    }
-
-    let active = true;
-
-    setGameSessionLoading(true);
-    setGameSessionError("");
-    thisPlayerSignedRequest("session", { gameId, walletAddress: address })
-      .then((auth) =>
-        apiPost("/player/session", {
-          gameId,
-          walletAddress: address,
-          nonce: auth.nonce,
-          signature: auth.signature,
-        })
-      )
-      .then((session) => {
-        if (!active) return;
-        setGameSession(session);
-        setGameSessionError("");
-      })
-      .catch((error) => {
-        if (!active) return;
-        console.error("Failed to resolve player session:", error);
-        setGameSession(null);
-        setGameSessionError("Game session could not be resolved yet.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setGameSessionLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, address, signer]);
+  // Session is established lazily at trade-execution time (not on page load)
+  // to avoid an unexpected MetaMask popup when navigating to this page.
 
   async function thisPlayerSignedRequest(purpose, { gameId, walletAddress }) {
     if (!signer) {
@@ -335,6 +295,27 @@ export default function Trade() {
     setTxHash(null);
 
     try {
+      // If in game context, establish the player session silently before trading.
+      // This registers the player's wallet in the game without a separate popup.
+      if (gameId && address) {
+        try {
+          setGameSessionLoading(true);
+          const auth = await thisPlayerSignedRequest("session", { gameId, walletAddress: address });
+          const session = await apiPost("/player/session", {
+            gameId,
+            walletAddress: address,
+            nonce: auth.nonce,
+            signature: auth.signature,
+          });
+          setGameSession(session);
+        } catch (sessionError) {
+          console.error("Game session setup failed:", sessionError);
+          setGameSessionError("Game session could not be resolved.");
+        } finally {
+          setGameSessionLoading(false);
+        }
+      }
+
       const shop = getShop();
       if (!shop) {
         throw new Error(

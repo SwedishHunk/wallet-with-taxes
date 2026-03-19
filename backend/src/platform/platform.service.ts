@@ -14,6 +14,7 @@ import {
   WalletDepositIntent,
   WalletDepositIntentStatus,
 } from "./entities/wallet-deposit-intent.entity";
+import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
@@ -55,6 +56,8 @@ export class PlatformService {
     private walletDepositIntentRepo: Repository<WalletDepositIntent>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(MarketplaceListing)
+    private marketplaceListingRepo: Repository<MarketplaceListing>,
     private economicsService: EconomicsService,
   ) {}
 
@@ -1007,6 +1010,174 @@ export class PlatformService {
 
       return { fromWallet: savedFrom, toWallet: savedTo };
     });
+  }
+
+  async playerTransferNFT(
+    gameId: string,
+    fromWalletAddress: string,
+    toWalletAddress: string,
+    nftInstanceId: string,
+  ) {
+    const normalizedFrom = fromWalletAddress.toLowerCase();
+    const normalizedTo = toWalletAddress.toLowerCase();
+
+    if (normalizedFrom === normalizedTo) {
+      throw new AppException("Cannot transfer to yourself", 400);
+    }
+
+    const { gamePlayer: fromGamePlayer } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalizedFrom,
+    );
+
+    const nftInstance = await this.nftInstanceRepo.findOne({
+      where: {
+        id: nftInstanceId,
+        owner: { id: fromGamePlayer.id },
+        template: { game: { id: gameId } },
+      },
+      relations: ["owner", "template"],
+    });
+
+    if (!nftInstance) {
+      throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
+    }
+
+    const { gamePlayer: toGamePlayer } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalizedTo,
+    );
+
+    nftInstance.owner = toGamePlayer;
+    return this.nftInstanceRepo.save(nftInstance);
+  }
+
+  // ─── Marketplace ───────────────────────────────────────────────────────────
+
+  async getGameListings(gameId: string) {
+    return this.marketplaceListingRepo.find({
+      where: { game: { id: gameId }, status: "active" },
+      relations: { nftInstance: { template: true }, seller: { user: true } },
+      order: { createdAt: "DESC" },
+    });
+  }
+
+  async createNFTListing(
+    gameId: string,
+    walletAddress: string,
+    nftInstanceId: string,
+    askPrice: string,
+  ) {
+    const normalized = walletAddress.toLowerCase();
+    const { gamePlayer } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalized,
+    );
+
+    const nftInstance = await this.nftInstanceRepo.findOne({
+      where: {
+        id: nftInstanceId,
+        owner: { id: gamePlayer.id },
+        template: { game: { id: gameId } },
+      },
+      relations: ["owner", "template"],
+    });
+    if (!nftInstance) {
+      throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
+    }
+
+    const existing = await this.marketplaceListingRepo.findOne({
+      where: { nftInstance: { id: nftInstanceId }, status: "active" },
+    });
+    if (existing) {
+      throw new AppException(
+        "This NFT is already listed in the marketplace",
+        409,
+      );
+    }
+
+    const game = await this.gameRepo.findOneBy({ id: gameId });
+    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
+
+    const listing = this.marketplaceListingRepo.create({
+      game,
+      seller: gamePlayer,
+      nftInstance,
+      askPrice: String(parseAmount(askPrice)),
+      status: "active",
+    });
+    return this.marketplaceListingRepo.save(listing);
+  }
+
+  async cancelNFTListing(
+    gameId: string,
+    walletAddress: string,
+    listingId: string,
+  ) {
+    const normalized = walletAddress.toLowerCase();
+    const { gamePlayer } = await this.resolvePlayerGameWallet(
+      gameId,
+      normalized,
+    );
+
+    const listing = await this.marketplaceListingRepo.findOne({
+      where: { id: listingId, game: { id: gameId }, status: "active" },
+      relations: ["seller"],
+    });
+    if (!listing) throw new AppException("Listing not found", 404);
+    if (listing.seller.id !== gamePlayer.id) {
+      throw new AppException("Not your listing", 403);
+    }
+
+    listing.status = "cancelled";
+    return this.marketplaceListingRepo.save(listing);
+  }
+
+  async purchaseNFTListing(
+    gameId: string,
+    walletAddress: string,
+    listingId: string,
+  ) {
+    const normalized = walletAddress.toLowerCase();
+    const { gamePlayer: buyerPlayer, wallet: buyerWallet } =
+      await this.resolvePlayerGameWallet(gameId, normalized);
+
+    const listing = await this.marketplaceListingRepo.findOne({
+      where: { id: listingId, game: { id: gameId }, status: "active" },
+      relations: ["seller", "nftInstance"],
+    });
+    if (!listing) {
+      throw new AppException("Listing not found or no longer active", 404);
+    }
+    if (listing.seller.id === buyerPlayer.id) {
+      throw new AppException("Cannot purchase your own listing", 400);
+    }
+
+    const ask = parseAmount(listing.askPrice);
+    const buyerBalance = parseFloat(buyerWallet.balance ?? "0");
+    if (buyerBalance < ask) {
+      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 402);
+    }
+
+    const sellerWallet = await this.walletRepo.findOne({
+      where: { gamePlayer: { id: listing.seller.id } },
+    });
+    if (!sellerWallet) {
+      throw new AppException("Seller wallet not found", 404);
+    }
+
+    buyerWallet.balance = safeSub(buyerWallet.balance ?? "0", ask);
+    sellerWallet.balance = safeAdd(sellerWallet.balance ?? "0", ask);
+
+    listing.nftInstance.owner = buyerPlayer;
+    listing.status = "sold";
+    listing.buyer = buyerPlayer;
+    listing.soldAt = new Date();
+
+    await this.walletRepo.save(buyerWallet);
+    await this.walletRepo.save(sellerWallet);
+    await this.nftInstanceRepo.save(listing.nftInstance);
+    return this.marketplaceListingRepo.save(listing);
   }
 
   // ─── NFT Shop (player-facing) ───────────────────────────────────────────────
