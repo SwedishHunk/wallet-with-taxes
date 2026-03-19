@@ -1991,7 +1991,10 @@ describe("PlatformService", () => {
     wallet: { balance: string },
   ) {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1", walletAddress: "0xabc" });
+    userRepo.findOne.mockResolvedValueOnce({
+      id: "u1",
+      walletAddress: "0xabc",
+    });
     gamePlayerRepo.findOne.mockResolvedValueOnce(gamePlayer);
     walletRepo.findOne.mockResolvedValueOnce(wallet);
   }
