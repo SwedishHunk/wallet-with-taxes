@@ -16,6 +16,7 @@ import {
   WalletDepositIntentStatus,
 } from "./entities/wallet-deposit-intent.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
+import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
@@ -61,6 +62,8 @@ export class PlatformService {
     private walletDepositIntentRepo: Repository<WalletDepositIntent>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(PlayerWalletIdentity)
+    private walletIdentityRepo: Repository<PlayerWalletIdentity>,
     @InjectRepository(MarketplaceListing)
     private marketplaceListingRepo: Repository<MarketplaceListing>,
     private economicsService: EconomicsService,
@@ -144,6 +147,25 @@ export class PlatformService {
     });
     if (!player) {
       player = gamePlayerRepo.create({ user, game });
+      player = await gamePlayerRepo.save(player);
+    }
+    return player;
+  }
+
+  private async ensureGamePlayerForWalletIdentity(
+    gamePlayerRepo: Repository<GamePlayer>,
+    game: Game,
+    walletIdentity: PlayerWalletIdentity,
+  ): Promise<GamePlayer> {
+    let player = await gamePlayerRepo.findOne({
+      where: {
+        walletIdentity: { id: walletIdentity.id },
+        game: { id: game.id },
+      },
+      relations: ["game", "walletIdentity"],
+    });
+    if (!player) {
+      player = gamePlayerRepo.create({ walletIdentity, game });
       player = await gamePlayerRepo.save(player);
     }
     return player;
@@ -1041,40 +1063,37 @@ export class PlatformService {
   private async resolvePlayerGameWallet(
     gameId: string,
     walletAddress: string,
-  ): Promise<{ user: User; gamePlayer: GamePlayer; wallet: GameWallet }> {
+  ): Promise<{
+    walletIdentity: PlayerWalletIdentity;
+    gamePlayer: GamePlayer;
+    wallet: GameWallet;
+  }> {
     const normalizedWallet = walletAddress.toLowerCase();
 
     const game = await this.gameRepo.findOne({ where: { id: gameId } });
     if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
 
-    let user = await this.userRepo.findOne({
+    let walletIdentity = await this.walletIdentityRepo.findOne({
       where: { walletAddress: normalizedWallet },
     });
-    if (!user) {
-      user = this.userRepo.create({
-        email: `wallet-${normalizedWallet.slice(2)}@player.local`,
-        passwordHash: randomUUID(),
-        custodyMode: "self",
-        encryptedPrivateKey: null,
+    if (!walletIdentity) {
+      walletIdentity = this.walletIdentityRepo.create({
         walletAddress: normalizedWallet,
-        kycStatus: "pending",
-        onChainWallet: undefined,
-        isAdmin: false,
       });
-      user = await this.userRepo.save(user);
+      walletIdentity = await this.walletIdentityRepo.save(walletIdentity);
     }
 
-    const gamePlayer = await this.ensureGamePlayer(
+    const gamePlayer = await this.ensureGamePlayerForWalletIdentity(
       this.gamePlayerRepo,
       game,
-      user,
+      walletIdentity,
     );
     const wallet = await this.ensureWalletForGamePlayer(
       this.walletRepo,
       gamePlayer,
     );
 
-    return { user, gamePlayer, wallet };
+    return { walletIdentity, gamePlayer, wallet };
   }
 
   async registerPlayerByWallet(
@@ -1091,13 +1110,16 @@ export class PlatformService {
     if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
 
     const normalizedWallet = walletAddress.toLowerCase();
-    const user = await this.userRepo.findOne({
+    const walletIdentity = await this.walletIdentityRepo.findOne({
       where: { walletAddress: normalizedWallet },
     });
-    if (!user) return null;
+    if (!walletIdentity) return null;
 
     const gamePlayer = await this.gamePlayerRepo.findOne({
-      where: { game: { id: gameId }, user: { id: user.id } },
+      where: {
+        game: { id: gameId },
+        walletIdentity: { id: walletIdentity.id },
+      },
     });
     if (!gamePlayer) return null;
 
@@ -1688,9 +1710,20 @@ export class PlatformService {
   }
 
   async getAllNFTsForWallet(walletAddress: string) {
-    // Find the user by wallet address
+    const normalizedWallet = walletAddress.toLowerCase();
+    const walletIdentity = await this.walletIdentityRepo.findOne({
+      where: { walletAddress: normalizedWallet },
+    });
+    if (walletIdentity) {
+      return this.nftInstanceRepo.find({
+        where: { owner: { walletIdentity: { id: walletIdentity.id } } },
+        relations: ["template", "template.game", "owner", "owner.game"],
+        order: { createdAt: "DESC" },
+      });
+    }
+
     const user = await this.userRepo.findOne({
-      where: { walletAddress: walletAddress.toLowerCase() },
+      where: { walletAddress: normalizedWallet },
     });
     if (!user) return [];
 

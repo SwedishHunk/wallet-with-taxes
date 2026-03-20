@@ -11,6 +11,7 @@ import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
+import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 import { PlatformService } from "./platform.service";
 import {
   ApiPlatformController,
@@ -36,6 +37,7 @@ import { EconomicsModule } from "../economics/economics.module";
       NFTInstance,
       WalletDepositIntent,
       MarketplaceListing,
+      PlayerWalletIdentity,
       User,
     ]),
     EconomicsModule,
