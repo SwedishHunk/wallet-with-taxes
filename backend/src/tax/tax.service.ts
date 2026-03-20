@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { Logger } from "@nestjs/common";
 import { Repository } from "typeorm";
 import { TaxEvent } from "./entities/tax-event.entity";
 import { TaxCostBasis } from "./entities/tax-cost-basis.entity";
+import { TaxProjectionState } from "./entities/tax-projection-state.entity";
 import { Response } from "express";
 import { SWEDISH_LOSS_DEDUCTION_RATE } from "../shared/constants/business.constants";
 
@@ -18,11 +20,16 @@ interface TaxCsvRow {
 
 @Injectable()
 export class TaxService {
+  private readonly logger = new Logger(TaxService.name);
+  private static readonly PROJECTOR = "cost-basis";
+
   constructor(
     @InjectRepository(TaxEvent)
     private readonly repo: Repository<TaxEvent>,
     @InjectRepository(TaxCostBasis)
     private readonly costBasisRepo: Repository<TaxCostBasis>,
+    @InjectRepository(TaxProjectionState)
+    private readonly projectionStateRepo: Repository<TaxProjectionState>,
   ) {}
 
   async logEvent(data: Partial<TaxEvent>) {
@@ -42,8 +49,9 @@ export class TaxService {
     ) {
       try {
         await this.updateCostBasis(saved);
-      } catch {
-        // Table may not exist yet — skip silently
+        await this.markProjectionHealthy();
+      } catch (error) {
+        await this.markProjectionFailed(error);
       }
     }
 
@@ -80,14 +88,22 @@ export class TaxService {
           totalLossesUSD: +totalLossesUSD.toFixed(2),
           adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
           netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
+          projection: await this.getProjectionSummary("cost-basis"),
         };
       }
-    } catch {
-      // Table may not exist yet — fall through to legacy path
+      return {
+        ...(await this.getSummaryLegacy(normalizedAddress)),
+        projection: await this.getProjectionSummary("legacy-fallback"),
+      };
+    } catch (error) {
+      await this.markProjectionFailed(error);
     }
 
     // Fallback: legacy in-memory calculation (for pre-existing data)
-    return this.getSummaryLegacy(normalizedAddress);
+    return {
+      ...(await this.getSummaryLegacy(normalizedAddress)),
+      projection: await this.getProjectionSummary("legacy-fallback"),
+    };
   }
 
   /**
@@ -205,6 +221,56 @@ export class TaxService {
 
     basis.lastProcessedEventId = event.id;
     await this.costBasisRepo.save(basis);
+  }
+
+  private async getProjectionState() {
+    let state = await this.projectionStateRepo.findOne({
+      where: { projector: TaxService.PROJECTOR },
+    });
+
+    if (!state) {
+      state = this.projectionStateRepo.create({
+        projector: TaxService.PROJECTOR,
+        healthy: true,
+        lastError: null,
+        lastFailureAt: null,
+        lastSuccessAt: null,
+      });
+    }
+
+    return state;
+  }
+
+  private async markProjectionHealthy() {
+    const state = await this.getProjectionState();
+    state.healthy = true;
+    state.lastError = null;
+    state.lastSuccessAt = new Date();
+    await this.projectionStateRepo.save(state);
+  }
+
+  private async markProjectionFailed(error: unknown) {
+    const state = await this.getProjectionState();
+    const message =
+      error instanceof Error ? error.message : "Unknown projection error";
+
+    state.healthy = false;
+    state.lastError = message.slice(0, 255);
+    state.lastFailureAt = new Date();
+    await this.projectionStateRepo.save(state);
+    this.logger.error(`Cost-basis projection failed: ${message}`);
+  }
+
+  private async getProjectionSummary(mode: "cost-basis" | "legacy-fallback") {
+    const state = await this.getProjectionState();
+    return {
+      mode,
+      projector: state.projector,
+      healthy: state.healthy,
+      lastError: state.lastError,
+      lastFailureAt: state.lastFailureAt,
+      lastSuccessAt: state.lastSuccessAt,
+    };
   }
 
   // Prevent CSV formula injection: prefix values starting with =, +, -, @ with a single quote
