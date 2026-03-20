@@ -16,7 +16,7 @@ import { GamePlayer } from "./entities/game-player.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
-import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
+import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 
 type Repo = {
   findOne: jest.Mock;
@@ -42,6 +42,7 @@ describe("PlatformService", () => {
   let walletIdentityRepo: Repo;
   let marketplaceListingRepo: Repo;
   let economicsService: { logEvent: jest.Mock };
+  let playerWalletIdentityService: PlayerWalletIdentityService;
   let service: PlatformService;
 
   beforeEach(() => {
@@ -126,6 +127,12 @@ describe("PlatformService", () => {
     economicsService = {
       logEvent: jest.fn().mockResolvedValue(undefined),
     };
+    playerWalletIdentityService = new PlayerWalletIdentityService(
+      gameRepo as never,
+      gamePlayerRepo as never,
+      walletRepo as never,
+      walletIdentityRepo as never,
+    );
 
     service = new PlatformService(
       dataSource as never,
@@ -142,6 +149,7 @@ describe("PlatformService", () => {
       walletIdentityRepo as never,
       marketplaceListingRepo as never,
       economicsService as never,
+      playerWalletIdentityService as never,
     );
 
     (jest.spyOn(service as any, "verifyNativeDepositTransaction") as any)

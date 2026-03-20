@@ -27,6 +27,7 @@ import {
   EconomicDirection,
   EconomicScopeType,
 } from "../economics/entities/economic-event.entity";
+import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 
 @Injectable()
 export class PlatformService {
@@ -67,6 +68,7 @@ export class PlatformService {
     @InjectRepository(MarketplaceListing)
     private marketplaceListingRepo: Repository<MarketplaceListing>,
     private economicsService: EconomicsService,
+    private playerWalletIdentityService: PlayerWalletIdentityService,
   ) {}
 
   private generateFakeDepositAddress(
@@ -188,6 +190,16 @@ export class PlatformService {
       wallet = await walletRepo.save(wallet);
     }
     return wallet;
+  }
+
+  private async resolvePlayerGameWallet(
+    gameId: string,
+    walletAddress: string,
+  ) {
+    return this.playerWalletIdentityService.resolvePlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
   }
 
   private async lockWalletOrThrow(
@@ -1060,74 +1072,23 @@ export class PlatformService {
 
   // ─── Player-facing wallet operations (wallet address based) ───────────────
 
-  private async resolvePlayerGameWallet(
-    gameId: string,
-    walletAddress: string,
-  ): Promise<{
-    walletIdentity: PlayerWalletIdentity;
-    gamePlayer: GamePlayer;
-    wallet: GameWallet;
-  }> {
-    const normalizedWallet = walletAddress.toLowerCase();
-
-    const game = await this.gameRepo.findOne({ where: { id: gameId } });
-    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
-
-    let walletIdentity = await this.walletIdentityRepo.findOne({
-      where: { walletAddress: normalizedWallet },
-    });
-    if (!walletIdentity) {
-      walletIdentity = this.walletIdentityRepo.create({
-        walletAddress: normalizedWallet,
-      });
-      walletIdentity = await this.walletIdentityRepo.save(walletIdentity);
-    }
-
-    const gamePlayer = await this.ensureGamePlayerForWalletIdentity(
-      this.gamePlayerRepo,
-      game,
-      walletIdentity,
-    );
-    const wallet = await this.ensureWalletForGamePlayer(
-      this.walletRepo,
-      gamePlayer,
-    );
-
-    return { walletIdentity, gamePlayer, wallet };
-  }
-
   async registerPlayerByWallet(
     gameId: string,
     walletAddress: string,
     studioId: string,
   ) {
-    await this.assertGameBelongsToStudio(gameId, studioId);
-    return this.resolvePlayerGameWallet(gameId, walletAddress);
+    return this.playerWalletIdentityService.registerPlayerByWallet(
+      gameId,
+      walletAddress,
+      studioId,
+    );
   }
 
   async getPlayerGameWallet(gameId: string, walletAddress: string) {
-    const game = await this.gameRepo.findOne({ where: { id: gameId } });
-    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
-
-    const normalizedWallet = walletAddress.toLowerCase();
-    const walletIdentity = await this.walletIdentityRepo.findOne({
-      where: { walletAddress: normalizedWallet },
-    });
-    if (!walletIdentity) return null;
-
-    const gamePlayer = await this.gamePlayerRepo.findOne({
-      where: {
-        game: { id: gameId },
-        walletIdentity: { id: walletIdentity.id },
-      },
-    });
-    if (!gamePlayer) return null;
-
-    const wallet = await this.walletRepo.findOne({
-      where: { gamePlayer: { id: gamePlayer.id } },
-    });
-
-    return wallet ?? null;
+    return this.playerWalletIdentityService.getPlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
   }
 
   async playerWithdrawFromGameWallet(
@@ -1445,7 +1406,10 @@ export class PlatformService {
   ) {
     const normalized = walletAddress.toLowerCase();
     const { gamePlayer: buyerPlayer, wallet: buyerWallet } =
-      await this.resolvePlayerGameWallet(gameId, normalized);
+      await this.resolvePlayerGameWallet(
+        gameId,
+        normalized,
+      );
     const txGroupId = randomUUID();
 
     return this.dataSource.transaction(async (manager) => {
@@ -1580,10 +1544,11 @@ export class PlatformService {
 
     const mintingCost = parseFloat(template.mintingCost);
     const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const { gamePlayer, wallet } = await this.resolvePlayerGameWallet(
+    const { gamePlayer, wallet } =
+      await this.resolvePlayerGameWallet(
       gameId,
       walletAddress,
-    );
+      );
 
     if (operationKey) {
       const existingPurchase = await this.nftInstanceRepo.findOne({
