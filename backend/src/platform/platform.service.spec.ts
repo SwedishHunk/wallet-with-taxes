@@ -135,8 +135,9 @@ describe("PlatformService", () => {
       economicsService as never,
     );
 
-    (jest.spyOn(service as any, "verifyNativeDepositTransaction") as any)
-      .mockResolvedValue(undefined);
+    (
+      jest.spyOn(service as any, "verifyNativeDepositTransaction") as any
+    ).mockResolvedValue(undefined);
   });
 
   it("createWalletDepositIntent creates pending intent with deterministic fake address", async () => {
@@ -2463,7 +2464,9 @@ describe("PlatformService", () => {
           if (entity === GameWallet) {
             return {
               findOne: jest.fn(async ({ where }: { where: { id?: string } }) =>
-                where.id === "w-buyer" ? { id: "w-buyer", balance: "100" } : null,
+                where.id === "w-buyer"
+                  ? { id: "w-buyer", balance: "100" }
+                  : null,
               ),
               save: jest.fn(async (x) => x),
             };

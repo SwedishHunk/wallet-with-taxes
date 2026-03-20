@@ -9,10 +9,7 @@ import { JwtService } from "@nestjs/jwt";
 import type { InterfaceAbi } from "ethers";
 import { ContractTransactionResponse } from "ethers";
 import { Studio } from "../platform/entities/studio.entity";
-import {
-  StudioMember,
-  StudioRole,
-} from "../platform/entities/studio-member.entity";
+import { StudioMember } from "../platform/entities/studio-member.entity";
 import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
@@ -308,7 +305,12 @@ export class UsersService {
    * Called after the initial login when the user explicitly selects a studio.
    */
   async selectStudio(
-    jwtUser: { id: string; email?: string; walletAddress?: string; isAdmin: boolean },
+    jwtUser: {
+      id: string;
+      email?: string;
+      walletAddress?: string;
+      isAdmin: boolean;
+    },
     studioId: string,
   ) {
     const membership = await this.studioMemberRepository.findOne({

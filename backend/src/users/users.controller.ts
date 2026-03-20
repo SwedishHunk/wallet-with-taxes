@@ -46,8 +46,8 @@ export class UsersController {
   ) {
     const { email, password, studioName } = body;
     const result = await this.usersService.signup(email, password, studioName);
-    res.cookie(ACCESS_COOKIE, result.token, cookieOpts());
-    const { token: _token, ...payload } = result;
+    const { token, ...payload } = result;
+    res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;
   }
 
@@ -62,8 +62,8 @@ export class UsersController {
       body.password,
       body.studioId,
     );
-    res.cookie(ACCESS_COOKIE, result.token, cookieOpts());
-    const { token: _token, ...payload } = result;
+    const { token, ...payload } = result;
+    res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;
   }
 
@@ -81,8 +81,8 @@ export class UsersController {
   ) {
     const jwtUser = req.user as JwtUser;
     const result = await this.usersService.selectStudio(jwtUser, body.studioId);
-    res.cookie(ACCESS_COOKIE, result.token, cookieOpts());
-    const { token: _token, ...payload } = result;
+    const { token, ...payload } = result;
+    res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;
   }
 

@@ -42,8 +42,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // (player portal and any non-browser clients that can't use cookies).
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) =>
-          (req?.cookies as Record<string, string> | undefined)
-            ?.access_token ?? null,
+          (req?.cookies as Record<string, string> | undefined)?.access_token ??
+          null,
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
