@@ -20,6 +20,7 @@ import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { MarketplaceService } from "./marketplace.service";
 import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
 import { NFTShopService } from "./nft-shop.service";
+import { GameWalletAdminService } from "./game-wallet-admin.service";
 
 type Repo = {
   findOne: jest.Mock;
@@ -49,6 +50,7 @@ describe("PlatformService", () => {
   let marketplaceService: MarketplaceService;
   let playerWalletOperationsService: PlayerWalletOperationsService;
   let nftShopService: NFTShopService;
+  let gameWalletAdminService: GameWalletAdminService;
   let service: PlatformService;
 
   beforeEach(() => {
@@ -164,6 +166,15 @@ describe("PlatformService", () => {
       nftTemplateRepo as never,
       playerWalletIdentityService as never,
     );
+    gameWalletAdminService = new GameWalletAdminService(
+      dataSource as never,
+      gameRepo as never,
+      gamePlayerRepo as never,
+      walletRepo as never,
+      ledgerRepo as never,
+      walletDepositIntentRepo as never,
+      userRepo as never,
+    );
 
     service = new PlatformService(
       dataSource as never,
@@ -184,9 +195,10 @@ describe("PlatformService", () => {
       marketplaceService as never,
       playerWalletOperationsService as never,
       nftShopService as never,
+      gameWalletAdminService as never,
     );
 
-    (jest.spyOn(service as any, "verifyNativeDepositTransaction") as any)
+    (jest.spyOn(gameWalletAdminService as any, "verifyNativeDepositTransaction") as any)
       .mockResolvedValue(undefined);
   });
 
@@ -230,7 +242,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent maps txHash unique violation to AppException", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -261,7 +273,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent has expired", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -283,7 +295,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent returns wallet on replay of confirmed intent", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -337,7 +349,7 @@ describe("PlatformService", () => {
   });
 
   it("depositToGameWallet updates wallet and writes deposit ledger entry", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: {
         id: "w1",
@@ -383,7 +395,7 @@ describe("PlatformService", () => {
   });
 
   it("depositToGameWallet uses default description when omitted", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: {
         id: "w1",
@@ -413,7 +425,7 @@ describe("PlatformService", () => {
   });
 
   it("depositToGameWallet returns current wallet on idempotent replay", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1", balance: "7" } as never,
     });
@@ -443,7 +455,7 @@ describe("PlatformService", () => {
 
   it("withdrawFromGameWallet throws on insufficient balance", async () => {
     jest
-      .spyOn(service, "getGameWalletBalance")
+      .spyOn(gameWalletAdminService, "getGameWalletBalance")
       .mockResolvedValue({ balance: "3", totalWithdrawn: "0" } as never);
 
     await expect(
@@ -464,7 +476,7 @@ describe("PlatformService", () => {
   });
 
   it("updateNFTInstance clamps condition and merges custom attributes", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -488,7 +500,7 @@ describe("PlatformService", () => {
   });
 
   it("updateNFTInstance throws asset not found when ownership does not match", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -504,7 +516,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent succeeds and returns wallet on happy path", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -723,7 +735,7 @@ describe("PlatformService", () => {
   });
 
   it("getGameWalletLedger loads entries in descending timestamp order", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -737,7 +749,7 @@ describe("PlatformService", () => {
   });
 
   it("withdrawFromGameWallet updates wallet and writes withdrawal ledger entry", async () => {
-    jest.spyOn(service, "getGameWalletBalance").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "getGameWalletBalance").mockResolvedValue({
       id: "w1",
       balance: "10",
       totalWithdrawn: "1",
@@ -777,7 +789,7 @@ describe("PlatformService", () => {
   });
 
   it("withdrawFromGameWallet uses default description when omitted", async () => {
-    jest.spyOn(service, "getGameWalletBalance").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "getGameWalletBalance").mockResolvedValue({
       id: "w1",
       balance: "5",
       totalWithdrawn: "0",
@@ -958,7 +970,7 @@ describe("PlatformService", () => {
   });
 
   it("getGameWalletBalance delegates ensureGameWalletForPlayer", async () => {
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -982,7 +994,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent is missing", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -1019,7 +1031,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when intent is not pending", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -1059,7 +1071,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent marks expired intent inside transaction", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -1103,7 +1115,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent rethrows unknown query failures", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -1130,7 +1142,7 @@ describe("PlatformService", () => {
 
   it("confirmWalletDepositIntent throws when locked wallet is missing", async () => {
     gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
@@ -1492,7 +1504,7 @@ describe("PlatformService", () => {
 
   it("getPlayerNFTs returns nft instances for ensured player", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
-    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+    jest.spyOn(gameWalletAdminService, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
       wallet: { id: "w1" } as never,
     });
