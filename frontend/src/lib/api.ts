@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:3000",
+  baseURL: import.meta.env.VITE_API_URL ?? "",
   // Send the HttpOnly auth cookie with every cross-origin request.
   // The cookie is set server-side on login and cleared on logout —
   // JavaScript never reads or writes it, eliminating token theft via XSS.
