@@ -44,7 +44,7 @@ export class PlatformController {
     }
     return this.platformService.createGameForUser(
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data,
     );
   }
@@ -56,7 +56,7 @@ export class PlatformController {
     return this.platformService.getGameWalletBalance(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -67,7 +67,7 @@ export class PlatformController {
     return this.platformService.getGameWalletLedger(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -78,7 +78,7 @@ export class PlatformController {
     return this.platformService.getGameById(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -86,7 +86,7 @@ export class PlatformController {
   @Get("games")
   getGames(@Req() req: Request) {
     const jwtUser = req.user as JwtUser;
-    return this.platformService.getGamesForUser(jwtUser.studioId);
+    return this.platformService.getGamesForUser(jwtUser.studioId!);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -100,7 +100,7 @@ export class PlatformController {
     return this.platformService.depositToGameWallet(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.amount,
       undefined,
       data.idempotencyKey,
@@ -118,7 +118,7 @@ export class PlatformController {
     return this.platformService.createWalletDepositIntent(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.amount,
     );
   }
@@ -134,7 +134,7 @@ export class PlatformController {
     return this.platformService.confirmWalletDepositIntent(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.intentId,
       data.txHash,
       data.idempotencyKey,
@@ -152,7 +152,7 @@ export class PlatformController {
     return this.platformService.withdrawFromGameWallet(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.amount,
       undefined,
       data.idempotencyKey,
@@ -171,7 +171,7 @@ export class PlatformController {
       gameId,
       jwtUser.id,
       data.toUserId,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.amount,
       data.description,
       data.idempotencyKey,
@@ -186,7 +186,7 @@ export class PlatformController {
     const jwtUser = req.user as JwtUser;
     return this.platformService.getNFTTemplatesForGame(
       gameId,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -203,7 +203,7 @@ export class PlatformController {
     }
     return this.platformService.createNFTTemplate(
       gameId,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data,
     );
   }
@@ -215,7 +215,7 @@ export class PlatformController {
     return this.platformService.getPlayerNFTs(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -233,7 +233,7 @@ export class PlatformController {
     }
     return this.platformService.mintNFTToPlayer(
       gameId,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       templateId,
       body.gamePlayerId,
     );
@@ -256,7 +256,7 @@ export class PlatformController {
     return this.platformService.registerPlayerByWallet(
       gameId,
       body.walletAddress,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -267,7 +267,7 @@ export class PlatformController {
     if (jwtUser.role !== "owner" && jwtUser.role !== "admin") {
       throw new ForbiddenException("Only admins can view player list");
     }
-    return this.platformService.getGamePlayers(gameId, jwtUser.studioId);
+    return this.platformService.getGamePlayers(gameId, jwtUser.studioId!);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -279,7 +279,7 @@ export class PlatformController {
     }
     return this.platformService.getAllNFTInstancesForGame(
       gameId,
-      jwtUser.studioId,
+      jwtUser.studioId!,
     );
   }
 
@@ -295,7 +295,7 @@ export class PlatformController {
     return this.platformService.updateNFTInstance(
       gameId,
       jwtUser.id,
-      jwtUser.studioId,
+      jwtUser.studioId!,
       nftId,
       data,
     );
@@ -317,7 +317,7 @@ export class PlatformController {
       );
     }
     return this.platformService.createPersonalAccount(
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.email,
       data.password,
       data.accessPoints,
@@ -328,7 +328,7 @@ export class PlatformController {
   @Get("personal-accounts")
   getPersonalAccounts(@Req() req: Request) {
     const jwtUser = req.user as JwtUser;
-    return this.platformService.getStudioUsers(jwtUser.studioId);
+    return this.platformService.getStudioUsers(jwtUser.studioId!);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -339,7 +339,7 @@ export class PlatformController {
   ) {
     const jwtUser = req.user as JwtUser;
     return this.platformService.loginStudioUser(
-      jwtUser.studioId,
+      jwtUser.studioId!,
       data.email,
       data.password,
     );
@@ -358,7 +358,7 @@ export class PlatformController {
       throw new ForbiddenException("Only studio owners can update permissions");
     }
     return this.platformService.updatePersonalAccountPermissions(
-      jwtUser.studioId,
+      jwtUser.studioId!,
       userId,
       data.accessPoints,
     );
