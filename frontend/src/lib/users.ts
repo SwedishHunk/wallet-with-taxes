@@ -40,6 +40,7 @@ export const linkWallet = (email: string, walletAddress: string) =>
 export const getMe = () => api.get<User>("/users/me");
 
 export const devBootstrap = (payload?: {
+  mode?: "player" | "studio";
   email?: string;
   password?: string;
   studioName?: string;

@@ -9,6 +9,7 @@ import { User } from "../users/user.entity";
 import { UsersService } from "../users/users.service";
 
 interface DevBootstrapOptions {
+  mode?: "player" | "studio";
   email?: string;
   password?: string;
   studioName?: string;
@@ -174,6 +175,7 @@ export class AdminDevService {
   async bootstrap(options: DevBootstrapOptions, providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
 
+    const mode = options.mode === "studio" ? "studio" : "player";
     const email = options.email?.trim() || "dev-owner@triolith.local";
     const password = options.password || "DevPass123!";
     const studioName = options.studioName?.trim() || "Dev Studio";
@@ -253,6 +255,9 @@ export class AdminDevService {
         games: "/games",
         trade: `/player/game/${game.id}/trade`,
       },
+      recommendedLanding:
+        mode === "studio" ? "/dashboard" : `/player/game/${game.id}/trade`,
+      mode,
     };
   }
 }

@@ -13,20 +13,20 @@ export default function RoleGateway() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { setStudioSession, setMemberSession, setActiveGame } = useAuthState();
-  const [bootstrapping, setBootstrapping] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState<"player" | "studio" | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
-  const handleDevQuickstart = async () => {
+  const handleDevQuickstart = async (mode: "player" | "studio") => {
     try {
-      setBootstrapping(true);
+      setBootstrapping(mode);
       setBootstrapError(null);
 
-      const { data } = await devBootstrap();
+      const { data } = await devBootstrap({ mode });
       // Cookie is set server-side by the bootstrap endpoint.
       setStudioSession(data.studio);
       setMemberSession(data.member);
       setActiveGame(data.game);
-      navigate(data.routes.trade);
+      navigate(data.recommendedLanding || (mode === "studio" ? data.routes.dashboard : data.routes.trade));
     } catch (error: unknown) {
       const e = error as { response?: { data?: { message?: string } }; message?: string };
       setBootstrapError(
@@ -35,7 +35,7 @@ export default function RoleGateway() {
           "Dev bootstrap failed",
       );
     } finally {
-      setBootstrapping(false);
+      setBootstrapping(null);
     }
   };
 
@@ -115,22 +115,51 @@ export default function RoleGateway() {
               gap: "0.75rem",
             }}
           >
-            <button
-              type="button"
-              onClick={handleDevQuickstart}
-              disabled={bootstrapping}
+            <div
               style={{
-                border: "1px solid rgba(0, 212, 255, 0.35)",
-                background: "rgba(6, 14, 32, 0.8)",
-                color: "#8be9fd",
-                padding: "0.9rem 1.2rem",
-                borderRadius: "999px",
-                cursor: bootstrapping ? "wait" : "pointer",
-                fontWeight: 700,
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                gap: "0.75rem",
               }}
             >
-              {bootstrapping ? "Bootstrapping dev session..." : "Dev Quickstart"}
-            </button>
+              <button
+                type="button"
+                onClick={() => handleDevQuickstart("player")}
+                disabled={bootstrapping !== null}
+                style={{
+                  border: "1px solid rgba(0, 212, 255, 0.35)",
+                  background: "rgba(6, 14, 32, 0.8)",
+                  color: "#8be9fd",
+                  padding: "0.9rem 1.2rem",
+                  borderRadius: "999px",
+                  cursor: bootstrapping ? "wait" : "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                {bootstrapping === "player"
+                  ? "Bootstrapping player demo..."
+                  : "Dev Quickstart: Player"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDevQuickstart("studio")}
+                disabled={bootstrapping !== null}
+                style={{
+                  border: "1px solid rgba(129, 140, 248, 0.35)",
+                  background: "rgba(13, 19, 40, 0.88)",
+                  color: "#c7d2fe",
+                  padding: "0.9rem 1.2rem",
+                  borderRadius: "999px",
+                  cursor: bootstrapping ? "wait" : "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                {bootstrapping === "studio"
+                  ? "Bootstrapping studio demo..."
+                  : "Dev Quickstart: Studio"}
+              </button>
+            </div>
             <div
               style={{
                 color: "rgba(255,255,255,0.68)",
@@ -139,8 +168,8 @@ export default function RoleGateway() {
                 maxWidth: "42rem",
               }}
             >
-              Creates or reuses a dev studio, owner account, member session, test game,
-              sets active game, and opens game-scoped trade directly.
+              Player quickstart opens game-scoped trade directly. Studio quickstart opens the
+              studio dashboard with the same demo studio, member session, and active game ready.
             </div>
             {bootstrapError && (
               <div

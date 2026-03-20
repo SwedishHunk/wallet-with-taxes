@@ -3,6 +3,7 @@ import { Response, CookieOptions } from "express";
 import { AdminDevService } from "./admin-dev.service";
 
 interface DevBootstrapBody {
+  mode?: "player" | "studio";
   email?: string;
   password?: string;
   studioName?: string;
