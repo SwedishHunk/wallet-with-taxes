@@ -137,6 +137,9 @@ export class AdminDevService {
     const loginResult = await this.usersService.login(email, password);
     const userId = loginResult.user.id;
     const studioId = loginResult.user.studioId;
+    if (!studioId) {
+      throw new AppException("Studio session was not created during bootstrap login", 500);
+    }
 
     const studio = await this.studioRepo.findOne({ where: { id: studioId } });
     if (!studio) {

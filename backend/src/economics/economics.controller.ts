@@ -154,6 +154,9 @@ export class EconomicsController {
     @Query("gameId") gameId?: string,
   ) {
     const jwtUser = req.user as JwtUser;
+    if (!jwtUser.studioId) {
+      throw new BadRequestException("Studio context is required");
+    }
     return this.economicsService.getEventsForStudio(
       jwtUser.studioId,
       gameId?.trim() || undefined,
@@ -167,6 +170,9 @@ export class EconomicsController {
     @Param("gameId") gameId: string,
   ) {
     const jwtUser = req.user as JwtUser;
+    if (!jwtUser.studioId) {
+      throw new BadRequestException("Studio context is required");
+    }
     return this.economicsService.getEventsForStudioGame(
       jwtUser.studioId,
       gameId,
