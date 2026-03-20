@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { formatErrorMessage } from "../../lib/formatErrorMessage";
 
 const API_BASE = "/api";
 
@@ -48,7 +49,7 @@ export function useApiData(path) {
       const result = await apiFetch(currentPath);
       setData(result);
     } catch (err) {
-      setError(err.message);
+      setError(formatErrorMessage(err.message, "Could not load data."));
     } finally {
       setLoading(false);
     }

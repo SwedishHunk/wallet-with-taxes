@@ -11,7 +11,13 @@ import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
+import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 import { PlatformService } from "./platform.service";
+import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
+import { MarketplaceService } from "./marketplace.service";
+import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
+import { NFTShopService } from "./nft-shop.service";
+import { GameWalletAdminService } from "./game-wallet-admin.service";
 import {
   ApiPlatformController,
   PlatformController,
@@ -36,15 +42,30 @@ import { EconomicsModule } from "../economics/economics.module";
       NFTInstance,
       WalletDepositIntent,
       MarketplaceListing,
+      PlayerWalletIdentity,
       User,
     ]),
     EconomicsModule,
   ],
   controllers: [PlatformController, ApiPlatformController, StudiosController],
-  providers: [PlatformService, StudioMemberService, StudiosService],
+  providers: [
+    PlatformService,
+    PlayerWalletIdentityService,
+    MarketplaceService,
+    PlayerWalletOperationsService,
+    NFTShopService,
+    GameWalletAdminService,
+    StudioMemberService,
+    StudiosService,
+  ],
   exports: [
     TypeOrmModule,
     PlatformService,
+    PlayerWalletIdentityService,
+    MarketplaceService,
+    PlayerWalletOperationsService,
+    NFTShopService,
+    GameWalletAdminService,
     StudioMemberService,
     StudiosService,
   ],

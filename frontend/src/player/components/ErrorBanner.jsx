@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { formatErrorMessage } from "../../lib/formatErrorMessage";
 
 export default function ErrorBanner({ message, onRetry }) {
   if (!message) return null;
+  const friendlyMessage = formatErrorMessage(message, "Something went wrong.");
 
   return (
     <motion.div
@@ -24,7 +26,7 @@ export default function ErrorBanner({ message, onRetry }) {
           >
             <AlertTriangle size={16} />
           </motion.div>
-          <span className="text-sm font-medium">{message}</span>
+          <span className="text-sm font-medium">{friendlyMessage}</span>
         </div>
         {onRetry && (
           <motion.button

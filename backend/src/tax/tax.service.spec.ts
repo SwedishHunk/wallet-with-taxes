@@ -28,6 +28,7 @@ function makeEvent(partial: Partial<TaxEvent>): TaxEvent {
 describe("TaxService", () => {
   let repo: MockRepo;
   let costBasisRepo: MockRepo;
+  let projectionStateRepo: MockRepo;
   let service: TaxService;
 
   beforeEach(() => {
@@ -43,7 +44,17 @@ describe("TaxService", () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
     };
-    service = new TaxService(repo as never, costBasisRepo as never);
+    projectionStateRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+      find: jest.fn(),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    service = new TaxService(
+      repo as never,
+      costBasisRepo as never,
+      projectionStateRepo as never,
+    );
   });
 
   it("logEvent creates and saves event", async () => {
@@ -94,6 +105,14 @@ describe("TaxService", () => {
       totalLossesUSD: -20,
       adjustedLossesUSD: -14,
       netTaxableGainUSD: 26,
+      projection: {
+        mode: "legacy-fallback",
+        projector: "cost-basis",
+        healthy: true,
+        lastError: null,
+        lastFailureAt: null,
+        lastSuccessAt: null,
+      },
     });
   });
 
@@ -111,6 +130,14 @@ describe("TaxService", () => {
       totalLossesUSD: 0,
       adjustedLossesUSD: 0,
       netTaxableGainUSD: 25,
+      projection: {
+        mode: "legacy-fallback",
+        projector: "cost-basis",
+        healthy: true,
+        lastError: null,
+        lastFailureAt: null,
+        lastSuccessAt: null,
+      },
     });
   });
 
@@ -290,6 +317,14 @@ describe("TaxService", () => {
       totalLossesUSD: -60,
       adjustedLossesUSD: -42,
       netTaxableGainUSD: 83,
+      projection: {
+        mode: "cost-basis",
+        projector: "cost-basis",
+        healthy: true,
+        lastError: null,
+        lastFailureAt: null,
+        lastSuccessAt: null,
+      },
     });
 
     // Should NOT have loaded events from the main repo
@@ -348,5 +383,38 @@ describe("TaxService", () => {
 
     expect(costBasisRepo.findOne).not.toHaveBeenCalled();
     expect(costBasisRepo.save).not.toHaveBeenCalled();
+  });
+
+  it("marks projection unhealthy when cost-basis update fails", async () => {
+    const saved = makeEvent({
+      id: 40,
+      type: "acquisition",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 2,
+      priceUSD: 75,
+    });
+    repo.save.mockResolvedValueOnce(saved);
+    costBasisRepo.findOne.mockRejectedValueOnce(
+      new Error("projection blew up"),
+    );
+
+    await service.logEvent({
+      type: "acquisition",
+      userAddress: "0xuser",
+      assetAddress: "0xasset",
+      tokenId: 1,
+      amount: 2,
+      priceUSD: 75,
+    });
+
+    expect(projectionStateRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projector: "cost-basis",
+        healthy: false,
+        lastError: "projection blew up",
+      }),
+    );
   });
 });
