@@ -152,13 +152,13 @@ export class AdminDevService {
       }));
 
     if (!game) {
-      game = await this.platformService.createGameForUser(userId, studioId, {
+      game = await this.platformService.createGameForUser(userId, studioId!, {
         name: gameName,
         slug: gameSlug,
       });
     }
 
-    const member = await this.usersService.getMemberSession(userId, studioId);
+    const member = await this.usersService.getMemberSession(userId, studioId!);
 
     return {
       token: loginResult.token,

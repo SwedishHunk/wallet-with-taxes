@@ -155,7 +155,7 @@ export class EconomicsController {
   ) {
     const jwtUser = req.user as JwtUser;
     return this.economicsService.getEventsForStudio(
-      jwtUser.studioId,
+      jwtUser.studioId!,
       gameId?.trim() || undefined,
     );
   }
@@ -168,7 +168,7 @@ export class EconomicsController {
   ) {
     const jwtUser = req.user as JwtUser;
     return this.economicsService.getEventsForStudioGame(
-      jwtUser.studioId,
+      jwtUser.studioId!,
       gameId,
     );
   }
