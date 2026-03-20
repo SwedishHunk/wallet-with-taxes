@@ -41,6 +41,12 @@ export class LoginDto {
   studioId?: string;
 }
 
+export class SelectStudioDto {
+  @ApiProperty({ description: "Studio ID to activate" })
+  @IsUUID()
+  studioId: string;
+}
+
 export class LinkWalletDto {
   @ApiProperty({ example: "user@example.com" })
   @IsEmail()

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../routes";
 import { getPersonalAccounts } from "../lib/platform";
-import { setAuthToken } from "../lib/api";
 import SafeCyberpunkScene from "../components/3d/SafeCyberpunkScene";
 import { useGsapEntrance, useGsapStagger } from "../hooks/useGsapEntrance";
 
@@ -70,10 +69,7 @@ export default function HomePage() {
   };
 
   const handleLogoutAll = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("studioId");
     sessionStorage.removeItem("personalUser");
-    setAuthToken(null);
     navigate(ROUTES.root);
   };
 

@@ -7,7 +7,6 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useEffect } from "react";
-import { setAuthToken } from "./lib/api";
 import { AuthProvider } from "./lib/AuthContext";
 import { LanguageProvider } from "./lib/LanguageContext";
 import LanguageToggle from "./components/LanguageToggle";
@@ -42,19 +41,6 @@ import PlayerPortal from "./player/PlayerPortal";
 import { ROUTES } from "./routes";
 import "./index.css";
 
-// Set auth token synchronously at module load time so all API calls
-// (including AuthContext hydration) have the Authorization header from the start.
-// Token is stored in sessionStorage (clears on tab close) for reduced XSS persistence.
-const _storedToken =
-  sessionStorage.getItem("token") ?? localStorage.getItem("token");
-if (_storedToken) {
-  setAuthToken(_storedToken);
-  // Migrate legacy localStorage token to sessionStorage on first load
-  if (localStorage.getItem("token")) {
-    sessionStorage.setItem("token", _storedToken);
-    localStorage.removeItem("token");
-  }
-}
 
 function NotFound() {
   return (

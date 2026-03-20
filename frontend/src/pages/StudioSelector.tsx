@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../lib/AuthContext";
-import { getStudios } from "../lib/users";
-import { getPersonalAccounts } from "../lib/platform";
-import { setAuthToken } from "../lib/api";
+import { useLoginStudio } from "../lib/useAuth";
+import { getStudios, selectStudio, logout } from "../lib/users";
 import { ROUTES } from "../routes";
 import "../style/Bright.css";
 
@@ -17,25 +16,19 @@ interface Studio {
 export default function StudioSelector() {
   const [studios, setStudios] = useState<Studio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState<string | null>(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { authContext } = useAuthState();
+  const { loginStudio } = useLoginStudio();
 
   useEffect(() => {
-    // Redirect if already in a studio session
+    // If the user already has an active studio session, send them to the dashboard.
     if (authContext.state !== "Unauthenticated") {
       navigate(ROUTES.dashboard, { replace: true });
       return;
     }
-
-    const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
-    if (!token) {
-      navigate(ROUTES.root);
-      return;
-    }
-    setAuthToken(token);
-
-    loadStudios();
+    void loadStudios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, authContext.state]);
 
@@ -43,42 +36,53 @@ export default function StudioSelector() {
     try {
       setLoading(true);
       const res = await getStudios();
-      setStudios(res.data || []);
+      const list: Studio[] = res.data ?? [];
+      setStudios(list);
 
-      // If only one studio, auto-select it
-      if (res.data && res.data.length === 1) {
-        selectStudio(res.data[0].id);
+      // If only one studio was returned the user still ended up here
+      // (e.g. via a direct URL). Auto-select it for them.
+      if (list.length === 1) {
+        await handleSelectStudio(list[0].id);
       }
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to load studios"
+          ?.message || "Failed to load studios",
       );
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const selectStudio = async (studioId: string) => {
-    localStorage.setItem("studioId", studioId);
-
+  const handleSelectStudio = async (studioId: string) => {
     try {
-      // Check if personal accounts exist
-      const res = await getPersonalAccounts();
-      const personalAccounts = res.data || [];
-
-      if (personalAccounts.length === 0) {
-        // No accounts - go to create first account
-        navigate(ROUTES.createFirstAccount);
-      } else {
-        // Accounts exist - go to personal account login
-        navigate(ROUTES.accountLogin);
-      }
+      setSelecting(studioId);
+      const { data } = await selectStudio(studioId);
+      // Cookie is updated server-side. Record the non-sensitive session info
+      // in React state / sessionStorage for UI display only.
+      loginStudio({
+        studioId: data.studioId,
+        studioName: data.studioName,
+        authenticatedAt: new Date().toISOString(),
+        isTriolithAdmin: data.isTriolithAdmin ?? false,
+      });
+      navigate(
+        data.isTriolithAdmin ? ROUTES.triolithAdmin : ROUTES.dashboard,
+        { replace: true },
+      );
     } catch (err) {
-      console.error("Error checking personal accounts:", err);
-      // On error, go to create first account as fallback
-      navigate(ROUTES.createFirstAccount);
+      console.error("Error selecting studio:", err);
+      setError("Failed to select studio. Please try again.");
+    } finally {
+      setSelecting(null);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate(ROUTES.root);
     }
   };
 
@@ -90,11 +94,7 @@ export default function StudioSelector() {
       <div style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
         <div className="bright-alert bright-alert-error">{error}</div>
         <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            setAuthToken(null);
-            navigate(ROUTES.root);
-          }}
+          onClick={() => void handleLogout()}
           className="bright-button bright-button-secondary"
           style={{ marginTop: "16px" }}>
           Back to Login
@@ -107,6 +107,9 @@ export default function StudioSelector() {
     <div style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
       <div className="bright-header" style={{ marginBottom: "32px" }}>
         <h1>Select a Studio</h1>
+        <p style={{ color: "var(--muted)", marginTop: "8px" }}>
+          Your account has access to multiple studios. Choose one to continue.
+        </p>
       </div>
 
       {studios.length === 0 ? (
@@ -126,16 +129,20 @@ export default function StudioSelector() {
           {studios.map((studio) => (
             <div
               key={studio.id}
-              onClick={() => selectStudio(studio.id)}
+              onClick={() => void handleSelectStudio(studio.id)}
               className="bright-card"
               style={{
-                cursor: "pointer",
+                cursor: selecting ? "wait" : "pointer",
+                opacity: selecting && selecting !== studio.id ? 0.5 : 1,
                 transition: "all 0.2s ease",
                 padding: "20px",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-                e.currentTarget.style.transform = "translateY(-2px)";
+                if (!selecting) {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.15)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.boxShadow = "none";
@@ -156,12 +163,7 @@ export default function StudioSelector() {
                     }}>
                     {studio.name}
                   </h3>
-                  <p
-                    style={{
-                      margin: "0",
-                      color: "var(--muted)",
-                      fontSize: "14px",
-                    }}>
+                  <p style={{ margin: "0", color: "var(--muted)", fontSize: "14px" }}>
                     {studio.email}
                   </p>
                   <div style={{ marginTop: "8px" }}>
@@ -178,7 +180,9 @@ export default function StudioSelector() {
                     </span>
                   </div>
                 </div>
-                <div style={{ fontSize: "28px" }}>→</div>
+                <div style={{ fontSize: "28px" }}>
+                  {selecting === studio.id ? "⏳" : "→"}
+                </div>
               </div>
             </div>
           ))}
@@ -193,12 +197,7 @@ export default function StudioSelector() {
       )}
 
       <button
-        onClick={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("studioId");
-          setAuthToken(null);
-          navigate(ROUTES.root);
-        }}
+        onClick={() => void handleLogout()}
         className="bright-button bright-button-danger"
         style={{ marginTop: "32px", width: "100%" }}>
         Logout

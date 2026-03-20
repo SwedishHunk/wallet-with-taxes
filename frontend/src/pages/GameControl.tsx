@@ -7,7 +7,6 @@ import {
   withdrawFromWallet,
   getPlayerNFTs,
 } from "../lib/platform";
-import { setAuthToken } from "../lib/api";
 import { ROUTES } from "../routes";
 import "../style/Bright.css";
 import PersonalAccountHeader from "../components/PersonalAccountHeader";
@@ -65,21 +64,6 @@ export function GameControl() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
-    const studioId = localStorage.getItem("studioId");
-
-    if (!token) {
-      navigate(ROUTES.root);
-      return;
-    }
-
-    if (!studioId) {
-      navigate(ROUTES.studios);
-      return;
-    }
-
-    setAuthToken(token);
-
     if (!gameId) return;
     loadGameData();
     // eslint-disable-next-line react-hooks/exhaustive-deps

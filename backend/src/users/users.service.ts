@@ -221,11 +221,9 @@ export class UsersService {
       );
     }
 
-    // If studioId provided, verify user is a member
-    let selectedStudio: Studio | null = null;
-    let selectedRole: StudioRole | null = null;
-
     if (studioId) {
+      // Explicit studio login (e.g. MemberLogin switching member identity):
+      // validate the studio membership and issue a studio-scoped JWT directly.
       const membership = await this.studioMemberRepository.findOne({
         where: { studio: { id: studioId }, user: { id: user.id } },
         relations: ["studio"],
@@ -233,43 +231,56 @@ export class UsersService {
       if (!membership) {
         throw new AppException(ERROR_MESSAGES.NOT_STUDIO_MEMBER, 403);
       }
-      selectedStudio = membership.studio;
-      selectedRole = membership.role;
-    } else {
-      // If no studio specified, get first membership (for backwards compat)
-      let membership = await this.studioMemberRepository.findOne({
-        where: { user: { id: user.id } },
-        relations: ["studio"],
+      if (membership.studio.status === "suspended") {
+        throw new AppException(
+          "This studio has been suspended. Contact support.",
+          403,
+        );
+      }
+
+      const token = this.jwtService.sign({
+        id: user.id,
+        email: user.email,
+        walletAddress: user.walletAddress,
+        studioId: membership.studio.id,
+        role: membership.role,
+        isAdmin: user.isAdmin,
       });
 
-      // Auto-migrate old users without studios
-      if (!membership) {
-        membership = await this.autoMigrateOrphanUser(user);
-      }
-
-      if (membership) {
-        selectedStudio = membership.studio;
-        selectedRole = membership.role;
-      }
+      return {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          walletAddress: user.walletAddress,
+          custodyMode: user.custodyMode,
+          kycStatus: user.kycStatus,
+          studioId: membership.studio.id,
+          isAdmin: user.isAdmin,
+        },
+      };
     }
 
-    if (!selectedStudio) {
-      throw new AppException(ERROR_MESSAGES.STUDIO_NOT_FOUND, 404);
+    // No studioId provided — multi-studio flow.
+    // Issue a base JWT (no studioId/role) and return the full studios list so
+    // the frontend can present a picker or auto-select when there is only one.
+    const membershipCount = await this.studioMemberRepository.count({
+      where: { user: { id: user.id } },
+    });
+    if (membershipCount === 0) {
+      await this.autoMigrateOrphanUser(user);
     }
 
-    if (selectedStudio.status === "suspended") {
-      throw new AppException(
-        "This studio has been suspended. Contact support.",
-        403,
-      );
+    const studios = await this.getStudiosForUser(user.id);
+    const activeStudios = studios.filter((s) => s.status !== "suspended");
+    if (activeStudios.length === 0) {
+      throw new AppException("No active studios available", 403);
     }
 
     const token = this.jwtService.sign({
       id: user.id,
       email: user.email,
       walletAddress: user.walletAddress,
-      studioId: selectedStudio.id,
-      role: selectedRole,
       isAdmin: user.isAdmin,
     });
 
@@ -281,9 +292,55 @@ export class UsersService {
         walletAddress: user.walletAddress,
         custodyMode: user.custodyMode,
         kycStatus: user.kycStatus,
-        studioId: selectedStudio.id,
         isAdmin: user.isAdmin,
       },
+      studios: activeStudios.map((s) => ({
+        id: s.id,
+        name: s.name,
+        role: s.role,
+      })),
+    };
+  }
+
+  /**
+   * Validate that the authenticated user is a member of the given studio,
+   * then issue a studio-scoped JWT and return studio session info.
+   * Called after the initial login when the user explicitly selects a studio.
+   */
+  async selectStudio(
+    jwtUser: { id: string; email?: string; walletAddress?: string; isAdmin: boolean },
+    studioId: string,
+  ) {
+    const membership = await this.studioMemberRepository.findOne({
+      where: { user: { id: jwtUser.id }, studio: { id: studioId } },
+      relations: ["studio"],
+    });
+
+    if (!membership) {
+      throw new AppException(ERROR_MESSAGES.NOT_STUDIO_MEMBER, 403);
+    }
+    if (membership.studio.status === "suspended") {
+      throw new AppException(
+        "This studio has been suspended. Contact support.",
+        403,
+      );
+    }
+
+    const token = this.jwtService.sign({
+      id: jwtUser.id,
+      email: jwtUser.email,
+      walletAddress: jwtUser.walletAddress,
+      studioId: membership.studio.id,
+      role: membership.role,
+      isAdmin: jwtUser.isAdmin,
+    });
+
+    return {
+      token,
+      studioId: membership.studio.id,
+      studioName: membership.studio.name,
+      role: membership.role,
+      isTriolithAdmin: jwtUser.isAdmin === true,
     };
   }
 
