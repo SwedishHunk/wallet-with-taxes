@@ -64,9 +64,10 @@ export default function RoleGateway() {
           {t("role.title")}
         </motion.h1>
 
-        <motion.p className="role-gateway__intro" variants={fadeInUp}>
-          {t("role.intro")}
-        </motion.p>
+        <motion.div className="role-gateway__intro" variants={fadeInUp}>
+          <p>{t("role.intro.player")}</p>
+          <p>{t("role.intro.owner")}</p>
+        </motion.div>
 
         <motion.div className="role-gateway__choices" variants={staggerContainer}>
           <motion.div variants={scalePop}>

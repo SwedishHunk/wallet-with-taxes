@@ -95,10 +95,16 @@
 .role-gateway__intro {
   max-width: 620px;
   margin: 0 0 48px;
+  display: grid;
+  gap: 0.35rem;
   font-size: 1.05rem;
   line-height: 1.75;
   color: var(--muted);
   animation: fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.role-gateway__intro p {
+  margin: 0;
 }
 
 .role-gateway__choices {

@@ -11,7 +11,8 @@ const translations = {
   // ── RoleGateway ──
   "role.eyebrow":              { en: "Triolith Access Point", sv: "Triolith Access Point" },
   "role.title":                { en: "Choose how you want to enter the system", sv: "Välj hur du vill gå in i systemet" },
-  "role.intro":                { en: "The Player flow takes you to TokenShop, trading and portfolio. Game Owner goes to studio, member and platform management.", sv: "Player-flödet går till TokenShop, trading och portfolio. Spelägare går till studio-, medlem- och plattformsdelen." },
+  "role.intro.player":         { en: "The Player Flow takes you to TokenShop, trading and portfolio.", sv: "Player-flödet går till TokenShop, trading och portfolio." },
+  "role.intro.owner":          { en: "Game Owner goes to studio, member and platform management.", sv: "Spelägare går till studio-, medlems- och plattformsdelen." },
   "role.player":               { en: "Player", sv: "Spelare" },
   "role.player.headline":      { en: "Enter the Player Portal", sv: "Gå till spelarportalen" },
   "role.player.body":          { en: "TokenShop, buy/sell tokens, portfolio and tax overview.", sv: "TokenShop, köp/sälj tokens, portfolio och skatteöversikt." },
