@@ -198,6 +198,14 @@ const translations = {
   "player.dash.subtitle":      { en: "Token economy overview", sv: "Tokenekonomins översikt" },
   "player.dash.syncing":       { en: "Syncing...", sv: "Synkroniserar..." },
   "player.dash.syncNow":       { en: "Sync Now", sv: "Synka nu" },
+  "player.dash.walletRequiredTitle": {
+    en: "Connect your wallet to access the dashboard",
+    sv: "Anslut din plånbok för att få åtkomst till översikten",
+  },
+  "player.dash.walletRequiredBody": {
+    en: "The player dashboard needs an active wallet connection before it can load liquidity, config, and trading activity.",
+    sv: "Player-översikten behöver en aktiv plånboksanslutning innan den kan ladda likviditet, konfiguration och handelsaktivitet.",
+  },
   "player.dash.triSupply":     { en: "TRI Total Supply", sv: "TRI total tillgång" },
   "player.dash.circulating":   { en: "Circulating tokens", sv: "Cirkulerande tokens" },
   "player.dash.totalBuys":     { en: "Total Buys", sv: "Totala köp" },

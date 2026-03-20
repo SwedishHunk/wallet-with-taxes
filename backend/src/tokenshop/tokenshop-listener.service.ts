@@ -433,6 +433,16 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
             Number.isFinite(estimatedUnitPriceUsd)
               ? estimatedUnitPriceUsd
               : undefined,
+          valuationStatus:
+            estimatedUnitPriceUsd !== null &&
+            Number.isFinite(estimatedUnitPriceUsd)
+              ? "estimated"
+              : "missing",
+          valuationSource:
+            estimatedUnitPriceUsd !== null &&
+            Number.isFinite(estimatedUnitPriceUsd)
+              ? "tokenshop_eth_usd_snapshot"
+              : null,
           source: "tokenshop",
           txHash: event.txHash,
           logIndex: event.logIndex,

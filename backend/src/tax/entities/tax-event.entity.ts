@@ -36,6 +36,12 @@ export class TaxEvent {
   @Column({ type: "float", nullable: true })
   priceUSD?: number;
 
+  @Column({ type: "varchar", length: 24, default: "missing" })
+  valuationStatus: "authoritative" | "estimated" | "missing";
+
+  @Column({ type: "varchar", length: 120, nullable: true })
+  valuationSource?: string | null;
+
   @Column({ type: "varchar", nullable: true })
   source?: string | null;
 

@@ -27,6 +27,9 @@ import {
   EconomicDirection,
   EconomicScopeType,
 } from "../economics/entities/economic-event.entity";
+import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
+import { MarketplaceService } from "./marketplace.service";
+import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
 
 @Injectable()
 export class PlatformService {
@@ -67,6 +70,9 @@ export class PlatformService {
     @InjectRepository(MarketplaceListing)
     private marketplaceListingRepo: Repository<MarketplaceListing>,
     private economicsService: EconomicsService,
+    private playerWalletIdentityService: PlayerWalletIdentityService,
+    private marketplaceService: MarketplaceService,
+    private playerWalletOperationsService: PlayerWalletOperationsService,
   ) {}
 
   private generateFakeDepositAddress(
@@ -188,6 +194,16 @@ export class PlatformService {
       wallet = await walletRepo.save(wallet);
     }
     return wallet;
+  }
+
+  private async resolvePlayerGameWallet(
+    gameId: string,
+    walletAddress: string,
+  ) {
+    return this.playerWalletIdentityService.resolvePlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
   }
 
   private async lockWalletOrThrow(
@@ -1060,74 +1076,23 @@ export class PlatformService {
 
   // ─── Player-facing wallet operations (wallet address based) ───────────────
 
-  private async resolvePlayerGameWallet(
-    gameId: string,
-    walletAddress: string,
-  ): Promise<{
-    walletIdentity: PlayerWalletIdentity;
-    gamePlayer: GamePlayer;
-    wallet: GameWallet;
-  }> {
-    const normalizedWallet = walletAddress.toLowerCase();
-
-    const game = await this.gameRepo.findOne({ where: { id: gameId } });
-    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
-
-    let walletIdentity = await this.walletIdentityRepo.findOne({
-      where: { walletAddress: normalizedWallet },
-    });
-    if (!walletIdentity) {
-      walletIdentity = this.walletIdentityRepo.create({
-        walletAddress: normalizedWallet,
-      });
-      walletIdentity = await this.walletIdentityRepo.save(walletIdentity);
-    }
-
-    const gamePlayer = await this.ensureGamePlayerForWalletIdentity(
-      this.gamePlayerRepo,
-      game,
-      walletIdentity,
-    );
-    const wallet = await this.ensureWalletForGamePlayer(
-      this.walletRepo,
-      gamePlayer,
-    );
-
-    return { walletIdentity, gamePlayer, wallet };
-  }
-
   async registerPlayerByWallet(
     gameId: string,
     walletAddress: string,
     studioId: string,
   ) {
-    await this.assertGameBelongsToStudio(gameId, studioId);
-    return this.resolvePlayerGameWallet(gameId, walletAddress);
+    return this.playerWalletIdentityService.registerPlayerByWallet(
+      gameId,
+      walletAddress,
+      studioId,
+    );
   }
 
   async getPlayerGameWallet(gameId: string, walletAddress: string) {
-    const game = await this.gameRepo.findOne({ where: { id: gameId } });
-    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
-
-    const normalizedWallet = walletAddress.toLowerCase();
-    const walletIdentity = await this.walletIdentityRepo.findOne({
-      where: { walletAddress: normalizedWallet },
-    });
-    if (!walletIdentity) return null;
-
-    const gamePlayer = await this.gamePlayerRepo.findOne({
-      where: {
-        game: { id: gameId },
-        walletIdentity: { id: walletIdentity.id },
-      },
-    });
-    if (!gamePlayer) return null;
-
-    const wallet = await this.walletRepo.findOne({
-      where: { gamePlayer: { id: gamePlayer.id } },
-    });
-
-    return wallet ?? null;
+    return this.playerWalletIdentityService.getPlayerGameWallet(
+      gameId,
+      walletAddress,
+    );
   }
 
   async playerWithdrawFromGameWallet(
@@ -1136,62 +1101,12 @@ export class PlatformService {
     amount: unknown,
     idempotencyKey?: string,
   ) {
-    const amountNum = parseAmount(amount);
-    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const { wallet } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerWithdrawFromGameWallet(
       gameId,
       walletAddress,
+      amount,
+      idempotencyKey,
     );
-
-    if (operationKey) {
-      const existing = await this.ledgerRepo.findOne({
-        where: { operationKey },
-      });
-      if (existing) {
-        return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
-      }
-    }
-
-    if (amountNum > parseFloat(wallet.balance)) {
-      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-    }
-
-    const txGroupId = randomUUID();
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-
-      wallet.balance = safeSub(wallet.balance, amountNum);
-      wallet.totalWithdrawn = safeAdd(wallet.totalWithdrawn, amountNum);
-      const saved = await walletRepo.save(wallet);
-
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: saved,
-          txGroupId,
-          type: "withdraw",
-          amount: amountNum.toString(),
-          operationKey,
-          description: "Player withdrawal",
-        }),
-      );
-      return saved;
-    }).catch(async (error: unknown) => {
-      if (error instanceof QueryFailedError) {
-        const driverError = (
-          error as QueryFailedError & {
-            driverError?: { code?: string; constraint?: string };
-          }
-        ).driverError;
-        if (
-          driverError?.code === "23505" &&
-          driverError?.constraint === "uq_ledger_operation_key_not_null"
-        ) {
-          return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
-        }
-      }
-      throw error;
-    });
   }
 
   async playerTransferBetweenPlayers(
@@ -1201,110 +1116,13 @@ export class PlatformService {
     amount: unknown,
     idempotencyKey?: string,
   ) {
-    const amountNum = parseAmount(amount);
-    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const normalizedFrom = fromWalletAddress.toLowerCase();
-    const normalizedTo = toWalletAddress.toLowerCase();
-
-    if (normalizedFrom === normalizedTo) {
-      throw new AppException("Cannot transfer to yourself", 400);
-    }
-
-    const { wallet: fromWallet } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerTransferBetweenPlayers(
       gameId,
-      normalizedFrom,
+      fromWalletAddress,
+      toWalletAddress,
+      amount,
+      idempotencyKey,
     );
-    const { wallet: toWallet } = await this.resolvePlayerGameWallet(
-      gameId,
-      normalizedTo,
-    );
-
-    const debitOperationKey = operationKey ? `${operationKey}:debit` : null;
-    const creditOperationKey = operationKey ? `${operationKey}:credit` : null;
-
-    if (debitOperationKey && creditOperationKey) {
-      const [existingDebit, existingCredit] = await Promise.all([
-        this.ledgerRepo.findOne({ where: { operationKey: debitOperationKey } }),
-        this.ledgerRepo.findOne({ where: { operationKey: creditOperationKey } }),
-      ]);
-      if (existingDebit && existingCredit) {
-        return this.getReplayWallets(fromWallet.id, toWallet.id);
-      }
-      if (existingDebit || existingCredit) {
-        throw new AppException("Transfer replay state is inconsistent", 409);
-      }
-    }
-
-    if (amountNum > parseFloat(fromWallet.balance)) {
-      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-    }
-
-    const txGroupId = randomUUID();
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-
-      const lockedFrom = await this.lockWalletOrThrow(
-        walletRepo,
-        fromWallet.id,
-        "Sender wallet not found",
-      );
-      const lockedTo = await this.lockWalletOrThrow(
-        walletRepo,
-        toWallet.id,
-        "Recipient wallet not found",
-      );
-
-      if (amountNum > parseFloat(lockedFrom.balance)) {
-        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-      }
-
-      lockedFrom.balance = safeSub(lockedFrom.balance, amountNum);
-      lockedFrom.totalWithdrawn = safeAdd(lockedFrom.totalWithdrawn, amountNum);
-      const savedFrom = await walletRepo.save(lockedFrom);
-
-      lockedTo.balance = safeAdd(lockedTo.balance, amountNum);
-      lockedTo.totalDeposited = safeAdd(lockedTo.totalDeposited, amountNum);
-      const savedTo = await walletRepo.save(lockedTo);
-
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedFrom,
-          txGroupId,
-          type: "transfer",
-          amount: amountNum.toString(),
-          operationKey: debitOperationKey,
-          description: `Transfer to ${normalizedTo}`,
-        }),
-      );
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedTo,
-          txGroupId,
-          type: "transfer",
-          amount: amountNum.toString(),
-          operationKey: creditOperationKey,
-          description: `Transfer from ${normalizedFrom}`,
-        }),
-      );
-
-      return { fromWallet: savedFrom, toWallet: savedTo };
-    }).catch(async (error: unknown) => {
-      if (error instanceof QueryFailedError && operationKey) {
-        const driverError = (
-          error as QueryFailedError & {
-            driverError?: { code?: string; constraint?: string };
-          }
-        ).driverError;
-        if (
-          driverError?.code === "23505" &&
-          driverError?.constraint === "uq_ledger_operation_key_not_null"
-        ) {
-          return this.getReplayWallets(fromWallet.id, toWallet.id);
-        }
-      }
-      throw error;
-    });
   }
 
   async playerTransferNFT(
@@ -1313,48 +1131,18 @@ export class PlatformService {
     toWalletAddress: string,
     nftInstanceId: string,
   ) {
-    const normalizedFrom = fromWalletAddress.toLowerCase();
-    const normalizedTo = toWalletAddress.toLowerCase();
-
-    if (normalizedFrom === normalizedTo) {
-      throw new AppException("Cannot transfer to yourself", 400);
-    }
-
-    const { gamePlayer: fromGamePlayer } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerTransferNFT(
       gameId,
-      normalizedFrom,
+      fromWalletAddress,
+      toWalletAddress,
+      nftInstanceId,
     );
-
-    const nftInstance = await this.nftInstanceRepo.findOne({
-      where: {
-        id: nftInstanceId,
-        owner: { id: fromGamePlayer.id },
-        template: { game: { id: gameId } },
-      },
-      relations: ["owner", "template"],
-    });
-
-    if (!nftInstance) {
-      throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
-    }
-
-    const { gamePlayer: toGamePlayer } = await this.resolvePlayerGameWallet(
-      gameId,
-      normalizedTo,
-    );
-
-    nftInstance.owner = toGamePlayer;
-    return this.nftInstanceRepo.save(nftInstance);
   }
 
   // ─── Marketplace ───────────────────────────────────────────────────────────
 
   async getGameListings(gameId: string) {
-    return this.marketplaceListingRepo.find({
-      where: { game: { id: gameId }, status: "active" },
-      relations: { nftInstance: { template: true }, seller: { user: true } },
-      order: { createdAt: "DESC" },
-    });
+    return this.marketplaceService.getGameListings(gameId);
   }
 
   async createNFTListing(
@@ -1363,49 +1151,12 @@ export class PlatformService {
     nftInstanceId: string,
     askPrice: string,
   ) {
-    const normalized = walletAddress.toLowerCase();
-    const { gamePlayer } = await this.resolvePlayerGameWallet(
+    return this.marketplaceService.createNFTListing(
       gameId,
-      normalized,
+      walletAddress,
+      nftInstanceId,
+      askPrice,
     );
-
-    const nftInstance = await this.nftInstanceRepo.findOne({
-      where: {
-        id: nftInstanceId,
-        owner: { id: gamePlayer.id },
-        template: { game: { id: gameId } },
-      },
-      relations: ["owner", "template"],
-    });
-    if (!nftInstance) {
-      throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
-    }
-
-      const existing = await this.marketplaceListingRepo.findOne({
-        where: { nftInstance: { id: nftInstanceId }, status: "active" },
-        relations: ["seller"],
-      });
-      if (existing) {
-        if (existing.seller?.id === gamePlayer.id) {
-          return existing;
-        }
-        throw new AppException(
-          "This NFT is already listed in the marketplace",
-          409,
-        );
-      }
-
-    const game = await this.gameRepo.findOneBy({ id: gameId });
-    if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
-
-    const listing = this.marketplaceListingRepo.create({
-      game,
-      seller: gamePlayer,
-      nftInstance,
-      askPrice: String(parseAmount(askPrice)),
-      status: "active",
-    });
-    return this.marketplaceListingRepo.save(listing);
   }
 
   async cancelNFTListing(
@@ -1413,138 +1164,23 @@ export class PlatformService {
     walletAddress: string,
     listingId: string,
   ) {
-    const normalized = walletAddress.toLowerCase();
-    const { gamePlayer } = await this.resolvePlayerGameWallet(
+    return this.marketplaceService.cancelNFTListing(
       gameId,
-      normalized,
+      walletAddress,
+      listingId,
     );
-
-      const listing = await this.marketplaceListingRepo.findOne({
-        where: { id: listingId, game: { id: gameId } },
-        relations: ["seller"],
-      });
-      if (!listing) throw new AppException("Listing not found", 404);
-      if (listing.seller.id !== gamePlayer.id) {
-        throw new AppException("Not your listing", 403);
-      }
-      if (listing.status === "cancelled") {
-        return listing;
-      }
-      if (listing.status !== "active") {
-        throw new AppException("Listing is no longer active", 409);
-      }
-
-      listing.status = "cancelled";
-      return this.marketplaceListingRepo.save(listing);
-    }
+  }
 
   async purchaseNFTListing(
     gameId: string,
     walletAddress: string,
     listingId: string,
   ) {
-    const normalized = walletAddress.toLowerCase();
-    const { gamePlayer: buyerPlayer, wallet: buyerWallet } =
-      await this.resolvePlayerGameWallet(gameId, normalized);
-    const txGroupId = randomUUID();
-
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-      const listingRepo = manager.getRepository(MarketplaceListing);
-      const nftInstanceRepo = manager.getRepository(NFTInstance);
-
-        const listing = await listingRepo.findOne({
-          where: { id: listingId, game: { id: gameId } },
-          relations: ["seller", "buyer", "nftInstance", "nftInstance.owner"],
-          lock: { mode: "pessimistic_write" },
-        });
-
-        if (!listing) {
-          throw new AppException("Listing not found or no longer active", 404);
-        }
-        if (listing.status === "sold" && listing.buyer?.id === buyerPlayer.id) {
-          return listing;
-        }
-        if (listing.status !== "active") {
-          throw new AppException("Listing not found or no longer active", 404);
-        }
-        if (listing.seller.id === buyerPlayer.id) {
-          throw new AppException("Cannot purchase your own listing", 400);
-        }
-
-      const ask = parseAmount(listing.askPrice);
-      const lockedBuyerWallet = await this.lockWalletOrThrow(
-        walletRepo,
-        buyerWallet.id,
-        "Buyer wallet not found",
-      );
-      if (ask > parseFloat(lockedBuyerWallet.balance ?? "0")) {
-        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 402);
-      }
-
-      const sellerWallet = await walletRepo.findOne({
-        where: { gamePlayer: { id: listing.seller.id } },
-        lock: { mode: "pessimistic_write" },
-      });
-      if (!sellerWallet) {
-        throw new AppException("Seller wallet not found", 404);
-      }
-
-      const lockedNftInstance = await nftInstanceRepo.findOne({
-        where: { id: listing.nftInstance.id },
-        relations: ["owner"],
-        lock: { mode: "pessimistic_write" },
-      });
-      if (!lockedNftInstance) {
-        throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
-      }
-      if (lockedNftInstance.owner?.id !== listing.seller.id) {
-        throw new AppException("Listing is no longer valid", 409);
-      }
-
-      lockedBuyerWallet.balance = safeSub(lockedBuyerWallet.balance ?? "0", ask);
-      lockedBuyerWallet.totalWithdrawn = safeAdd(
-        lockedBuyerWallet.totalWithdrawn ?? "0",
-        ask,
-      );
-      const savedBuyerWallet = await walletRepo.save(lockedBuyerWallet);
-
-      sellerWallet.balance = safeAdd(sellerWallet.balance ?? "0", ask);
-      sellerWallet.totalDeposited = safeAdd(
-        sellerWallet.totalDeposited ?? "0",
-        ask,
-      );
-      const savedSellerWallet = await walletRepo.save(sellerWallet);
-
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedBuyerWallet,
-          txGroupId,
-          type: "spend",
-          amount: ask.toString(),
-          description: `Marketplace purchase listing=${listing.id}`,
-        }),
-      );
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedSellerWallet,
-          txGroupId,
-          type: "earn",
-          amount: ask.toString(),
-          description: `Marketplace sale listing=${listing.id}`,
-        }),
-      );
-
-      lockedNftInstance.owner = buyerPlayer;
-      await nftInstanceRepo.save(lockedNftInstance);
-
-      listing.status = "sold";
-      listing.buyer = buyerPlayer;
-      listing.soldAt = new Date();
-
-      return listingRepo.save(listing);
-    });
+    return this.marketplaceService.purchaseNFTListing(
+      gameId,
+      walletAddress,
+      listingId,
+    );
   }
 
   // ─── NFT Shop (player-facing) ───────────────────────────────────────────────
@@ -1580,10 +1216,11 @@ export class PlatformService {
 
     const mintingCost = parseFloat(template.mintingCost);
     const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const { gamePlayer, wallet } = await this.resolvePlayerGameWallet(
+    const { gamePlayer, wallet } =
+      await this.resolvePlayerGameWallet(
       gameId,
       walletAddress,
-    );
+      );
 
     if (operationKey) {
       const existingPurchase = await this.nftInstanceRepo.findOne({

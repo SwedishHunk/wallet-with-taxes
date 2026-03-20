@@ -165,6 +165,8 @@ describe("TokenShopListenerService", () => {
       amount: 100,
       feeUSD: 0,
       priceUSD: 70,
+      valuationStatus: "estimated",
+      valuationSource: "tokenshop_eth_usd_snapshot",
       source: "tokenshop",
       txHash:
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -193,6 +195,8 @@ describe("TokenShopListenerService", () => {
     expect(taxEventRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         priceUSD: undefined,
+        valuationStatus: "missing",
+        valuationSource: null,
       }),
     );
   });
