@@ -16,6 +16,7 @@ import { PlatformService } from "./platform.service";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { MarketplaceService } from "./marketplace.service";
 import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
+import { NFTShopService } from "./nft-shop.service";
 import {
   ApiPlatformController,
   PlatformController,
@@ -51,6 +52,7 @@ import { EconomicsModule } from "../economics/economics.module";
     PlayerWalletIdentityService,
     MarketplaceService,
     PlayerWalletOperationsService,
+    NFTShopService,
     StudioMemberService,
     StudiosService,
   ],
@@ -60,6 +62,7 @@ import { EconomicsModule } from "../economics/economics.module";
     PlayerWalletIdentityService,
     MarketplaceService,
     PlayerWalletOperationsService,
+    NFTShopService,
     StudioMemberService,
     StudiosService,
   ],
