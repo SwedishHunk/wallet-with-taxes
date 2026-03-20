@@ -47,7 +47,8 @@ export class PlayerEconomicsService {
       throw new NotFoundException("Game not found");
     }
 
-    const walletIdentity = await this.findOrCreateWalletIdentity(normalizedWallet);
+    const walletIdentity =
+      await this.findOrCreateWalletIdentity(normalizedWallet);
     const gamePlayer = await this.findOrCreateGamePlayer(game, walletIdentity);
 
     this.logger.log(

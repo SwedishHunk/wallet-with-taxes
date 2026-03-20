@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, QueryFailedError, Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import { createHash, randomUUID } from "crypto";
 import { ethers } from "ethers";
 import { Studio } from "./entities/studio.entity";
@@ -11,17 +11,12 @@ import { GameWallet } from "./entities/game-wallet.entity";
 import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
-import {
-  WalletDepositIntent,
-  WalletDepositIntentStatus,
-} from "./entities/wallet-deposit-intent.entity";
+import { WalletDepositIntent } from "./entities/wallet-deposit-intent.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
-import { parseAmount } from "./parse-amount";
-import { safeAdd, safeSub } from "../shared/safe-math";
 import { EconomicsService } from "../economics/economics.service";
 import {
   EconomicDirection,
@@ -202,10 +197,7 @@ export class PlatformService {
     return wallet;
   }
 
-  private async resolvePlayerGameWallet(
-    gameId: string,
-    walletAddress: string,
-  ) {
+  private async resolvePlayerGameWallet(gameId: string, walletAddress: string) {
     return this.playerWalletIdentityService.resolvePlayerGameWallet(
       gameId,
       walletAddress,
@@ -233,12 +225,18 @@ export class PlatformService {
       return null;
     }
     if (normalized.length > 128) {
-      throw new AppException("idempotencyKey must be 128 characters or less", 400);
+      throw new AppException(
+        "idempotencyKey must be 128 characters or less",
+        400,
+      );
     }
     return normalized;
   }
 
-  private async getWalletByIdOrThrow(walletId: string, notFoundMessage: string) {
+  private async getWalletByIdOrThrow(
+    walletId: string,
+    notFoundMessage: string,
+  ) {
     const wallet = await this.walletRepo.findOne({ where: { id: walletId } });
     if (!wallet) {
       throw new AppException(notFoundMessage, 404);

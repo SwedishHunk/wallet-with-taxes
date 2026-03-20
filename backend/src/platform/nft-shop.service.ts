@@ -35,12 +35,18 @@ export class NFTShopService {
       return null;
     }
     if (normalized.length > 128) {
-      throw new AppException("idempotencyKey must be 128 characters or less", 400);
+      throw new AppException(
+        "idempotencyKey must be 128 characters or less",
+        400,
+      );
     }
     return normalized;
   }
 
-  private async getWalletByIdOrThrow(walletId: string, notFoundMessage: string) {
+  private async getWalletByIdOrThrow(
+    walletId: string,
+    notFoundMessage: string,
+  ) {
     const wallet = await this.walletRepo.findOne({ where: { id: walletId } });
     if (!wallet) {
       throw new AppException(notFoundMessage, 404);

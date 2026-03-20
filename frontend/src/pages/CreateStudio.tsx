@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../lib/LanguageContext";
 import { ROUTES } from "../routes";
 import { signup } from "../lib/users";
-import { setAuthToken } from "../lib/api";
 import { useLoginStudio, useLoginMember } from "../lib/useAuth";
 import "../style/Bright.css";
 import "../style/Login.css";
@@ -68,10 +67,7 @@ export default function CreateStudio() {
     try {
       const { data } = await signup(email, password, studioName);
 
-      // Save token
-      setAuthToken(data.token);
-      sessionStorage.setItem("token", data.token);
-
+      // Cookie is set server-side — no token to store client-side.
       // Set studio session
       loginStudio({
         studioId: data.studio.studioId,

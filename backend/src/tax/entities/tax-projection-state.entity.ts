@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  PrimaryColumn,
-  UpdateDateColumn,
-} from "typeorm";
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm";
 
 @Entity({ name: "tax_projection_state" })
 export class TaxProjectionState {

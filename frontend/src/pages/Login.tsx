@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ROUTES } from "../routes";
-import { login, getStudios } from "../lib/users";
-import { setAuthToken } from "../lib/api";
+import { login, selectStudio } from "../lib/users";
 import { useAuthState } from "../lib/AuthContext";
 import { useLoginStudio } from "../lib/useAuth";
 import { useLanguage } from "../lib/LanguageContext";
@@ -41,39 +40,35 @@ export default function Login() {
     setStudioLoading(true);
 
     try {
+      // Cookie is set server-side — no token to store client-side.
       const { data } = await login(studioEmail, studioPassword);
-      setAuthToken(data.token);
-      // sessionStorage: token clears on tab/browser close, reducing XSS persistence window
-      sessionStorage.setItem("token", data.token);
 
-      let studioId = data.user.studioId;
-      let studioName = data.user.email;
+      const studios: Array<{ id: string; name: string; role: string }> =
+        data.studios ?? [];
+      const isTriolithAdmin = data.user?.isAdmin === true;
 
-      try {
-        const studiosResponse = await getStudios();
-        const studios: Array<{ id: string; name?: string }> =
-          studiosResponse.data ?? [];
-        const matched = studios.find((s) => s.id === studioId) ?? studios[0];
-        if (matched) {
-          studioId = matched.id || studioId;
-          studioName = matched.name || studioName;
-        }
-      } catch (innerErr) {
-        console.warn("Could not fetch studios list after login", innerErr);
+      if (studios.length === 0) {
+        setStudioError("No active studios found. Please contact support.");
+        return;
       }
 
-      const isTriolithAdmin = data.user.isAdmin === true;
-
-      loginStudio({
-        studioId,
-        studioName,
-        authenticatedAt: new Date().toISOString(),
-        isTriolithAdmin,
-      });
-
-      navigate(isTriolithAdmin ? ROUTES.triolithAdmin : ROUTES.dashboard, {
-        replace: true,
-      });
+      if (studios.length === 1) {
+        // Auto-select the only studio — no picker needed.
+        const { data: studioData } = await selectStudio(studios[0].id);
+        loginStudio({
+          studioId: studioData.studioId,
+          studioName: studioData.studioName,
+          authenticatedAt: new Date().toISOString(),
+          isTriolithAdmin: studioData.isTriolithAdmin ?? isTriolithAdmin,
+        });
+        navigate(
+          studioData.isTriolithAdmin ? ROUTES.triolithAdmin : ROUTES.dashboard,
+          { replace: true },
+        );
+      } else {
+        // Multiple studios — show the picker so the user explicitly chooses.
+        navigate(ROUTES.studios, { replace: true });
+      }
     } catch (err) {
       const error = err as ApiError;
       const message =

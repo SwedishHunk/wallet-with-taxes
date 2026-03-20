@@ -13,6 +13,7 @@ import { ethers } from "ethers";
 type Repo = {
   findOne: jest.Mock;
   find: jest.Mock;
+  count: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
 };
@@ -51,18 +52,21 @@ describe("UsersService", () => {
     userRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
+      count: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => ({ id: x.id ?? "u1", ...x })),
     };
     studioRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
+      count: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => ({ id: x.id ?? "s1", ...x })),
     };
     studioMemberRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
+      count: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
     };
@@ -248,10 +252,10 @@ describe("UsersService", () => {
       email: "user@test.com",
       passwordHash,
     });
-    studioMemberRepo.findOne.mockResolvedValueOnce({
-      studio: { id: "s1", status: "suspended" },
-      role: "owner",
-    });
+    studioMemberRepo.count.mockResolvedValueOnce(1);
+    studioMemberRepo.find.mockResolvedValueOnce([
+      { studio: { id: "s1", status: "suspended", name: "S1" }, role: "owner" },
+    ]);
 
     await expect(service.login("user@test.com", "pw")).rejects.toMatchObject({
       statusCode: 403,
@@ -285,16 +289,18 @@ describe("UsersService", () => {
       custodyMode: "custodial",
       kycStatus: "pending",
     });
-    studioMemberRepo.findOne.mockResolvedValueOnce({
-      studio: { id: "s1" },
-      role: "owner",
-    });
+    studioMemberRepo.count.mockResolvedValueOnce(1);
+    studioMemberRepo.find.mockResolvedValueOnce([
+      { studio: { id: "s1", status: "active", name: "S1" }, role: "owner" },
+    ]);
 
     const result = await service.login("user@test.com", "pw");
     expect(result).toEqual(
       expect.objectContaining({
         token: "jwt-token",
-        user: expect.objectContaining({ studioId: "s1" }),
+        studios: expect.arrayContaining([
+          expect.objectContaining({ id: "s1" }),
+        ]),
       }),
     );
   });
@@ -310,22 +316,27 @@ describe("UsersService", () => {
       custodyMode: "custodial",
       kycStatus: "pending",
     });
-    studioMemberRepo.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+    studioMemberRepo.count.mockResolvedValueOnce(0);
     studioRepo.findOne.mockResolvedValueOnce(null);
     studioRepo.save.mockImplementationOnce(async (x) => ({
       id: "s-new",
       ...x,
     }));
+    studioMemberRepo.findOne.mockResolvedValueOnce(null);
     studioMemberService.createBootstrapOwner.mockResolvedValueOnce({
       id: "m-new",
       studio: { id: "s-new" },
       role: "owner",
     });
+    studioMemberRepo.find.mockResolvedValueOnce([
+      {
+        studio: { id: "s-new", status: "active", name: "New Studio" },
+        role: "owner",
+      },
+    ]);
 
     const result = await service.login("user@test.com", "pw");
-    expect(result.user.studioId).toBe("s-new");
+    expect(result.studios![0].id).toBe("s-new");
     expect(studioRepo.create).toHaveBeenCalled();
     expect(studioMemberService.createBootstrapOwner).toHaveBeenCalled();
   });
@@ -340,18 +351,25 @@ describe("UsersService", () => {
       custodyMode: "custodial",
       kycStatus: "pending",
     });
-    studioMemberRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+    studioMemberRepo.count.mockResolvedValueOnce(0);
+    studioRepo.findOne.mockResolvedValueOnce({ id: "s-existing" });
+    studioMemberRepo.findOne.mockResolvedValueOnce({
       studio: { id: "s-existing" },
       role: "owner",
     });
-    studioRepo.findOne.mockResolvedValueOnce({ id: "s-existing" });
+    studioMemberRepo.find.mockResolvedValueOnce([
+      {
+        studio: { id: "s-existing", status: "active", name: "Existing Studio" },
+        role: "owner",
+      },
+    ]);
 
     const result = await service.login("user@test.com", "pw");
-    expect(result.user.studioId).toBe("s-existing");
+    expect(result.studios![0].id).toBe("s-existing");
     expect(studioMemberService.createBootstrapOwner).not.toHaveBeenCalled();
   });
 
-  it("login throws when no studio can be selected", async () => {
+  it("login throws when no active studio is available", async () => {
     const passwordHash = await bcrypt.hash("pw", 4);
     userRepo.findOne.mockResolvedValueOnce({
       id: "u1",
@@ -361,15 +379,17 @@ describe("UsersService", () => {
       custodyMode: "custodial",
       kycStatus: "pending",
     });
-    studioMemberRepo.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
-    studioRepo.findOne.mockResolvedValueOnce({ id: "s-existing" });
-    studioMemberService.createBootstrapOwner.mockResolvedValueOnce(null);
+    studioMemberRepo.count.mockResolvedValueOnce(1);
+    // All studios suspended — filter removes them all
+    studioMemberRepo.find.mockResolvedValueOnce([
+      {
+        studio: { id: "s1", status: "suspended", name: "S1" },
+        role: "owner",
+      },
+    ]);
 
     await expect(service.login("user@test.com", "pw")).rejects.toMatchObject({
-      statusCode: 404,
-      message: ERROR_MESSAGES.STUDIO_NOT_FOUND,
+      statusCode: 403,
     });
   });
 
