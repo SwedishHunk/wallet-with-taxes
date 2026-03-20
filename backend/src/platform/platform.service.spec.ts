@@ -16,6 +16,7 @@ import { GamePlayer } from "./entities/game-player.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
+import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 
 type Repo = {
   findOne: jest.Mock;
@@ -38,6 +39,7 @@ describe("PlatformService", () => {
   let nftInstanceRepo: Repo;
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
+  let walletIdentityRepo: Repo;
   let marketplaceListingRepo: Repo;
   let economicsService: { logEvent: jest.Mock };
   let service: PlatformService;
@@ -108,6 +110,12 @@ describe("PlatformService", () => {
       create: jest.fn((x) => x),
       save: jest.fn(),
     };
+    walletIdentityRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
     marketplaceListingRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -131,6 +139,7 @@ describe("PlatformService", () => {
       nftInstanceRepo as never,
       walletDepositIntentRepo as never,
       userRepo as never,
+      walletIdentityRepo as never,
       marketplaceListingRepo as never,
       economicsService as never,
     );
@@ -1520,7 +1529,8 @@ describe("PlatformService", () => {
     });
   });
 
-  it("getAllNFTsForWallet returns empty array when user not found", async () => {
+  it("getAllNFTsForWallet returns empty array when wallet identity and user are missing", async () => {
+    walletIdentityRepo.findOne.mockResolvedValueOnce(null);
     userRepo.findOne.mockResolvedValueOnce(null);
 
     const result = await service.getAllNFTsForWallet("0xabc");
@@ -1528,14 +1538,14 @@ describe("PlatformService", () => {
     expect(result).toEqual([]);
   });
 
-  it("getAllNFTsForWallet returns NFT instances for known wallet", async () => {
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+  it("getAllNFTsForWallet returns NFT instances for known wallet identity", async () => {
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     const instances = [{ id: "n1" }, { id: "n2" }];
     nftInstanceRepo.find.mockResolvedValueOnce(instances);
 
     const result = await service.getAllNFTsForWallet("0xABC");
 
-    expect(userRepo.findOne).toHaveBeenCalledWith({
+    expect(walletIdentityRepo.findOne).toHaveBeenCalledWith({
       where: { walletAddress: "0xabc" },
     });
     expect(result).toBe(instances);
@@ -1574,15 +1584,15 @@ describe("PlatformService", () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("registerPlayerByWallet creates user and game player for new wallet", async () => {
+  it("registerPlayerByWallet creates wallet identity and game player for new wallet", async () => {
     // assertGameBelongsToStudio
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
     // resolvePlayerGameWallet → gameRepo.findOne
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    // user not found → create
-    userRepo.findOne.mockResolvedValueOnce(null);
-    userRepo.save.mockResolvedValueOnce({
-      id: "u-new",
+    // wallet identity not found → create
+    walletIdentityRepo.findOne.mockResolvedValueOnce(null);
+    walletIdentityRepo.save.mockResolvedValueOnce({
+      id: "wid-new",
       walletAddress: "0x1234",
     });
     // ensureGamePlayer → not found → create
@@ -1598,7 +1608,7 @@ describe("PlatformService", () => {
       "s1",
     );
 
-    expect(userRepo.save).toHaveBeenCalled();
+    expect(walletIdentityRepo.save).toHaveBeenCalled();
     expect(result.gamePlayer.id).toBe("gp-new");
     expect(result.wallet.id).toBe("w-new");
   });
@@ -1613,16 +1623,16 @@ describe("PlatformService", () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("getPlayerGameWallet returns null when user not found by wallet", async () => {
+  it("getPlayerGameWallet returns null when wallet identity not found by wallet", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce(null);
+    walletIdentityRepo.findOne.mockResolvedValueOnce(null);
     const result = await service.getPlayerGameWallet("g1", "0xabc");
     expect(result).toBeNull();
   });
 
   it("getPlayerGameWallet returns wallet when player exists", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({ id: "w1", balance: "5" });
 
@@ -1633,7 +1643,7 @@ describe("PlatformService", () => {
   it("playerWithdrawFromGameWallet throws on insufficient balance", async () => {
     // resolvePlayerGameWallet flow
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({
       id: "w1",
@@ -1651,7 +1661,7 @@ describe("PlatformService", () => {
 
   it("playerWithdrawFromGameWallet succeeds and updates balance", async () => {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({
       id: "w1",
@@ -1696,9 +1706,9 @@ describe("PlatformService", () => {
     gameRepo.findOne
       .mockResolvedValueOnce({ id: "g1" })
       .mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne
-      .mockResolvedValueOnce({ id: "u1" })
-      .mockResolvedValueOnce({ id: "u2" });
+    walletIdentityRepo.findOne
+      .mockResolvedValueOnce({ id: "wid1" })
+      .mockResolvedValueOnce({ id: "wid2" });
     gamePlayerRepo.findOne
       .mockResolvedValueOnce({ id: "gp1" })
       .mockResolvedValueOnce({ id: "gp2" });
@@ -1775,9 +1785,9 @@ describe("PlatformService", () => {
     gameRepo.findOne
       .mockResolvedValueOnce({ id: "g1" })
       .mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne
-      .mockResolvedValueOnce({ id: "u1" })
-      .mockResolvedValueOnce({ id: "u2" });
+    walletIdentityRepo.findOne
+      .mockResolvedValueOnce({ id: "wid1" })
+      .mockResolvedValueOnce({ id: "wid2" });
     gamePlayerRepo.findOne
       .mockResolvedValueOnce({ id: "gp1" })
       .mockResolvedValueOnce({ id: "gp2" });
@@ -1814,9 +1824,9 @@ describe("PlatformService", () => {
     gameRepo.findOne
       .mockResolvedValueOnce({ id: "g1" })
       .mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne
-      .mockResolvedValueOnce({ id: "u1" })
-      .mockResolvedValueOnce({ id: "u2" });
+    walletIdentityRepo.findOne
+      .mockResolvedValueOnce({ id: "wid1" })
+      .mockResolvedValueOnce({ id: "wid2" });
     gamePlayerRepo.findOne
       .mockResolvedValueOnce({ id: "gp1" })
       .mockResolvedValueOnce({ id: "gp2" });
@@ -1914,7 +1924,7 @@ describe("PlatformService", () => {
     });
     // resolvePlayerGameWallet
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({
       id: "w1",
@@ -1941,7 +1951,7 @@ describe("PlatformService", () => {
     });
     // resolvePlayerGameWallet
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     // pre-check passes: balance "5" (5 > 5 is false)
     walletRepo.findOne.mockResolvedValueOnce({
@@ -1992,7 +2002,7 @@ describe("PlatformService", () => {
     nftTemplateRepo.findOne.mockResolvedValueOnce(template);
     // resolvePlayerGameWallet
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({
       id: "w1",
@@ -2048,7 +2058,7 @@ describe("PlatformService", () => {
     };
     nftTemplateRepo.findOne.mockResolvedValueOnce(template);
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
-    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
     gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
     walletRepo.findOne.mockResolvedValueOnce({
       id: "w1",
@@ -2146,8 +2156,8 @@ describe("PlatformService", () => {
     wallet: { id?: string; balance: string; totalWithdrawn?: string },
   ) {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
-    userRepo.findOne.mockResolvedValueOnce({
-      id: "u1",
+    walletIdentityRepo.findOne.mockResolvedValueOnce({
+      id: "wid1",
       walletAddress: "0xabc",
     });
     gamePlayerRepo.findOne.mockResolvedValueOnce(gamePlayer);

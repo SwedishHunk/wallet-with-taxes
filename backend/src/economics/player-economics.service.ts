@@ -1,10 +1,9 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { randomUUID } from "crypto";
 import { Repository } from "typeorm";
 import { Game } from "../platform/entities/game.entity";
 import { GamePlayer } from "../platform/entities/game-player.entity";
-import { User } from "../users/user.entity";
+import { PlayerWalletIdentity } from "../platform/entities/player-wallet-identity.entity";
 import {
   EconomicDirection,
   EconomicScopeType,
@@ -32,8 +31,8 @@ export class PlayerEconomicsService {
     private readonly gameRepo: Repository<Game>,
     @InjectRepository(GamePlayer)
     private readonly gamePlayerRepo: Repository<GamePlayer>,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
+    @InjectRepository(PlayerWalletIdentity)
+    private readonly walletIdentityRepo: Repository<PlayerWalletIdentity>,
     private readonly economicsService: EconomicsService,
   ) {}
 
@@ -48,8 +47,8 @@ export class PlayerEconomicsService {
       throw new NotFoundException("Game not found");
     }
 
-    const user = await this.findOrCreateWalletUser(normalizedWallet);
-    const gamePlayer = await this.findOrCreateGamePlayer(game, user);
+    const walletIdentity = await this.findOrCreateWalletIdentity(normalizedWallet);
+    const gamePlayer = await this.findOrCreateGamePlayer(game, walletIdentity);
 
     this.logger.log(
       `Resolved session studio=${game.studio.id} game=${game.id} player=${gamePlayer.id} wallet=${normalizedWallet}`,
@@ -61,7 +60,7 @@ export class PlayerEconomicsService {
       gameId: game.id,
       gameName: game.name,
       gamePlayerId: gamePlayer.id,
-      userId: user.id,
+      userId: gamePlayer.user?.id ?? null,
       walletAddress: normalizedWallet,
       scopeType: EconomicScopeType.GAME,
     };
@@ -98,50 +97,52 @@ export class PlayerEconomicsService {
     });
   }
 
-  private async findOrCreateWalletUser(walletAddress: string) {
-    const existing = await this.userRepo.findOne({ where: { walletAddress } });
+  private async findOrCreateWalletIdentity(walletAddress: string) {
+    const existing = await this.walletIdentityRepo.findOne({
+      where: { walletAddress },
+    });
     if (existing) {
-      this.logger.debug(`Reusing wallet user for ${walletAddress}`);
+      this.logger.debug(`Reusing wallet identity for ${walletAddress}`);
       return existing;
     }
 
-    const syntheticEmail = `wallet-${walletAddress.slice(2)}@player.local`;
-    const created: User = this.userRepo.create({
-      email: syntheticEmail,
-      passwordHash: randomUUID(),
-      custodyMode: "self",
-      encryptedPrivateKey: null,
+    const created = this.walletIdentityRepo.create({
       walletAddress,
-      kycStatus: "pending",
-      onChainWallet: undefined,
-      isAdmin: false,
     });
 
-    this.logger.log(`Creating synthetic wallet user for ${walletAddress}`);
-    return this.userRepo.save(created);
+    this.logger.log(`Creating wallet identity for ${walletAddress}`);
+    return this.walletIdentityRepo.save(created);
   }
 
-  private async findOrCreateGamePlayer(game: Game, user: User) {
+  private async findOrCreateGamePlayer(
+    game: Game,
+    walletIdentity: PlayerWalletIdentity,
+  ) {
     const existing = await this.gamePlayerRepo.findOne({
-      where: { game: { id: game.id }, user: { id: user.id } },
-      relations: ["game", "user"],
+      where: {
+        game: { id: game.id },
+        walletIdentity: { id: walletIdentity.id },
+      },
+      relations: ["game", "user", "walletIdentity"],
     });
 
     if (existing) {
       this.logger.debug(
-        `Reusing game player ${existing.id} for game=${game.id} user=${user.id}`,
+        `Reusing game player ${existing.id} for game=${game.id} walletIdentity=${walletIdentity.id}`,
       );
       return existing;
     }
 
     const created = this.gamePlayerRepo.create({
       game,
-      user,
+      walletIdentity,
       level: 1,
       exp: 0,
     });
 
-    this.logger.log(`Creating game player for game=${game.id} user=${user.id}`);
+    this.logger.log(
+      `Creating game player for game=${game.id} walletIdentity=${walletIdentity.id}`,
+    );
     return this.gamePlayerRepo.save(created);
   }
 }
