@@ -59,11 +59,12 @@ export class NFTInventoryService {
 
   async getPlayerNFTs(gameId: string, userId: string, studioId: string) {
     await this.assertGameBelongsToStudio(gameId, studioId);
-    const { gamePlayer } = await this.gameWalletAdminService.ensureGameWalletForPlayer(
-      gameId,
-      userId,
-      studioId,
-    );
+    const { gamePlayer } =
+      await this.gameWalletAdminService.ensureGameWalletForPlayer(
+        gameId,
+        userId,
+        studioId,
+      );
 
     return this.nftInstanceRepo.find({
       where: { owner: { id: gamePlayer.id } },
@@ -227,11 +228,12 @@ export class NFTInventoryService {
       customAttributes?: Record<string, any>;
     },
   ) {
-    const { gamePlayer } = await this.gameWalletAdminService.ensureGameWalletForPlayer(
-      gameId,
-      userId,
-      studioId,
-    );
+    const { gamePlayer } =
+      await this.gameWalletAdminService.ensureGameWalletForPlayer(
+        gameId,
+        userId,
+        studioId,
+      );
 
     const nftInstance = await this.nftInstanceRepo.findOne({
       where: {

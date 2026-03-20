@@ -18,10 +18,6 @@ import { User } from "../users/user.entity";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
 import { EconomicsService } from "../economics/economics.service";
-import {
-  EconomicDirection,
-  EconomicScopeType,
-} from "../economics/entities/economic-event.entity";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { MarketplaceService } from "./marketplace.service";
 import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
@@ -506,11 +502,7 @@ export class PlatformService {
   }
 
   async getPlayerNFTs(gameId: string, userId: string, studioId: string) {
-    return this.nftInventoryService.getPlayerNFTs(
-      gameId,
-      userId,
-      studioId,
-    );
+    return this.nftInventoryService.getPlayerNFTs(gameId, userId, studioId);
   }
 
   async createNFTTemplate(
@@ -680,10 +672,7 @@ export class PlatformService {
   }
 
   async getAllNFTInstancesForGame(gameId: string, studioId: string) {
-    return this.nftInventoryService.getAllNFTInstancesForGame(
-      gameId,
-      studioId,
-    );
+    return this.nftInventoryService.getAllNFTInstancesForGame(gameId, studioId);
   }
 
   async updateNFTInstance(
