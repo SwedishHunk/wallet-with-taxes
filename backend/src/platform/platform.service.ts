@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, QueryFailedError, Repository } from "typeorm";
 import { createHash, randomUUID } from "crypto";
+import { ethers } from "ethers";
 import { Studio } from "./entities/studio.entity";
 import { StudioMember, StudioRole } from "./entities/studio-member.entity";
 import { Game } from "./entities/game.entity";
@@ -29,6 +30,10 @@ import {
 @Injectable()
 export class PlatformService {
   private static readonly DEPOSIT_INTENT_TTL_MS = 15 * 60 * 1000;
+  private readonly rpcUrl = process.env.RPC_URL?.trim();
+  private readonly rpcProvider = this.rpcUrl
+    ? new ethers.JsonRpcProvider(this.rpcUrl)
+    : null;
 
   private buildStudioScopedSlug(baseSlug: string, studioId: string): string {
     return `${baseSlug}-${studioId.slice(0, 8)}`;
@@ -72,9 +77,49 @@ export class PlatformService {
     return `0x${hash.slice(0, 40)}`;
   }
 
-  private isValidFakeTxHash(txHash: string): boolean {
+  private isValidTxHash(txHash: string): boolean {
     const value = txHash.trim();
     return value.length >= 10 && value.startsWith("0x");
+  }
+
+  private async verifyNativeDepositTransaction(
+    intent: WalletDepositIntent,
+    txHash: string,
+  ) {
+    if (!this.rpcProvider) {
+      throw new AppException(
+        "External deposit confirmation is unavailable: RPC is not configured",
+        503,
+      );
+    }
+
+    const [tx, receipt] = await Promise.all([
+      this.rpcProvider.getTransaction(txHash),
+      this.rpcProvider.getTransactionReceipt(txHash),
+    ]);
+
+    if (!tx || !receipt) {
+      throw new AppException("Deposit transaction not found on chain", 400);
+    }
+
+    if (receipt.status !== 1) {
+      throw new AppException("Deposit transaction did not succeed", 400);
+    }
+
+    if (!tx.to || tx.to.toLowerCase() !== intent.depositAddress.toLowerCase()) {
+      throw new AppException(
+        "Deposit transaction recipient does not match intent",
+        400,
+      );
+    }
+
+    const expectedValue = ethers.parseUnits(intent.amount, 18);
+    if (tx.value !== expectedValue) {
+      throw new AppException(
+        "Deposit transaction amount does not match intent",
+        400,
+      );
+    }
   }
 
   private async findUserOrThrow(
@@ -136,6 +181,33 @@ export class PlatformService {
       throw new AppException(notFoundMessage, 404);
     }
     return locked;
+  }
+
+  private normalizeIdempotencyKey(idempotencyKey?: string | null) {
+    const normalized = idempotencyKey?.trim();
+    if (!normalized) {
+      return null;
+    }
+    if (normalized.length > 128) {
+      throw new AppException("idempotencyKey must be 128 characters or less", 400);
+    }
+    return normalized;
+  }
+
+  private async getWalletByIdOrThrow(walletId: string, notFoundMessage: string) {
+    const wallet = await this.walletRepo.findOne({ where: { id: walletId } });
+    if (!wallet) {
+      throw new AppException(notFoundMessage, 404);
+    }
+    return wallet;
+  }
+
+  private async getReplayWallets(fromWalletId: string, toWalletId: string) {
+    const [fromWallet, toWallet] = await Promise.all([
+      this.getWalletByIdOrThrow(fromWalletId, "Sender wallet not found"),
+      this.getWalletByIdOrThrow(toWalletId, "Recipient wallet not found"),
+    ]);
+    return { fromWallet, toWallet };
   }
 
   /**
@@ -340,14 +412,25 @@ export class PlatformService {
     studioId: string,
     amount: unknown,
     description?: string,
+    idempotencyKey?: string,
   ) {
     const amountNum = parseAmount(amount);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
 
     const { wallet } = await this.ensureGameWalletForPlayer(
       gameId,
       userId,
       studioId,
     );
+
+    if (operationKey) {
+      const existing = await this.ledgerRepo.findOne({
+        where: { operationKey },
+      });
+      if (existing) {
+        return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+      }
+    }
 
     // Generate txGroupId for this transaction
     const txGroupId = randomUUID();
@@ -367,11 +450,27 @@ export class PlatformService {
         txGroupId,
         type: "deposit",
         amount: amountNum.toString(),
+        operationKey,
         description: description || "Deposit",
       });
       await ledgerRepo.save(ledgerEntry);
 
       return savedWallet;
+    }).catch(async (error: unknown) => {
+      if (error instanceof QueryFailedError) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+        }
+      }
+      throw error;
     });
   }
 
@@ -424,8 +523,9 @@ export class PlatformService {
     studioId: string,
     intentId: string,
     txHash: string,
+    idempotencyKey?: string,
   ) {
-    if (!this.isValidFakeTxHash(txHash)) {
+    if (!this.isValidTxHash(txHash)) {
       throw new AppException("Invalid txHash", 400);
     }
 
@@ -459,6 +559,19 @@ export class PlatformService {
           throw new AppException("Deposit intent not found", 404);
         }
 
+        if (
+          intent.status === WalletDepositIntentStatus.CONFIRMED &&
+          intent.txHash === normalizedTxHash
+        ) {
+          const existingWallet = await walletRepo.findOne({
+            where: { id: wallet.id },
+          });
+          if (!existingWallet) {
+            throw new AppException("Game wallet not found", 404);
+          }
+          return { expired: false as const, wallet: existingWallet };
+        }
+
         if (intent.status !== WalletDepositIntentStatus.PENDING) {
           throw new AppException("Deposit intent is not pending", 400);
         }
@@ -469,6 +582,8 @@ export class PlatformService {
           await intentRepo.save(intent);
           return { expired: true as const };
         }
+
+        await this.verifyNativeDepositTransaction(intent, normalizedTxHash);
 
         const lockedWallet = await walletRepo.findOne({
           where: { id: wallet.id },
@@ -497,6 +612,7 @@ export class PlatformService {
           type: "deposit",
           amount: intent.amount,
           intentId: intent.id,
+          operationKey: this.normalizeIdempotencyKey(idempotencyKey),
           description: `External deposit txHash=${normalizedTxHash} intentId=${intent.id}`,
           txHash: normalizedTxHash,
         });
@@ -518,6 +634,12 @@ export class PlatformService {
         ) {
           throw new AppException("txHash already used", 400);
         }
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+        }
       }
       throw error;
     }
@@ -535,9 +657,20 @@ export class PlatformService {
     studioId: string,
     amount: unknown,
     description?: string,
+    idempotencyKey?: string,
   ) {
     const wallet = await this.getGameWalletBalance(gameId, userId, studioId);
     const amountNum = parseAmount(amount);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
+
+    if (operationKey) {
+      const existing = await this.ledgerRepo.findOne({
+        where: { operationKey },
+      });
+      if (existing) {
+        return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+      }
+    }
 
     const balanceNum = parseFloat(wallet.balance);
 
@@ -562,11 +695,27 @@ export class PlatformService {
         txGroupId,
         type: "withdraw",
         amount: amountNum.toString(),
+        operationKey,
         description: description || "Withdrawal",
       });
       await ledgerRepo.save(ledgerEntry);
 
       return savedWallet;
+    }).catch(async (error: unknown) => {
+      if (error instanceof QueryFailedError) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+        }
+      }
+      throw error;
     });
   }
 
@@ -577,8 +726,10 @@ export class PlatformService {
     studioId: string,
     amount: unknown,
     description?: string,
+    idempotencyKey?: string,
   ) {
     const amountNum = parseAmount(amount);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
 
     // Disallow transfer to self
     if (fromUserId === toUserId) {
@@ -619,6 +770,22 @@ export class PlatformService {
         walletRepo,
         toGamePlayer,
       );
+
+      const debitOperationKey = operationKey ? `${operationKey}:debit` : null;
+      const creditOperationKey = operationKey ? `${operationKey}:credit` : null;
+
+      if (debitOperationKey && creditOperationKey) {
+        const [existingDebit, existingCredit] = await Promise.all([
+          ledgerRepo.findOne({ where: { operationKey: debitOperationKey } }),
+          ledgerRepo.findOne({ where: { operationKey: creditOperationKey } }),
+        ]);
+        if (existingDebit && existingCredit) {
+          return this.getReplayWallets(fromWallet.id, toWallet.id);
+        }
+        if (existingDebit || existingCredit) {
+          throw new AppException("Transfer replay state is inconsistent", 409);
+        }
+      }
 
       const lockedFromWallet = await this.lockWalletOrThrow(
         walletRepo,
@@ -661,6 +828,7 @@ export class PlatformService {
         type: "transfer",
         amount: amountNum.toString(),
         counterpartyUserId: toUserId,
+        operationKey: debitOperationKey,
         description: fromDescription,
       });
       await ledgerRepo.save(fromLedgerEntry);
@@ -673,6 +841,7 @@ export class PlatformService {
         type: "transfer",
         amount: amountNum.toString(),
         counterpartyUserId: fromUserId,
+        operationKey: creditOperationKey,
         description: toDescription,
       });
       await ledgerRepo.save(toLedgerEntry);
@@ -681,6 +850,48 @@ export class PlatformService {
         fromWallet: savedFromWallet,
         toWallet: savedToWallet,
       };
+    }).catch(async (error: unknown) => {
+      if (error instanceof QueryFailedError && operationKey) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          const replayToUser = await this.userRepo.findOne({
+            where: { id: toUserId },
+          });
+          if (!replayToUser) {
+            throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
+          }
+          const replayFrom = await this.ensureGameWalletForPlayer(
+            gameId,
+            fromUserId,
+            studioId,
+          );
+          const replayGame = await this.assertGameBelongsToStudio(
+            gameId,
+            studioId,
+          );
+          const replayToPlayer = await this.ensureGamePlayer(
+            this.gamePlayerRepo,
+            replayGame,
+            replayToUser,
+          );
+          const replayToWallet = await this.ensureWalletForGamePlayer(
+            this.walletRepo,
+            replayToPlayer,
+          );
+          return this.getReplayWallets(
+            replayFrom.wallet.id,
+            replayToWallet.id,
+          );
+        }
+      }
+      throw error;
     });
   }
 
@@ -901,12 +1112,23 @@ export class PlatformService {
     gameId: string,
     walletAddress: string,
     amount: unknown,
+    idempotencyKey?: string,
   ) {
     const amountNum = parseAmount(amount);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
     const { wallet } = await this.resolvePlayerGameWallet(
       gameId,
       walletAddress,
     );
+
+    if (operationKey) {
+      const existing = await this.ledgerRepo.findOne({
+        where: { operationKey },
+      });
+      if (existing) {
+        return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
+      }
+    }
 
     if (amountNum > parseFloat(wallet.balance)) {
       throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
@@ -927,10 +1149,26 @@ export class PlatformService {
           txGroupId,
           type: "withdraw",
           amount: amountNum.toString(),
+          operationKey,
           description: "Player withdrawal",
         }),
       );
       return saved;
+    }).catch(async (error: unknown) => {
+      if (error instanceof QueryFailedError) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
+        }
+      }
+      throw error;
     });
   }
 
@@ -939,8 +1177,10 @@ export class PlatformService {
     fromWalletAddress: string,
     toWalletAddress: string,
     amount: unknown,
+    idempotencyKey?: string,
   ) {
     const amountNum = parseAmount(amount);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
     const normalizedFrom = fromWalletAddress.toLowerCase();
     const normalizedTo = toWalletAddress.toLowerCase();
 
@@ -956,6 +1196,22 @@ export class PlatformService {
       gameId,
       normalizedTo,
     );
+
+    const debitOperationKey = operationKey ? `${operationKey}:debit` : null;
+    const creditOperationKey = operationKey ? `${operationKey}:credit` : null;
+
+    if (debitOperationKey && creditOperationKey) {
+      const [existingDebit, existingCredit] = await Promise.all([
+        this.ledgerRepo.findOne({ where: { operationKey: debitOperationKey } }),
+        this.ledgerRepo.findOne({ where: { operationKey: creditOperationKey } }),
+      ]);
+      if (existingDebit && existingCredit) {
+        return this.getReplayWallets(fromWallet.id, toWallet.id);
+      }
+      if (existingDebit || existingCredit) {
+        throw new AppException("Transfer replay state is inconsistent", 409);
+      }
+    }
 
     if (amountNum > parseFloat(fromWallet.balance)) {
       throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
@@ -995,6 +1251,7 @@ export class PlatformService {
           txGroupId,
           type: "transfer",
           amount: amountNum.toString(),
+          operationKey: debitOperationKey,
           description: `Transfer to ${normalizedTo}`,
         }),
       );
@@ -1004,11 +1261,27 @@ export class PlatformService {
           txGroupId,
           type: "transfer",
           amount: amountNum.toString(),
+          operationKey: creditOperationKey,
           description: `Transfer from ${normalizedFrom}`,
         }),
       );
 
       return { fromWallet: savedFrom, toWallet: savedTo };
+    }).catch(async (error: unknown) => {
+      if (error instanceof QueryFailedError && operationKey) {
+        const driverError = (
+          error as QueryFailedError & {
+            driverError?: { code?: string; constraint?: string };
+          }
+        ).driverError;
+        if (
+          driverError?.code === "23505" &&
+          driverError?.constraint === "uq_ledger_operation_key_not_null"
+        ) {
+          return this.getReplayWallets(fromWallet.id, toWallet.id);
+        }
+      }
+      throw error;
     });
   }
 
@@ -1086,15 +1359,19 @@ export class PlatformService {
       throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
     }
 
-    const existing = await this.marketplaceListingRepo.findOne({
-      where: { nftInstance: { id: nftInstanceId }, status: "active" },
-    });
-    if (existing) {
-      throw new AppException(
-        "This NFT is already listed in the marketplace",
-        409,
-      );
-    }
+      const existing = await this.marketplaceListingRepo.findOne({
+        where: { nftInstance: { id: nftInstanceId }, status: "active" },
+        relations: ["seller"],
+      });
+      if (existing) {
+        if (existing.seller?.id === gamePlayer.id) {
+          return existing;
+        }
+        throw new AppException(
+          "This NFT is already listed in the marketplace",
+          409,
+        );
+      }
 
     const game = await this.gameRepo.findOneBy({ id: gameId });
     if (!game) throw new AppException(ERROR_MESSAGES.GAME_NOT_FOUND, 404);
@@ -1120,18 +1397,24 @@ export class PlatformService {
       normalized,
     );
 
-    const listing = await this.marketplaceListingRepo.findOne({
-      where: { id: listingId, game: { id: gameId }, status: "active" },
-      relations: ["seller"],
-    });
-    if (!listing) throw new AppException("Listing not found", 404);
-    if (listing.seller.id !== gamePlayer.id) {
-      throw new AppException("Not your listing", 403);
-    }
+      const listing = await this.marketplaceListingRepo.findOne({
+        where: { id: listingId, game: { id: gameId } },
+        relations: ["seller"],
+      });
+      if (!listing) throw new AppException("Listing not found", 404);
+      if (listing.seller.id !== gamePlayer.id) {
+        throw new AppException("Not your listing", 403);
+      }
+      if (listing.status === "cancelled") {
+        return listing;
+      }
+      if (listing.status !== "active") {
+        throw new AppException("Listing is no longer active", 409);
+      }
 
-    listing.status = "cancelled";
-    return this.marketplaceListingRepo.save(listing);
-  }
+      listing.status = "cancelled";
+      return this.marketplaceListingRepo.save(listing);
+    }
 
   async purchaseNFTListing(
     gameId: string,
@@ -1141,43 +1424,105 @@ export class PlatformService {
     const normalized = walletAddress.toLowerCase();
     const { gamePlayer: buyerPlayer, wallet: buyerWallet } =
       await this.resolvePlayerGameWallet(gameId, normalized);
+    const txGroupId = randomUUID();
 
-    const listing = await this.marketplaceListingRepo.findOne({
-      where: { id: listingId, game: { id: gameId }, status: "active" },
-      relations: ["seller", "nftInstance"],
+    return this.dataSource.transaction(async (manager) => {
+      const walletRepo = manager.getRepository(GameWallet);
+      const ledgerRepo = manager.getRepository(LedgerEntry);
+      const listingRepo = manager.getRepository(MarketplaceListing);
+      const nftInstanceRepo = manager.getRepository(NFTInstance);
+
+        const listing = await listingRepo.findOne({
+          where: { id: listingId, game: { id: gameId } },
+          relations: ["seller", "buyer", "nftInstance", "nftInstance.owner"],
+          lock: { mode: "pessimistic_write" },
+        });
+
+        if (!listing) {
+          throw new AppException("Listing not found or no longer active", 404);
+        }
+        if (listing.status === "sold" && listing.buyer?.id === buyerPlayer.id) {
+          return listing;
+        }
+        if (listing.status !== "active") {
+          throw new AppException("Listing not found or no longer active", 404);
+        }
+        if (listing.seller.id === buyerPlayer.id) {
+          throw new AppException("Cannot purchase your own listing", 400);
+        }
+
+      const ask = parseAmount(listing.askPrice);
+      const lockedBuyerWallet = await this.lockWalletOrThrow(
+        walletRepo,
+        buyerWallet.id,
+        "Buyer wallet not found",
+      );
+      if (ask > parseFloat(lockedBuyerWallet.balance ?? "0")) {
+        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 402);
+      }
+
+      const sellerWallet = await walletRepo.findOne({
+        where: { gamePlayer: { id: listing.seller.id } },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!sellerWallet) {
+        throw new AppException("Seller wallet not found", 404);
+      }
+
+      const lockedNftInstance = await nftInstanceRepo.findOne({
+        where: { id: listing.nftInstance.id },
+        relations: ["owner"],
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!lockedNftInstance) {
+        throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
+      }
+      if (lockedNftInstance.owner?.id !== listing.seller.id) {
+        throw new AppException("Listing is no longer valid", 409);
+      }
+
+      lockedBuyerWallet.balance = safeSub(lockedBuyerWallet.balance ?? "0", ask);
+      lockedBuyerWallet.totalWithdrawn = safeAdd(
+        lockedBuyerWallet.totalWithdrawn ?? "0",
+        ask,
+      );
+      const savedBuyerWallet = await walletRepo.save(lockedBuyerWallet);
+
+      sellerWallet.balance = safeAdd(sellerWallet.balance ?? "0", ask);
+      sellerWallet.totalDeposited = safeAdd(
+        sellerWallet.totalDeposited ?? "0",
+        ask,
+      );
+      const savedSellerWallet = await walletRepo.save(sellerWallet);
+
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: savedBuyerWallet,
+          txGroupId,
+          type: "spend",
+          amount: ask.toString(),
+          description: `Marketplace purchase listing=${listing.id}`,
+        }),
+      );
+      await ledgerRepo.save(
+        ledgerRepo.create({
+          wallet: savedSellerWallet,
+          txGroupId,
+          type: "earn",
+          amount: ask.toString(),
+          description: `Marketplace sale listing=${listing.id}`,
+        }),
+      );
+
+      lockedNftInstance.owner = buyerPlayer;
+      await nftInstanceRepo.save(lockedNftInstance);
+
+      listing.status = "sold";
+      listing.buyer = buyerPlayer;
+      listing.soldAt = new Date();
+
+      return listingRepo.save(listing);
     });
-    if (!listing) {
-      throw new AppException("Listing not found or no longer active", 404);
-    }
-    if (listing.seller.id === buyerPlayer.id) {
-      throw new AppException("Cannot purchase your own listing", 400);
-    }
-
-    const ask = parseAmount(listing.askPrice);
-    const buyerBalance = parseFloat(buyerWallet.balance ?? "0");
-    if (buyerBalance < ask) {
-      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 402);
-    }
-
-    const sellerWallet = await this.walletRepo.findOne({
-      where: { gamePlayer: { id: listing.seller.id } },
-    });
-    if (!sellerWallet) {
-      throw new AppException("Seller wallet not found", 404);
-    }
-
-    buyerWallet.balance = safeSub(buyerWallet.balance ?? "0", ask);
-    sellerWallet.balance = safeAdd(sellerWallet.balance ?? "0", ask);
-
-    listing.nftInstance.owner = buyerPlayer;
-    listing.status = "sold";
-    listing.buyer = buyerPlayer;
-    listing.soldAt = new Date();
-
-    await this.walletRepo.save(buyerWallet);
-    await this.walletRepo.save(sellerWallet);
-    await this.nftInstanceRepo.save(listing.nftInstance);
-    return this.marketplaceListingRepo.save(listing);
   }
 
   // ─── NFT Shop (player-facing) ───────────────────────────────────────────────
@@ -1196,6 +1541,7 @@ export class PlatformService {
     gameId: string,
     walletAddress: string,
     templateId: string,
+    idempotencyKey?: string,
   ) {
     const template = await this.nftTemplateRepo.findOne({
       where: { id: templateId, game: { id: gameId } },
@@ -1211,10 +1557,31 @@ export class PlatformService {
     }
 
     const mintingCost = parseFloat(template.mintingCost);
+    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
     const { gamePlayer, wallet } = await this.resolvePlayerGameWallet(
       gameId,
       walletAddress,
     );
+
+    if (operationKey) {
+      const existingPurchase = await this.nftInstanceRepo.findOne({
+        where: {
+          purchaseOperationKey: operationKey,
+          owner: { id: gamePlayer.id },
+          template: { id: template.id },
+        },
+        relations: ["owner", "template"],
+      });
+      if (existingPurchase) {
+        return {
+          nft: existingPurchase,
+          wallet: await this.getWalletByIdOrThrow(
+            wallet.id,
+            "Player wallet not found",
+          ),
+        };
+      }
+    }
 
     if (mintingCost > parseFloat(wallet.balance)) {
       throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
@@ -1222,56 +1589,102 @@ export class PlatformService {
 
     const txGroupId = randomUUID();
 
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-      const nftInstanceRepo = manager.getRepository(NFTInstance);
-      const nftTemplateRepo = manager.getRepository(NFTTemplate);
+    return this.dataSource
+      .transaction(async (manager) => {
+        const walletRepo = manager.getRepository(GameWallet);
+        const ledgerRepo = manager.getRepository(LedgerEntry);
+        const nftInstanceRepo = manager.getRepository(NFTInstance);
+        const nftTemplateRepo = manager.getRepository(NFTTemplate);
 
-      const lockedWallet = await this.lockWalletOrThrow(
-        walletRepo,
-        wallet.id,
-        "Player wallet not found",
-      );
+        const lockedWallet = await this.lockWalletOrThrow(
+          walletRepo,
+          wallet.id,
+          "Player wallet not found",
+        );
 
-      if (mintingCost > parseFloat(lockedWallet.balance)) {
-        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-      }
+        if (operationKey) {
+          const existingPurchase = await nftInstanceRepo.findOne({
+            where: {
+              purchaseOperationKey: operationKey,
+              owner: { id: gamePlayer.id },
+              template: { id: template.id },
+            },
+            relations: ["owner", "template"],
+          });
+          if (existingPurchase) {
+            return { nft: existingPurchase, wallet: lockedWallet };
+          }
+        }
 
-      lockedWallet.balance = safeSub(lockedWallet.balance, mintingCost);
-      lockedWallet.totalWithdrawn = safeAdd(
-        lockedWallet.totalWithdrawn,
-        mintingCost,
-      );
-      const savedWallet = await walletRepo.save(lockedWallet);
+        if (mintingCost > parseFloat(lockedWallet.balance)) {
+          throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
+        }
 
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedWallet,
-          txGroupId,
-          type: "withdraw",
-          amount: mintingCost.toString(),
-          description: `NFT purchase: ${template.name}`,
-        }),
-      );
+        lockedWallet.balance = safeSub(lockedWallet.balance, mintingCost);
+        lockedWallet.totalWithdrawn = safeAdd(
+          lockedWallet.totalWithdrawn,
+          mintingCost,
+        );
+        const savedWallet = await walletRepo.save(lockedWallet);
 
-      const nftInstance = nftInstanceRepo.create({
-        template,
-        owner: gamePlayer,
-        name: `${template.name} #${template.currentMintCount + 1}`,
-        level: 1,
-        condition: 100,
-        power: 0,
-        customAttributes: {},
-        equipped: false,
+        await ledgerRepo.save(
+          ledgerRepo.create({
+            wallet: savedWallet,
+            txGroupId,
+            type: "withdraw",
+            amount: mintingCost.toString(),
+            operationKey,
+            description: `NFT purchase: ${template.name}`,
+          }),
+        );
+
+        const nftInstance = nftInstanceRepo.create({
+          template,
+          owner: gamePlayer,
+          purchaseOperationKey: operationKey,
+          name: `${template.name} #${template.currentMintCount + 1}`,
+          level: 1,
+          condition: 100,
+          power: 0,
+          customAttributes: {},
+          equipped: false,
+        });
+        const savedInstance = await nftInstanceRepo.save(nftInstance);
+
+        template.currentMintCount += 1;
+        await nftTemplateRepo.save(template);
+
+        return { nft: savedInstance, wallet: savedWallet };
+      })
+      .catch(async (error: unknown) => {
+        if (error instanceof QueryFailedError && operationKey) {
+          const driverError = (
+            error as QueryFailedError & {
+              driverError?: { code?: string; constraint?: string };
+            }
+          ).driverError;
+          if (driverError?.code === "23505") {
+            const existingPurchase = await this.nftInstanceRepo.findOne({
+              where: {
+                purchaseOperationKey: operationKey,
+                owner: { id: gamePlayer.id },
+                template: { id: template.id },
+              },
+              relations: ["owner", "template"],
+            });
+            if (existingPurchase) {
+              return {
+                nft: existingPurchase,
+                wallet: await this.getWalletByIdOrThrow(
+                  wallet.id,
+                  "Player wallet not found",
+                ),
+              };
+            }
+          }
+        }
+        throw error;
       });
-      const savedInstance = await nftInstanceRepo.save(nftInstance);
-
-      template.currentMintCount += 1;
-      await nftTemplateRepo.save(template);
-
-      return { nft: savedInstance, wallet: savedWallet };
-    });
   }
 
   async getAllNFTsForWallet(walletAddress: string) {

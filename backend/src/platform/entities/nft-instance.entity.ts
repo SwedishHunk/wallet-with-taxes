@@ -16,6 +16,10 @@ import { GamePlayer } from "./game-player.entity";
   unique: true,
   where: '"tokenId" IS NOT NULL',
 })
+@Index(["purchaseOperationKey"], {
+  unique: true,
+  where: '"purchaseOperationKey" IS NOT NULL',
+})
 export class NFTInstance {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -35,6 +39,9 @@ export class NFTInstance {
 
   @Column({ type: "varchar", length: 150, nullable: true })
   txHash?: string;
+
+  @Column({ type: "varchar", length: 120, nullable: true })
+  purchaseOperationKey?: string | null;
 
   // Standard attributes (common across all games/NFTs)
   @Column({ type: "varchar", length: 200 })
