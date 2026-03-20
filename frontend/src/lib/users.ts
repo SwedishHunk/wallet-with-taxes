@@ -68,3 +68,12 @@ export const devBootstrap = (payload?: {
         }
       : undefined,
   });
+
+export const devSeedMembers = (payload: { studioId: string; count?: number }) =>
+  api.post("/admin/dev/seed-members", payload, {
+    headers: import.meta.env.VITE_DEV_BOOTSTRAP_KEY
+      ? {
+          "x-dev-bootstrap-key": import.meta.env.VITE_DEV_BOOTSTRAP_KEY,
+        }
+      : undefined,
+  });

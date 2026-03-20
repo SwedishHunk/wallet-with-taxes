@@ -191,3 +191,34 @@
   background: rgba(var(--error-rgb, 255,51,102), 0.05) !important;
   color: #ff3366;
 }
+
+.members-success {
+  border-color: rgba(0, 240, 170, 0.25) !important;
+  background: rgba(0, 240, 170, 0.05) !important;
+  color: #7ef7cf;
+}
+
+.members-dev-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.members-dev-title {
+  margin: 0 0 6px;
+  color: var(--text-bright);
+}
+
+.members-dev-copy {
+  margin: 0;
+  color: var(--muted);
+  max-width: 48rem;
+}
+
+.members-dev-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}

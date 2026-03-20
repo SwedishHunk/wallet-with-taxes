@@ -5,8 +5,17 @@ import { AppException } from "../common/exceptions/app-exception";
 import { PlatformService } from "../platform/platform.service";
 import { Studio } from "../platform/entities/studio.entity";
 import { Game } from "../platform/entities/game.entity";
+import {
+  PermissionBitMask,
+  StudioMember,
+  StudioRole,
+} from "../platform/entities/studio-member.entity";
+import { StudioMemberService } from "../platform/studio-member.service";
 import { User } from "../users/user.entity";
 import { UsersService } from "../users/users.service";
+import * as bcrypt from "bcryptjs";
+import { ethers } from "ethers";
+import { encryptPrivateKey } from "../shared/crypto.util";
 
 interface DevBootstrapOptions {
   mode?: "player" | "studio" | "admin";
@@ -22,6 +31,7 @@ export class AdminDevService {
   constructor(
     private readonly usersService: UsersService,
     private readonly platformService: PlatformService,
+    private readonly studioMemberService: StudioMemberService,
     private readonly dataSource: DataSource,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -29,7 +39,48 @@ export class AdminDevService {
     private readonly studioRepo: Repository<Studio>,
     @InjectRepository(Game)
     private readonly gameRepo: Repository<Game>,
+    @InjectRepository(StudioMember)
+    private readonly memberRepo: Repository<StudioMember>,
   ) {}
+
+  private buildRandomPermissionsMask(): bigint {
+    const permissionPool = [
+      PermissionBitMask.ManageMembers,
+      PermissionBitMask.ManageGames,
+      PermissionBitMask.ManageSettings,
+      PermissionBitMask.MintNFT,
+      PermissionBitMask.MakeTransactions,
+    ];
+
+    let mask = 0n;
+    for (const permission of permissionPool) {
+      if (Math.random() >= 0.5) {
+        mask |= permission;
+      }
+    }
+
+    return mask;
+  }
+
+  private async buildSeedUser(email: string, password: string) {
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+    const wallet = ethers.Wallet.createRandom();
+
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+    if (!encryptionKey) {
+      throw new AppException("ENCRYPTION_KEY env var is missing", 500);
+    }
+
+    return this.userRepo.create({
+      email,
+      passwordHash,
+      custodyMode: "custodial",
+      encryptedPrivateKey: encryptPrivateKey(wallet.privateKey, encryptionKey),
+      walletAddress: wallet.address,
+      kycStatus: "pending",
+    });
+  }
 
   private async findBootstrapStudioConflict(email: string, studioName: string) {
     const candidates = await this.studioRepo.find({
@@ -282,6 +333,75 @@ export class AdminDevService {
             ? "/triolith-admin"
             : `/player/game/${game.id}/trade`,
       mode,
+    };
+  }
+
+  async seedMembers(
+    options: { studioId: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const requestedCount = options.count ?? 5;
+    const count = Math.max(1, Math.min(requestedCount, 50));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const studio = await this.studioRepo.findOne({ where: { id: studioId } });
+    if (!studio) {
+      throw new AppException("Studio not found", 404);
+    }
+
+    const timestamp = Date.now();
+    const created: Array<{
+      id: string;
+      userId: string;
+      email: string;
+      role: StudioRole;
+      permissions: string[];
+    }> = [];
+
+    for (let index = 0; index < count; index += 1) {
+      const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 10000)}`;
+      const email = `seed-member-${suffix}@triolith.local`;
+      const password = `SeedPass-${suffix}`;
+      const user = await this.userRepo.save(
+        await this.buildSeedUser(email, password),
+      );
+
+      const permissionsMask = this.buildRandomPermissionsMask();
+      const role =
+        permissionsMask === 0n ? StudioRole.MEMBER : StudioRole.ADMIN;
+
+      const member = await this.memberRepo.save(
+        this.memberRepo.create({
+          studio,
+          user,
+          isOwner: false,
+          role,
+          permissionsMask,
+          gameAccessIds: [],
+        }),
+      );
+
+      created.push({
+        id: member.id,
+        userId: user.id,
+        email: user.email,
+        role,
+        permissions: this.studioMemberService.maskToPermissionStrings(
+          permissionsMask,
+        ),
+      });
+    }
+
+    return {
+      studioId: studio.id,
+      count: created.length,
+      created,
     };
   }
 }

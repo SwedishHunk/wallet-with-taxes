@@ -6,6 +6,7 @@ import {
   createStudioMember,
   updateStudioMember,
   deleteStudioMember,
+  devSeedMembers,
 } from "../lib/users";
 import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 import "../style/Members.css";
@@ -27,6 +28,7 @@ export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [message, setMessage] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export default function Members() {
       });
       setShowForm(false);
       setError("");
+      setMessage("Member created");
       await fetchMembers();
     } catch (err: unknown) {
       setError(
@@ -135,6 +138,7 @@ export default function Members() {
       MakeTransactions: member.permissions.includes("MakeTransactions"),
     });
     setError("");
+    setMessage("");
   };
 
   const cancelEditing = () => {
@@ -158,6 +162,7 @@ export default function Members() {
 
       setEditingMemberId(null);
       setError("");
+      setMessage("Permissions updated");
       await fetchMembers();
     } catch (err: unknown) {
       setError(
@@ -179,11 +184,34 @@ export default function Members() {
       setActionLoading(`delete:${member.id}`);
       await deleteStudioMember(studioSession.studioId, member.id);
       setError("");
+      setMessage("Member removed");
       await fetchMembers();
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || "Could not delete member",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSeedMembers = async (count: number) => {
+    if (!studioSession) return;
+
+    try {
+      setActionLoading(`seed:${count}`);
+      setError("");
+      const { data } = await devSeedMembers({
+        studioId: studioSession.studioId,
+        count,
+      });
+      setMessage(`Created ${data.count} test members`);
+      await fetchMembers();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed test members",
       );
     } finally {
       setActionLoading(null);
@@ -228,6 +256,40 @@ export default function Members() {
       {error && (
         <Card className="members-error">
           <p>{error}</p>
+        </Card>
+      )}
+
+      {message && (
+        <Card className="members-success">
+          <p>{message}</p>
+        </Card>
+      )}
+
+      {import.meta.env.DEV && studioSession && (
+        <Card>
+          <div className="members-dev-tools">
+            <div>
+              <h3 className="members-dev-title">Dev member seeding</h3>
+              <p className="members-dev-copy">
+                Create random test members with mixed permissions to stress-test the
+                list, actions, and layout.
+              </p>
+            </div>
+            <div className="members-dev-actions">
+              {[5, 10, 25].map((count) => (
+                <Button
+                  key={count}
+                  variant="secondary"
+                  onClick={() => handleSeedMembers(count)}
+                  disabled={actionLoading === `seed:${count}`}
+                >
+                  {actionLoading === `seed:${count}`
+                    ? `Seeding ${count}...`
+                    : `Seed ${count}`}
+                </Button>
+              ))}
+            </div>
+          </div>
         </Card>
       )}
 

@@ -11,6 +11,11 @@ interface DevBootstrapBody {
   gameSlug?: string;
 }
 
+interface DevSeedMembersBody {
+  studioId: string;
+  count?: number;
+}
+
 function cookieOpts(): CookieOptions {
   return {
     httpOnly: true,
@@ -43,5 +48,13 @@ export class AdminDevController {
       );
     }
     return result;
+  }
+
+  @Post("seed-members")
+  async seedMembers(
+    @Body() body: DevSeedMembersBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedMembers(body, devBootstrapKey);
   }
 }
