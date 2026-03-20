@@ -30,6 +30,66 @@ export class AdminDevService {
     private readonly gameRepo: Repository<Game>,
   ) {}
 
+  private async findBootstrapStudioConflict(email: string, studioName: string) {
+    const candidates = await this.studioRepo.find({
+      where: [{ name: studioName }, { email }],
+      relations: ["members", "members.user"],
+    });
+
+    return candidates.find(
+      (studio) =>
+        studio.members.length === 0 ||
+        studio.members.every((member) => member.user?.email !== email),
+    );
+  }
+
+  private async resolveStudioSession(
+    email: string,
+    studioName: string,
+    password: string,
+  ) {
+    const loginResult = await this.usersService.login(email, password);
+    const baseUser = loginResult.user;
+
+    if (baseUser.studioId) {
+      return {
+        token: loginResult.token,
+        userId: baseUser.id,
+        studioId: baseUser.studioId,
+        isAdmin: baseUser.isAdmin === true,
+      };
+    }
+
+    const studioOptions = loginResult.studios ?? [];
+    const selectedStudio =
+      studioOptions.find((studio) => studio.name === studioName) ??
+      (studioOptions.length === 1 ? studioOptions[0] : null);
+
+    if (!selectedStudio) {
+      throw new AppException(
+        "Dev bootstrap could not resolve a studio session for this user",
+        500,
+      );
+    }
+
+    const studioSession = await this.usersService.selectStudio(
+      {
+        id: baseUser.id,
+        email: baseUser.email,
+        walletAddress: baseUser.walletAddress,
+        isAdmin: baseUser.isAdmin === true,
+      },
+      selectedStudio.id,
+    );
+
+    return {
+      token: studioSession.token,
+      userId: baseUser.id,
+      studioId: studioSession.studioId,
+      isAdmin: studioSession.isTriolithAdmin,
+    };
+  }
+
   private assertBootstrapAllowed(providedKey?: string) {
     if (process.env.NODE_ENV === "production") {
       throw new AppException("Dev bootstrap is disabled in production", 403);
@@ -125,18 +185,29 @@ export class AdminDevService {
     if (!existingUser) {
       // Clean up any orphaned studio left by a previous failed bootstrap
       // (e.g. on-chain wallet creation reverted after the DB rows committed).
-      const orphanedStudio = await this.studioRepo.findOne({
-        where: { name: studioName },
-      });
+      const orphanedStudio = await this.findBootstrapStudioConflict(
+        email,
+        studioName,
+      );
       if (orphanedStudio) {
         await this.purgeStudio(orphanedStudio.id);
       }
       await this.usersService.signup(email, password, studioName);
     }
 
-    const loginResult = await this.usersService.login(email, password);
-    const userId = loginResult.user.id;
-    const studioId = loginResult.user.studioId;
+    const session = await this.resolveStudioSession(
+      email,
+      studioName,
+      password,
+    );
+    const userId = session.userId;
+    const studioId = session.studioId;
+    if (!studioId) {
+      throw new AppException(
+        "Studio session was not created during bootstrap login",
+        500,
+      );
+    }
 
     const studio = await this.studioRepo.findOne({ where: { id: studioId } });
     if (!studio) {
@@ -152,16 +223,16 @@ export class AdminDevService {
       }));
 
     if (!game) {
-      game = await this.platformService.createGameForUser(userId, studioId!, {
+      game = await this.platformService.createGameForUser(userId, studioId, {
         name: gameName,
         slug: gameSlug,
       });
     }
 
-    const member = await this.usersService.getMemberSession(userId, studioId!);
+    const member = await this.usersService.getMemberSession(userId, studioId);
 
     return {
-      token: loginResult.token,
+      token: session.token,
       credentials: {
         email,
         password,
@@ -169,7 +240,7 @@ export class AdminDevService {
       studio: {
         studioId: studio.id,
         studioName: studio.name,
-        isTriolithAdmin: loginResult.user.isAdmin === true,
+        isTriolithAdmin: session.isAdmin === true,
       },
       member,
       game: {

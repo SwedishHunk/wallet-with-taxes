@@ -18,6 +18,7 @@ import { MarketplaceService } from "./marketplace.service";
 import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
 import { NFTShopService } from "./nft-shop.service";
 import { GameWalletAdminService } from "./game-wallet-admin.service";
+import { NFTInventoryService } from "./nft-inventory.service";
 import {
   ApiPlatformController,
   PlatformController,
@@ -55,6 +56,7 @@ import { EconomicsModule } from "../economics/economics.module";
     PlayerWalletOperationsService,
     NFTShopService,
     GameWalletAdminService,
+    NFTInventoryService,
     StudioMemberService,
     StudiosService,
   ],
@@ -66,6 +68,7 @@ import { EconomicsModule } from "../economics/economics.module";
     PlayerWalletOperationsService,
     NFTShopService,
     GameWalletAdminService,
+    NFTInventoryService,
     StudioMemberService,
     StudiosService,
   ],
