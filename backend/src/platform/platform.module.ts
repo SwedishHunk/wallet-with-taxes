@@ -14,6 +14,7 @@ import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 import { PlayerWalletIdentity } from "./entities/player-wallet-identity.entity";
 import { PlatformService } from "./platform.service";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
+import { MarketplaceService } from "./marketplace.service";
 import {
   ApiPlatformController,
   PlatformController,
@@ -47,6 +48,7 @@ import { EconomicsModule } from "../economics/economics.module";
   providers: [
     PlatformService,
     PlayerWalletIdentityService,
+    MarketplaceService,
     StudioMemberService,
     StudiosService,
   ],
@@ -54,6 +56,7 @@ import { EconomicsModule } from "../economics/economics.module";
     TypeOrmModule,
     PlatformService,
     PlayerWalletIdentityService,
+    MarketplaceService,
     StudioMemberService,
     StudiosService,
   ],
