@@ -206,7 +206,10 @@ export class MarketplaceService {
         throw new AppException("Listing is no longer valid", 409);
       }
 
-      lockedBuyerWallet.balance = safeSub(lockedBuyerWallet.balance ?? "0", ask);
+      lockedBuyerWallet.balance = safeSub(
+        lockedBuyerWallet.balance ?? "0",
+        ask,
+      );
       lockedBuyerWallet.totalWithdrawn = safeAdd(
         lockedBuyerWallet.totalWithdrawn ?? "0",
         ask,

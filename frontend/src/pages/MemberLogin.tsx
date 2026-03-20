@@ -8,7 +8,6 @@ import { PageHeader } from "../components/ui/PageHeader";
 
 import { ROUTES } from "../routes";
 import { useAuthState } from "../lib/AuthContext";
-import { setAuthToken } from "../lib/api";
 import { getMemberSession, getMembersCount, login } from "../lib/users";
 import { useLanguage } from "../lib/LanguageContext";
 
@@ -145,24 +144,14 @@ export default function MemberLogin() {
       setSubmitting(true);
       setError(null);
 
-      // 1) Logga in som den valda usern i denna studio → få ny token
+      // 1) Authenticate as the selected member — cookie is updated server-side.
       const loginRes = await login(selectedMember.email, password, studioId);
 
-      const token = loginRes.data?.token;
-      if (!token) {
-        throw new Error(t("member.missingToken"));
-      }
-
-      sessionStorage.setItem("token", token);
-      setAuthToken(token);
-
-      // Uppdatera studiosession om vi faktiskt har giltiga värden
+      // Derive studio info from response (studioId was passed so response has user.studioId)
       const nextStudioId =
-        loginRes.data?.studioId ?? loginRes.data?.user?.studioId ?? studioId;
+        loginRes.data?.user?.studioId ?? studioId;
       const nextStudioName =
-        loginRes.data?.studioName ??
-        authContext.studioSession?.studioName ??
-        "";
+        authContext.studioSession?.studioName ?? "";
 
       if (nextStudioId) {
         setStudioSession({

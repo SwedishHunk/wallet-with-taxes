@@ -5,7 +5,6 @@ import {
   getPersonalAccounts,
   updatePersonalAccountPermissions,
 } from "../lib/platform";
-import { setAuthToken } from "../lib/api";
 import PersonalAccountHeader from "../components/PersonalAccountHeader";
 import { ROUTES } from "../routes";
 import "../style/Bright.css";
@@ -34,7 +33,6 @@ export default function PersonalAccounts() {
   >({});
   const navigate = useNavigate();
 
-  const token = sessionStorage.getItem("token") ?? localStorage.getItem("token");
   const handleLogoutPersonal = () => {
     // Clear form and reset to fresh state
     setEmail("");
@@ -46,14 +44,6 @@ export default function PersonalAccounts() {
   const personalUser = sessionStorage.getItem("personalUser");
 
   useEffect(() => {
-    if (!token) {
-      navigate(ROUTES.root);
-      return;
-    }
-
-    // Set auth token in axios headers on mount or when token changes
-    setAuthToken(token);
-
     // Check if personal user is logged in
     if (!personalUser) {
       navigate(ROUTES.home);

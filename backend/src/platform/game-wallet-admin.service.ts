@@ -164,12 +164,18 @@ export class GameWalletAdminService {
       return null;
     }
     if (normalized.length > 128) {
-      throw new AppException("idempotencyKey must be 128 characters or less", 400);
+      throw new AppException(
+        "idempotencyKey must be 128 characters or less",
+        400,
+      );
     }
     return normalized;
   }
 
-  private async getWalletByIdOrThrow(walletId: string, notFoundMessage: string) {
+  private async getWalletByIdOrThrow(
+    walletId: string,
+    notFoundMessage: string,
+  ) {
     const wallet = await this.walletRepo.findOne({ where: { id: walletId } });
     if (!wallet) {
       throw new AppException(notFoundMessage, 404);
@@ -207,8 +213,15 @@ export class GameWalletAdminService {
       throw new AppException(ERROR_MESSAGES.USER_NOT_FOUND, 404);
     }
 
-    const gamePlayer = await this.ensureGamePlayer(this.gamePlayerRepo, game, user);
-    const wallet = await this.ensureWalletForGamePlayer(this.walletRepo, gamePlayer);
+    const gamePlayer = await this.ensureGamePlayer(
+      this.gamePlayerRepo,
+      game,
+      user,
+    );
+    const wallet = await this.ensureWalletForGamePlayer(
+      this.walletRepo,
+      gamePlayer,
+    );
 
     return { gamePlayer, wallet };
   }
@@ -252,7 +265,9 @@ export class GameWalletAdminService {
     );
 
     if (operationKey) {
-      const existing = await this.ledgerRepo.findOne({ where: { operationKey } });
+      const existing = await this.ledgerRepo.findOne({
+        where: { operationKey },
+      });
       if (existing) {
         return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
       }
@@ -293,7 +308,10 @@ export class GameWalletAdminService {
             driverError?.code === "23505" &&
             driverError?.constraint === "uq_ledger_operation_key_not_null"
           ) {
-            return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+            return this.getWalletByIdOrThrow(
+              wallet.id,
+              "Game wallet not found",
+            );
           }
         }
         throw error;
@@ -315,8 +333,14 @@ export class GameWalletAdminService {
     }
 
     const intentId = randomUUID();
-    const expiresAt = new Date(Date.now() + GameWalletAdminService.DEPOSIT_INTENT_TTL_MS);
-    const depositAddress = this.generateFakeDepositAddress(gameId, userId, intentId);
+    const expiresAt = new Date(
+      Date.now() + GameWalletAdminService.DEPOSIT_INTENT_TTL_MS,
+    );
+    const depositAddress = this.generateFakeDepositAddress(
+      gameId,
+      userId,
+      intentId,
+    );
 
     const intent = this.walletDepositIntentRepo.create({
       id: intentId,
@@ -379,7 +403,9 @@ export class GameWalletAdminService {
           intent.status === WalletDepositIntentStatus.CONFIRMED &&
           intent.txHash === normalizedTxHash
         ) {
-          const existingWallet = await walletRepo.findOne({ where: { id: wallet.id } });
+          const existingWallet = await walletRepo.findOne({
+            where: { id: wallet.id },
+          });
           if (!existingWallet) {
             throw new AppException("Game wallet not found", 404);
           }
@@ -409,7 +435,10 @@ export class GameWalletAdminService {
 
         const amountNum = parseFloat(intent.amount);
         lockedWallet.balance = safeAdd(lockedWallet.balance, amountNum);
-        lockedWallet.totalDeposited = safeAdd(lockedWallet.totalDeposited, amountNum);
+        lockedWallet.totalDeposited = safeAdd(
+          lockedWallet.totalDeposited,
+          amountNum,
+        );
         const savedWallet = await walletRepo.save(lockedWallet);
 
         intent.status = WalletDepositIntentStatus.CONFIRMED;
@@ -441,7 +470,8 @@ export class GameWalletAdminService {
         ).driverError;
         if (
           driverError?.code === "23505" &&
-          driverError?.constraint === "uq_wallet_deposit_intents_tx_hash_not_null"
+          driverError?.constraint ===
+            "uq_wallet_deposit_intents_tx_hash_not_null"
         ) {
           throw new AppException("txHash already used", 400);
         }
@@ -475,7 +505,9 @@ export class GameWalletAdminService {
     const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
 
     if (operationKey) {
-      const existing = await this.ledgerRepo.findOne({ where: { operationKey } });
+      const existing = await this.ledgerRepo.findOne({
+        where: { operationKey },
+      });
       if (existing) {
         return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
       }
@@ -519,7 +551,10 @@ export class GameWalletAdminService {
             driverError?.code === "23505" &&
             driverError?.constraint === "uq_ledger_operation_key_not_null"
           ) {
-            return this.getWalletByIdOrThrow(wallet.id, "Game wallet not found");
+            return this.getWalletByIdOrThrow(
+              wallet.id,
+              "Game wallet not found",
+            );
           }
         }
         throw error;
@@ -555,14 +590,30 @@ export class GameWalletAdminService {
         const fromUser = await this.findUserOrThrow(userRepo, fromUserId);
         const toUser = await this.findUserOrThrow(userRepo, toUserId);
 
-        const fromGamePlayer = await this.ensureGamePlayer(gamePlayerRepo, game, fromUser);
-        const toGamePlayer = await this.ensureGamePlayer(gamePlayerRepo, game, toUser);
+        const fromGamePlayer = await this.ensureGamePlayer(
+          gamePlayerRepo,
+          game,
+          fromUser,
+        );
+        const toGamePlayer = await this.ensureGamePlayer(
+          gamePlayerRepo,
+          game,
+          toUser,
+        );
 
-        const fromWallet = await this.ensureWalletForGamePlayer(walletRepo, fromGamePlayer);
-        const toWallet = await this.ensureWalletForGamePlayer(walletRepo, toGamePlayer);
+        const fromWallet = await this.ensureWalletForGamePlayer(
+          walletRepo,
+          fromGamePlayer,
+        );
+        const toWallet = await this.ensureWalletForGamePlayer(
+          walletRepo,
+          toGamePlayer,
+        );
 
         const debitOperationKey = operationKey ? `${operationKey}:debit` : null;
-        const creditOperationKey = operationKey ? `${operationKey}:credit` : null;
+        const creditOperationKey = operationKey
+          ? `${operationKey}:credit`
+          : null;
 
         if (debitOperationKey && creditOperationKey) {
           const [existingDebit, existingCredit] = await Promise.all([
@@ -573,7 +624,10 @@ export class GameWalletAdminService {
             return this.getReplayWallets(fromWallet.id, toWallet.id);
           }
           if (existingDebit || existingCredit) {
-            throw new AppException("Transfer replay state is inconsistent", 409);
+            throw new AppException(
+              "Transfer replay state is inconsistent",
+              409,
+            );
           }
         }
 
@@ -654,7 +708,10 @@ export class GameWalletAdminService {
               fromUserId,
               studioId,
             );
-            const replayGame = await this.assertGameBelongsToStudio(gameId, studioId);
+            const replayGame = await this.assertGameBelongsToStudio(
+              gameId,
+              studioId,
+            );
             const replayToPlayer = await this.ensureGamePlayer(
               this.gamePlayerRepo,
               replayGame,
@@ -664,7 +721,10 @@ export class GameWalletAdminService {
               this.walletRepo,
               replayToPlayer,
             );
-            return this.getReplayWallets(replayFrom.wallet.id, replayToWallet.id);
+            return this.getReplayWallets(
+              replayFrom.wallet.id,
+              replayToWallet.id,
+            );
           }
         }
         throw error;

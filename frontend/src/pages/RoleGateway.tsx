@@ -3,7 +3,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeInUp, scalePop } from "../lib/motionPresets";
 import { useLanguage } from "../lib/LanguageContext";
-import { setAuthToken } from "../lib/api";
 import { useAuthState } from "../lib/AuthContext";
 import { devBootstrap } from "../lib/users";
 import CyberpunkScene from "../components/3d/SafeCyberpunkScene";
@@ -23,8 +22,7 @@ export default function RoleGateway() {
       setBootstrapError(null);
 
       const { data } = await devBootstrap();
-      sessionStorage.setItem("token", data.token);
-      setAuthToken(data.token);
+      // Cookie is set server-side by the bootstrap endpoint.
       setStudioSession(data.studio);
       setMemberSession(data.member);
       setActiveGame(data.game);

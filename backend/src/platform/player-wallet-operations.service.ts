@@ -30,12 +30,18 @@ export class PlayerWalletOperationsService {
       return null;
     }
     if (normalized.length > 128) {
-      throw new AppException("idempotencyKey must be 128 characters or less", 400);
+      throw new AppException(
+        "idempotencyKey must be 128 characters or less",
+        400,
+      );
     }
     return normalized;
   }
 
-  private async getWalletByIdOrThrow(walletId: string, notFoundMessage: string) {
+  private async getWalletByIdOrThrow(
+    walletId: string,
+    notFoundMessage: string,
+  ) {
     const wallet = await this.walletRepo.findOne({ where: { id: walletId } });
     if (!wallet) {
       throw new AppException(notFoundMessage, 404);
@@ -74,10 +80,11 @@ export class PlayerWalletOperationsService {
   ) {
     const amountNum = parseAmount(amount);
     const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const { wallet } = await this.playerWalletIdentityService.resolvePlayerGameWallet(
-      gameId,
-      walletAddress,
-    );
+    const { wallet } =
+      await this.playerWalletIdentityService.resolvePlayerGameWallet(
+        gameId,
+        walletAddress,
+      );
 
     if (operationKey) {
       const existing = await this.ledgerRepo.findOne({
@@ -125,7 +132,10 @@ export class PlayerWalletOperationsService {
             driverError?.code === "23505" &&
             driverError?.constraint === "uq_ledger_operation_key_not_null"
           ) {
-            return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
+            return this.getWalletByIdOrThrow(
+              wallet.id,
+              "Player wallet not found",
+            );
           }
         }
         throw error;
@@ -165,7 +175,9 @@ export class PlayerWalletOperationsService {
     if (debitOperationKey && creditOperationKey) {
       const [existingDebit, existingCredit] = await Promise.all([
         this.ledgerRepo.findOne({ where: { operationKey: debitOperationKey } }),
-        this.ledgerRepo.findOne({ where: { operationKey: creditOperationKey } }),
+        this.ledgerRepo.findOne({
+          where: { operationKey: creditOperationKey },
+        }),
       ]);
       if (existingDebit && existingCredit) {
         return this.getReplayWallets(fromWallet.id, toWallet.id);
@@ -201,7 +213,10 @@ export class PlayerWalletOperationsService {
         }
 
         lockedFrom.balance = safeSub(lockedFrom.balance, amountNum);
-        lockedFrom.totalWithdrawn = safeAdd(lockedFrom.totalWithdrawn, amountNum);
+        lockedFrom.totalWithdrawn = safeAdd(
+          lockedFrom.totalWithdrawn,
+          amountNum,
+        );
         const savedFrom = await walletRepo.save(lockedFrom);
 
         lockedTo.balance = safeAdd(lockedTo.balance, amountNum);

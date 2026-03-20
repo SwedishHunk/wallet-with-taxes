@@ -396,7 +396,9 @@ describe("TaxService", () => {
       priceUSD: 75,
     });
     repo.save.mockResolvedValueOnce(saved);
-    costBasisRepo.findOne.mockRejectedValueOnce(new Error("projection blew up"));
+    costBasisRepo.findOne.mockRejectedValueOnce(
+      new Error("projection blew up"),
+    );
 
     await service.logEvent({
       type: "acquisition",

@@ -7,6 +7,22 @@ export const signup = (email: string, password: string, studioName?: string) =>
 export const login = (email: string, password: string, studioId?: string) =>
   api.post("/users/login", { email, password, studioId });
 
+/**
+ * Exchange the base JWT for a studio-scoped JWT by explicitly selecting a
+ * studio. Must be called after login for multi-studio users (or auto-called
+ * by the frontend when there is only one studio available).
+ */
+export const selectStudio = (studioId: string) =>
+  api.post<{
+    studioId: string;
+    studioName: string;
+    role: string;
+    isTriolithAdmin: boolean;
+  }>("/users/select-studio", { studioId });
+
+/** Clear the HttpOnly cookie server-side and end the session. */
+export const logout = () => api.post("/users/logout");
+
 export const getStudios = () => api.get("/users/studios");
 
 export const getMemberSession = (studioId: string) =>

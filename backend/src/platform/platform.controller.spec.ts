@@ -118,6 +118,8 @@ describe("PlatformController", () => {
       "u1",
       "s1",
       10,
+      undefined,
+      undefined,
     );
     expect(service.createWalletDepositIntent).toHaveBeenCalledWith(
       "g1",
@@ -131,12 +133,15 @@ describe("PlatformController", () => {
       "s1",
       "i1",
       "0xabc",
+      undefined,
     );
     expect(service.withdrawFromGameWallet).toHaveBeenCalledWith(
       "g1",
       "u1",
       "s1",
       3,
+      undefined,
+      undefined,
     );
     expect(service.transferBetweenPlayersInGame).toHaveBeenCalledWith(
       "g1",
@@ -145,6 +150,7 @@ describe("PlatformController", () => {
       "s1",
       2,
       "tip",
+      undefined,
     );
   });
 
@@ -399,6 +405,7 @@ describe("ApiPlatformController", () => {
       "g1",
       "0xabc",
       5,
+      undefined,
     );
   });
 
@@ -419,6 +426,7 @@ describe("ApiPlatformController", () => {
       "0xabc",
       "0xdef",
       3,
+      undefined,
     );
   });
 
@@ -460,6 +468,7 @@ describe("ApiPlatformController", () => {
       "g1",
       "0xabc",
       "t1",
+      undefined,
     );
   });
 

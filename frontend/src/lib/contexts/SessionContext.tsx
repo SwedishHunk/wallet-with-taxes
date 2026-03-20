@@ -17,8 +17,7 @@ import {
   StudioSession,
   MemberSession,
 } from "../../types/auth";
-import { setAuthToken } from "../api";
-import { getMemberSession, getMembersCount } from "../users";
+import { getMemberSession, getMembersCount, logout } from "../users";
 
 const STUDIO_SESSION_KEY = "studio_session";
 const MEMBER_SESSION_KEY = "member_session";
@@ -184,8 +183,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logoutStudio = () => {
     setStudioSession(null);
     setMemberSession(null);
-    sessionStorage.removeItem("token");
-    setAuthToken(null);
+    // Best-effort: ask server to clear the HttpOnly cookie.
+    void logout().catch(() => undefined);
     window.location.href = "/login";
   };
 

@@ -4,6 +4,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import * as dotenv from "dotenv";
 import passport from "passport";
+import cookieParser from "cookie-parser";
 import { AppExceptionFilter } from "./common/filters/app-exception.filter";
 
 dotenv.config();
@@ -23,6 +24,7 @@ async function bootstrap() {
     origin: allowedOrigins,
     credentials: true,
   });
+  app.use(cookieParser());
   app.use(passport.initialize());
   app.useGlobalPipes(
     new ValidationPipe({
