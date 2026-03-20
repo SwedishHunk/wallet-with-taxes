@@ -258,6 +258,7 @@ export class StudioMemberService {
   ): Promise<StudioMember> {
     const actor = await this.memberRepository.findOne({
       where: { id: actorId },
+      relations: ["studio"],
     });
 
     if (!actor) {
@@ -268,6 +269,7 @@ export class StudioMemberService {
 
     const target = await this.memberRepository.findOne({
       where: { id: memberId },
+      relations: ["studio"],
     });
 
     if (!target) {
@@ -302,6 +304,7 @@ export class StudioMemberService {
   async deleteMember(actorId: string, memberId: string): Promise<void> {
     const actor = await this.memberRepository.findOne({
       where: { id: actorId },
+      relations: ["studio"],
     });
 
     if (!actor) {
@@ -312,6 +315,7 @@ export class StudioMemberService {
 
     const target = await this.memberRepository.findOne({
       where: { id: memberId },
+      relations: ["studio"],
     });
 
     if (!target) {
@@ -340,6 +344,7 @@ export class StudioMemberService {
   ): Promise<StudioMember> {
     const actor = await this.memberRepository.findOne({
       where: { id: actorId },
+      relations: ["studio"],
     });
 
     if (!actor) {
@@ -351,6 +356,7 @@ export class StudioMemberService {
 
     const target = await this.memberRepository.findOne({
       where: { id: memberId },
+      relations: ["studio"],
     });
 
     if (!target) {
