@@ -41,6 +41,14 @@ export class WalletAmountDto {
   @IsNumber({ allowNaN: false, allowInfinity: false })
   @IsPositive()
   amount: number;
+
+  @ApiPropertyOptional({
+    description: "Optional idempotency key to make retries safe",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey?: string;
 }
 
 export class TransferBetweenPlayersDto {
@@ -58,6 +66,14 @@ export class TransferBetweenPlayersDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({
+    description: "Optional idempotency key to make retries safe",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey?: string;
 }
 
 export class CreateNftTemplateDto {

@@ -15,6 +15,7 @@ import { User } from "../users/user.entity";
 import { GamePlayer } from "./entities/game-player.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { NFTTemplate } from "./entities/nft-template.entity";
+import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 
 type Repo = {
   findOne: jest.Mock;
@@ -133,6 +134,9 @@ describe("PlatformService", () => {
       marketplaceListingRepo as never,
       economicsService as never,
     );
+
+    (jest.spyOn(service as any, "verifyNativeDepositTransaction") as any)
+      .mockResolvedValue(undefined);
   });
 
   it("createWalletDepositIntent creates pending intent with deterministic fake address", async () => {
@@ -226,6 +230,61 @@ describe("PlatformService", () => {
     });
   });
 
+  it("confirmWalletDepositIntent returns wallet on replay of confirmed intent", async () => {
+    gameRepo.findOne.mockResolvedValue({ id: "g1", studio: { id: "s1" } });
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1" } as never,
+    });
+
+    const existingWallet = {
+      id: "w1",
+      balance: "3",
+      totalDeposited: "3",
+      totalWithdrawn: "0",
+    };
+    const txIntentRepo = {
+      findOne: jest.fn(async () => ({
+        id: "i1",
+        amount: "2",
+        status: WalletDepositIntentStatus.CONFIRMED,
+        expiresAt: new Date(Date.now() + 60000),
+        txHash: "0xabcdef1234",
+      })),
+      save: jest.fn(async (x) => x),
+    };
+    const txWalletRepo = {
+      findOne: jest.fn(async () => existingWallet),
+      save: jest.fn(async (x) => x),
+    };
+    const txLedgerRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+    };
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === WalletDepositIntent) return txIntentRepo;
+          if (entity === GameWallet) return txWalletRepo;
+          if (entity === LedgerEntry) return txLedgerRepo;
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
+
+    const result = await service.confirmWalletDepositIntent(
+      "g1",
+      "u1",
+      "s1",
+      "i1",
+      "0xabcdef1234",
+      "idem-confirm-1",
+    );
+
+    expect((result as { id: string }).id).toBe("w1");
+    expect(txLedgerRepo.save).not.toHaveBeenCalled();
+  });
+
   it("depositToGameWallet updates wallet and writes deposit ledger entry", async () => {
     jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
       gamePlayer: { id: "gp1" } as never,
@@ -300,6 +359,35 @@ describe("PlatformService", () => {
     expect(txLedgerRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ description: "Deposit" }),
     );
+  });
+
+  it("depositToGameWallet returns current wallet on idempotent replay", async () => {
+    jest.spyOn(service, "ensureGameWalletForPlayer").mockResolvedValue({
+      gamePlayer: { id: "gp1" } as never,
+      wallet: { id: "w1", balance: "7" } as never,
+    });
+    ledgerRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      operationKey: "idem-1",
+    });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "7",
+      totalDeposited: "7",
+      totalWithdrawn: "0",
+    });
+
+    const result = await service.depositToGameWallet(
+      "g1",
+      "u1",
+      "s1",
+      "2",
+      undefined,
+      "idem-1",
+    );
+
+    expect((result as { id: string }).id).toBe("w1");
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
   it("withdrawFromGameWallet throws on insufficient balance", async () => {
@@ -1657,6 +1745,31 @@ describe("PlatformService", () => {
     expect(txLedgerRepo.save).toHaveBeenCalledTimes(2);
   });
 
+  it("playerTransferBetweenPlayers returns current wallets on idempotent replay", async () => {
+    const fromWallet = { id: "w-from", balance: "4" };
+    const toWallet = { id: "w-to", balance: "6" };
+
+    mockResolvePlayer({ id: "gp-from" }, fromWallet);
+    mockResolvePlayer({ id: "gp-to" }, toWallet);
+    ledgerRepo.findOne
+      .mockResolvedValueOnce({ id: "l-debit", operationKey: "idem-x:debit" })
+      .mockResolvedValueOnce({ id: "l-credit", operationKey: "idem-x:credit" });
+    walletRepo.findOne
+      .mockResolvedValueOnce(fromWallet)
+      .mockResolvedValueOnce(toWallet);
+
+    const result = await service.playerTransferBetweenPlayers(
+      "g1",
+      "0xfrom",
+      "0xto",
+      "1",
+      "idem-x",
+    );
+
+    expect(result).toEqual({ fromWallet, toWallet });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
   it("playerTransferBetweenPlayers rejects insufficient balance", async () => {
     // resolvePlayerGameWallet for fromWallet
     gameRepo.findOne
@@ -1924,6 +2037,48 @@ describe("PlatformService", () => {
     expect(template.currentMintCount).toBe(1);
   });
 
+  it("purchaseNFTFromShop returns replay result for same idempotency key", async () => {
+    const template = {
+      id: "t1",
+      name: "Sword",
+      mintingCost: "5",
+      currentMintCount: 0,
+      maxMintCount: null,
+      game: { id: "g1" },
+    };
+    nftTemplateRepo.findOne.mockResolvedValueOnce(template);
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "20",
+      totalWithdrawn: "0",
+    });
+    nftInstanceRepo.findOne.mockResolvedValueOnce({
+      id: "n-existing",
+      purchaseOperationKey: "shop-1",
+      owner: { id: "gp1" },
+      template: { id: "t1" },
+      name: "Sword #1",
+    });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "15",
+      totalWithdrawn: "5",
+    });
+
+    const result = await service.purchaseNFTFromShop(
+      "g1",
+      "0xabc",
+      "t1",
+      "shop-1",
+    );
+
+    expect((result as { nft: { id: string } }).nft.id).toBe("n-existing");
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
   it("playerTransferNFT rejects self-transfer", async () => {
     await expect(
       service.playerTransferNFT("g1", "0xABC", "0xabc", "n1"),
@@ -1988,7 +2143,7 @@ describe("PlatformService", () => {
   /** Set up the mock chain that resolvePlayerGameWallet needs */
   function mockResolvePlayer(
     gamePlayer: { id: string },
-    wallet: { balance: string },
+    wallet: { id?: string; balance: string; totalWithdrawn?: string },
   ) {
     gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
     userRepo.findOne.mockResolvedValueOnce({
@@ -2059,6 +2214,26 @@ describe("PlatformService", () => {
     });
   });
 
+  it("createNFTListing returns existing listing for replay by same seller", async () => {
+    const gamePlayer = { id: "gp1" };
+    mockResolvePlayer(gamePlayer, { balance: "50" });
+    nftInstanceRepo.findOne.mockResolvedValueOnce({
+      id: "n1",
+      owner: gamePlayer,
+      template: {},
+    });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "existing",
+      status: "active",
+      seller: { id: "gp1" },
+    });
+
+    const result = await service.createNFTListing("g1", "0xseller", "n1", "10");
+
+    expect((result as { id: string }).id).toBe("existing");
+    expect(marketplaceListingRepo.save).not.toHaveBeenCalled();
+  });
+
   it("createNFTListing throws 404 when game not found", async () => {
     const gamePlayer = { id: "gp1" };
     mockResolvePlayer(gamePlayer, { balance: "50" });
@@ -2111,11 +2286,25 @@ describe("PlatformService", () => {
     ).rejects.toMatchObject({ statusCode: 403, message: "Not your listing" });
   });
 
+  it("cancelNFTListing returns listing when already cancelled by same seller", async () => {
+    mockResolvePlayer({ id: "gp1" }, { balance: "0" });
+    marketplaceListingRepo.findOne.mockResolvedValueOnce({
+      id: "l1",
+      status: "cancelled",
+      seller: { id: "gp1" },
+    });
+
+    const result = await service.cancelNFTListing("g1", "0xseller", "l1");
+
+    expect((result as { status: string }).status).toBe("cancelled");
+    expect(marketplaceListingRepo.save).not.toHaveBeenCalled();
+  });
+
   it("purchaseNFTListing transfers NFT and balances", async () => {
     const buyerPlayer = { id: "gp-buyer" };
     const sellerPlayer = { id: "gp-seller" };
-    const buyerWallet = { id: "w-buyer", balance: "100" };
-    const sellerWallet = { id: "w-seller", balance: "0" };
+    const buyerWallet = { id: "w-buyer", balance: "100", totalWithdrawn: "0" };
+    const sellerWallet = { id: "w-seller", balance: "0", totalDeposited: "0" };
     const nftInstance = { id: "n1", owner: sellerPlayer };
     const listing = {
       id: "l1",
@@ -2126,25 +2315,67 @@ describe("PlatformService", () => {
     };
 
     mockResolvePlayer(buyerPlayer, buyerWallet);
-    marketplaceListingRepo.findOne.mockResolvedValueOnce(listing);
-    // seller wallet lookup
-    walletRepo.findOne.mockResolvedValueOnce(sellerWallet);
-    walletRepo.save.mockResolvedValue({} as never);
-    nftInstanceRepo.save.mockResolvedValueOnce(nftInstance);
-    marketplaceListingRepo.save.mockResolvedValueOnce({
-      ...listing,
-      status: "sold",
-    });
+    const txWalletRepo = {
+      findOne: jest.fn(async ({ where }: { where: { id?: string } }) => {
+        if (where.id === "w-buyer") return buyerWallet;
+        return sellerWallet;
+      }),
+      save: jest.fn(async (x) => x),
+    };
+    const txLedgerRepo = {
+      create: jest.fn((x) => x),
+      save: jest.fn(async (x) => x),
+    };
+    const txNftRepo = {
+      findOne: jest.fn(async () => nftInstance),
+      save: jest.fn(async (x) => x),
+    };
+    const txListingRepo = {
+      findOne: jest.fn(async () => listing),
+      save: jest.fn(async (x) => x),
+    };
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) return txWalletRepo;
+          if (entity === LedgerEntry) return txLedgerRepo;
+          if (entity === NFTInstance) return txNftRepo;
+          if (entity === MarketplaceListing) return txListingRepo;
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
 
     const result = await service.purchaseNFTListing("g1", "0xbuyer", "l1");
     expect((result as { status: string }).status).toBe("sold");
-    expect(listing.nftInstance.owner).toBe(buyerPlayer);
+    expect(nftInstance.owner).toBe(buyerPlayer);
     expect(listing.status).toBe("sold");
+    expect(txLedgerRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "spend", amount: "10" }),
+    );
+    expect(txLedgerRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "earn", amount: "10" }),
+    );
   });
 
   it("purchaseNFTListing throws 404 when listing not found", async () => {
-    mockResolvePlayer({ id: "gp-buyer" }, { balance: "100" });
-    marketplaceListingRepo.findOne.mockResolvedValueOnce(null);
+    mockResolvePlayer({ id: "gp-buyer" }, { id: "w-buyer", balance: "100" });
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) return walletRepo;
+          if (entity === LedgerEntry) return ledgerRepo;
+          if (entity === NFTInstance) return nftInstanceRepo;
+          if (entity === MarketplaceListing) {
+            return {
+              findOne: jest.fn(async () => null),
+              save: jest.fn(),
+            };
+          }
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
 
     await expect(
       service.purchaseNFTListing("g1", "0xbuyer", "l404"),
@@ -2156,14 +2387,29 @@ describe("PlatformService", () => {
 
   it("purchaseNFTListing throws 400 when buyer is also the seller", async () => {
     const player = { id: "gp1" };
-    mockResolvePlayer(player, { balance: "100" });
-    marketplaceListingRepo.findOne.mockResolvedValueOnce({
-      id: "l1",
-      status: "active",
-      askPrice: "10",
-      seller: { id: "gp1" },
-      nftInstance: { id: "n1" },
-    });
+    mockResolvePlayer(player, { id: "w-buyer", balance: "100" });
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) return walletRepo;
+          if (entity === LedgerEntry) return ledgerRepo;
+          if (entity === NFTInstance) return nftInstanceRepo;
+          if (entity === MarketplaceListing) {
+            return {
+              findOne: jest.fn(async () => ({
+                id: "l1",
+                status: "active",
+                askPrice: "10",
+                seller: { id: "gp1" },
+                nftInstance: { id: "n1" },
+              })),
+              save: jest.fn(),
+            };
+          }
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
 
     await expect(
       service.purchaseNFTListing("g1", "0xbuyer", "l1"),
@@ -2174,14 +2420,35 @@ describe("PlatformService", () => {
   });
 
   it("purchaseNFTListing throws 402 when buyer has insufficient balance", async () => {
-    mockResolvePlayer({ id: "gp-buyer" }, { balance: "5" });
-    marketplaceListingRepo.findOne.mockResolvedValueOnce({
-      id: "l1",
-      status: "active",
-      askPrice: "10",
-      seller: { id: "gp-seller" },
-      nftInstance: { id: "n1" },
-    });
+    mockResolvePlayer({ id: "gp-buyer" }, { id: "w-buyer", balance: "5" });
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) {
+            return {
+              findOne: jest.fn(async ({ where }: { where: { id?: string } }) =>
+                where.id === "w-buyer" ? { id: "w-buyer", balance: "5" } : null,
+              ),
+            };
+          }
+          if (entity === LedgerEntry) return ledgerRepo;
+          if (entity === NFTInstance) return nftInstanceRepo;
+          if (entity === MarketplaceListing) {
+            return {
+              findOne: jest.fn(async () => ({
+                id: "l1",
+                status: "active",
+                askPrice: "10",
+                seller: { id: "gp-seller" },
+                nftInstance: { id: "n1" },
+              })),
+              save: jest.fn(),
+            };
+          }
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
 
     await expect(
       service.purchaseNFTListing("g1", "0xbuyer", "l1"),
@@ -2189,16 +2456,36 @@ describe("PlatformService", () => {
   });
 
   it("purchaseNFTListing throws 404 when seller wallet is missing", async () => {
-    mockResolvePlayer({ id: "gp-buyer" }, { balance: "100" });
-    marketplaceListingRepo.findOne.mockResolvedValueOnce({
-      id: "l1",
-      status: "active",
-      askPrice: "10",
-      seller: { id: "gp-seller" },
-      nftInstance: { id: "n1" },
-    });
-    // seller wallet not found
-    walletRepo.findOne.mockResolvedValueOnce(null);
+    mockResolvePlayer({ id: "gp-buyer" }, { id: "w-buyer", balance: "100" });
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) {
+            return {
+              findOne: jest.fn(async ({ where }: { where: { id?: string } }) =>
+                where.id === "w-buyer" ? { id: "w-buyer", balance: "100" } : null,
+              ),
+              save: jest.fn(async (x) => x),
+            };
+          }
+          if (entity === LedgerEntry) return ledgerRepo;
+          if (entity === NFTInstance) return nftInstanceRepo;
+          if (entity === MarketplaceListing) {
+            return {
+              findOne: jest.fn(async () => ({
+                id: "l1",
+                status: "active",
+                askPrice: "10",
+                seller: { id: "gp-seller" },
+                nftInstance: { id: "n1" },
+              })),
+              save: jest.fn(),
+            };
+          }
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
 
     await expect(
       service.purchaseNFTListing("g1", "0xbuyer", "l1"),
@@ -2206,5 +2493,37 @@ describe("PlatformService", () => {
       statusCode: 404,
       message: "Seller wallet not found",
     });
+  });
+
+  it("purchaseNFTListing returns sold listing for replay by same buyer", async () => {
+    const buyerPlayer = { id: "gp-buyer" };
+    mockResolvePlayer(buyerPlayer, { id: "w-buyer", balance: "100" });
+    dataSource.transaction.mockImplementation(async (cb) =>
+      cb({
+        getRepository: (entity: unknown) => {
+          if (entity === GameWallet) return walletRepo;
+          if (entity === LedgerEntry) return ledgerRepo;
+          if (entity === NFTInstance) return nftInstanceRepo;
+          if (entity === MarketplaceListing) {
+            return {
+              findOne: jest.fn(async () => ({
+                id: "l1",
+                status: "sold",
+                askPrice: "10",
+                seller: { id: "gp-seller" },
+                buyer: { id: "gp-buyer" },
+                nftInstance: { id: "n1", owner: { id: "gp-buyer" } },
+              })),
+              save: jest.fn(),
+            };
+          }
+          throw new Error("unexpected repository");
+        },
+      }),
+    );
+
+    const result = await service.purchaseNFTListing("g1", "0xbuyer", "l1");
+
+    expect((result as { status: string }).status).toBe("sold");
   });
 });

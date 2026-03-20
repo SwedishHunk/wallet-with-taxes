@@ -19,6 +19,10 @@ import { GameWallet } from "./game-wallet.entity";
   unique: true,
   where: `"intentId" IS NOT NULL`,
 })
+@Index("uq_ledger_operation_key_not_null", ["operationKey"], {
+  unique: true,
+  where: `"operationKey" IS NOT NULL`,
+})
 export class LedgerEntry {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -47,6 +51,9 @@ export class LedgerEntry {
 
   @Column({ type: "uuid", nullable: true })
   intentId?: string | null;
+
+  @Column({ type: "varchar", length: 128, nullable: true })
+  operationKey?: string | null;
 
   @Column({ nullable: true })
   description?: string;

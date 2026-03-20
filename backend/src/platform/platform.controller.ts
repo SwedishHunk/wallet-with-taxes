@@ -102,6 +102,8 @@ export class PlatformController {
       jwtUser.id,
       jwtUser.studioId,
       data.amount,
+      undefined,
+      data.idempotencyKey,
     );
   }
 
@@ -135,6 +137,7 @@ export class PlatformController {
       jwtUser.studioId,
       data.intentId,
       data.txHash,
+      data.idempotencyKey,
     );
   }
 
@@ -151,6 +154,8 @@ export class PlatformController {
       jwtUser.id,
       jwtUser.studioId,
       data.amount,
+      undefined,
+      data.idempotencyKey,
     );
   }
 
@@ -169,6 +174,7 @@ export class PlatformController {
       jwtUser.studioId,
       data.amount,
       data.description,
+      data.idempotencyKey,
     );
   }
 
@@ -402,6 +408,7 @@ export class ApiPlatformController {
       nonce: string;
       signature: string;
       amount: number;
+      idempotencyKey?: string;
     },
   ) {
     if (
@@ -428,6 +435,7 @@ export class ApiPlatformController {
       body.gameId,
       body.walletAddress,
       body.amount,
+      body.idempotencyKey,
     );
   }
 
@@ -441,6 +449,7 @@ export class ApiPlatformController {
       signature: string;
       toWalletAddress: string;
       amount: number;
+      idempotencyKey?: string;
     },
   ) {
     if (
@@ -469,6 +478,7 @@ export class ApiPlatformController {
       body.walletAddress,
       body.toWalletAddress,
       body.amount,
+      body.idempotencyKey,
     );
   }
 
@@ -531,6 +541,7 @@ export class ApiPlatformController {
       walletAddress: string;
       nonce: string;
       signature: string;
+      idempotencyKey?: string;
     },
   ) {
     if (!body?.walletAddress || !body?.nonce || !body?.signature) {
@@ -551,6 +562,7 @@ export class ApiPlatformController {
       gameId,
       body.walletAddress,
       templateId,
+      body.idempotencyKey,
     );
   }
 

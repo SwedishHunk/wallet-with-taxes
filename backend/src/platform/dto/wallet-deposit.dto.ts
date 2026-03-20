@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, IsUUID } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 
 export class WalletDepositIntentDto {
   @ApiProperty({ description: 'Amount as decimal string, e.g. "1.5"' })
@@ -17,4 +18,12 @@ export class WalletDepositConfirmDto {
   @IsString()
   @IsNotEmpty()
   txHash: string;
+
+  @ApiPropertyOptional({
+    description: "Optional idempotency key to make retries safe",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey?: string;
 }
