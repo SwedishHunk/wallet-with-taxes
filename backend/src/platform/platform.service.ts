@@ -29,6 +29,7 @@ import {
 } from "../economics/entities/economic-event.entity";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { MarketplaceService } from "./marketplace.service";
+import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
 
 @Injectable()
 export class PlatformService {
@@ -71,6 +72,7 @@ export class PlatformService {
     private economicsService: EconomicsService,
     private playerWalletIdentityService: PlayerWalletIdentityService,
     private marketplaceService: MarketplaceService,
+    private playerWalletOperationsService: PlayerWalletOperationsService,
   ) {}
 
   private generateFakeDepositAddress(
@@ -1099,62 +1101,12 @@ export class PlatformService {
     amount: unknown,
     idempotencyKey?: string,
   ) {
-    const amountNum = parseAmount(amount);
-    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const { wallet } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerWithdrawFromGameWallet(
       gameId,
       walletAddress,
+      amount,
+      idempotencyKey,
     );
-
-    if (operationKey) {
-      const existing = await this.ledgerRepo.findOne({
-        where: { operationKey },
-      });
-      if (existing) {
-        return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
-      }
-    }
-
-    if (amountNum > parseFloat(wallet.balance)) {
-      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-    }
-
-    const txGroupId = randomUUID();
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-
-      wallet.balance = safeSub(wallet.balance, amountNum);
-      wallet.totalWithdrawn = safeAdd(wallet.totalWithdrawn, amountNum);
-      const saved = await walletRepo.save(wallet);
-
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: saved,
-          txGroupId,
-          type: "withdraw",
-          amount: amountNum.toString(),
-          operationKey,
-          description: "Player withdrawal",
-        }),
-      );
-      return saved;
-    }).catch(async (error: unknown) => {
-      if (error instanceof QueryFailedError) {
-        const driverError = (
-          error as QueryFailedError & {
-            driverError?: { code?: string; constraint?: string };
-          }
-        ).driverError;
-        if (
-          driverError?.code === "23505" &&
-          driverError?.constraint === "uq_ledger_operation_key_not_null"
-        ) {
-          return this.getWalletByIdOrThrow(wallet.id, "Player wallet not found");
-        }
-      }
-      throw error;
-    });
   }
 
   async playerTransferBetweenPlayers(
@@ -1164,110 +1116,13 @@ export class PlatformService {
     amount: unknown,
     idempotencyKey?: string,
   ) {
-    const amountNum = parseAmount(amount);
-    const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
-    const normalizedFrom = fromWalletAddress.toLowerCase();
-    const normalizedTo = toWalletAddress.toLowerCase();
-
-    if (normalizedFrom === normalizedTo) {
-      throw new AppException("Cannot transfer to yourself", 400);
-    }
-
-    const { wallet: fromWallet } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerTransferBetweenPlayers(
       gameId,
-      normalizedFrom,
+      fromWalletAddress,
+      toWalletAddress,
+      amount,
+      idempotencyKey,
     );
-    const { wallet: toWallet } = await this.resolvePlayerGameWallet(
-      gameId,
-      normalizedTo,
-    );
-
-    const debitOperationKey = operationKey ? `${operationKey}:debit` : null;
-    const creditOperationKey = operationKey ? `${operationKey}:credit` : null;
-
-    if (debitOperationKey && creditOperationKey) {
-      const [existingDebit, existingCredit] = await Promise.all([
-        this.ledgerRepo.findOne({ where: { operationKey: debitOperationKey } }),
-        this.ledgerRepo.findOne({ where: { operationKey: creditOperationKey } }),
-      ]);
-      if (existingDebit && existingCredit) {
-        return this.getReplayWallets(fromWallet.id, toWallet.id);
-      }
-      if (existingDebit || existingCredit) {
-        throw new AppException("Transfer replay state is inconsistent", 409);
-      }
-    }
-
-    if (amountNum > parseFloat(fromWallet.balance)) {
-      throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-    }
-
-    const txGroupId = randomUUID();
-    return this.dataSource.transaction(async (manager) => {
-      const walletRepo = manager.getRepository(GameWallet);
-      const ledgerRepo = manager.getRepository(LedgerEntry);
-
-      const lockedFrom = await this.lockWalletOrThrow(
-        walletRepo,
-        fromWallet.id,
-        "Sender wallet not found",
-      );
-      const lockedTo = await this.lockWalletOrThrow(
-        walletRepo,
-        toWallet.id,
-        "Recipient wallet not found",
-      );
-
-      if (amountNum > parseFloat(lockedFrom.balance)) {
-        throw new AppException(ERROR_MESSAGES.INSUFFICIENT_BALANCE, 400);
-      }
-
-      lockedFrom.balance = safeSub(lockedFrom.balance, amountNum);
-      lockedFrom.totalWithdrawn = safeAdd(lockedFrom.totalWithdrawn, amountNum);
-      const savedFrom = await walletRepo.save(lockedFrom);
-
-      lockedTo.balance = safeAdd(lockedTo.balance, amountNum);
-      lockedTo.totalDeposited = safeAdd(lockedTo.totalDeposited, amountNum);
-      const savedTo = await walletRepo.save(lockedTo);
-
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedFrom,
-          txGroupId,
-          type: "transfer",
-          amount: amountNum.toString(),
-          operationKey: debitOperationKey,
-          description: `Transfer to ${normalizedTo}`,
-        }),
-      );
-      await ledgerRepo.save(
-        ledgerRepo.create({
-          wallet: savedTo,
-          txGroupId,
-          type: "transfer",
-          amount: amountNum.toString(),
-          operationKey: creditOperationKey,
-          description: `Transfer from ${normalizedFrom}`,
-        }),
-      );
-
-      return { fromWallet: savedFrom, toWallet: savedTo };
-    }).catch(async (error: unknown) => {
-      if (error instanceof QueryFailedError && operationKey) {
-        const driverError = (
-          error as QueryFailedError & {
-            driverError?: { code?: string; constraint?: string };
-          }
-        ).driverError;
-        if (
-          driverError?.code === "23505" &&
-          driverError?.constraint === "uq_ledger_operation_key_not_null"
-        ) {
-          return this.getReplayWallets(fromWallet.id, toWallet.id);
-        }
-      }
-      throw error;
-    });
   }
 
   async playerTransferNFT(
@@ -1276,38 +1131,12 @@ export class PlatformService {
     toWalletAddress: string,
     nftInstanceId: string,
   ) {
-    const normalizedFrom = fromWalletAddress.toLowerCase();
-    const normalizedTo = toWalletAddress.toLowerCase();
-
-    if (normalizedFrom === normalizedTo) {
-      throw new AppException("Cannot transfer to yourself", 400);
-    }
-
-    const { gamePlayer: fromGamePlayer } = await this.resolvePlayerGameWallet(
+    return this.playerWalletOperationsService.playerTransferNFT(
       gameId,
-      normalizedFrom,
+      fromWalletAddress,
+      toWalletAddress,
+      nftInstanceId,
     );
-
-    const nftInstance = await this.nftInstanceRepo.findOne({
-      where: {
-        id: nftInstanceId,
-        owner: { id: fromGamePlayer.id },
-        template: { game: { id: gameId } },
-      },
-      relations: ["owner", "template"],
-    });
-
-    if (!nftInstance) {
-      throw new AppException(ERROR_MESSAGES.ASSET_NOT_FOUND, 404);
-    }
-
-    const { gamePlayer: toGamePlayer } = await this.resolvePlayerGameWallet(
-      gameId,
-      normalizedTo,
-    );
-
-    nftInstance.owner = toGamePlayer;
-    return this.nftInstanceRepo.save(nftInstance);
   }
 
   // ─── Marketplace ───────────────────────────────────────────────────────────

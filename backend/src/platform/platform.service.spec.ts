@@ -18,6 +18,7 @@ import { NFTTemplate } from "./entities/nft-template.entity";
 import { MarketplaceListing } from "./entities/marketplace-listing.entity";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { MarketplaceService } from "./marketplace.service";
+import { PlayerWalletOperationsService } from "./player-wallet-operations.service";
 
 type Repo = {
   findOne: jest.Mock;
@@ -45,6 +46,7 @@ describe("PlatformService", () => {
   let economicsService: { logEvent: jest.Mock };
   let playerWalletIdentityService: PlayerWalletIdentityService;
   let marketplaceService: MarketplaceService;
+  let playerWalletOperationsService: PlayerWalletOperationsService;
   let service: PlatformService;
 
   beforeEach(() => {
@@ -144,6 +146,13 @@ describe("PlatformService", () => {
       marketplaceListingRepo as never,
       playerWalletIdentityService as never,
     );
+    playerWalletOperationsService = new PlayerWalletOperationsService(
+      dataSource as never,
+      walletRepo as never,
+      ledgerRepo as never,
+      nftInstanceRepo as never,
+      playerWalletIdentityService as never,
+    );
 
     service = new PlatformService(
       dataSource as never,
@@ -162,6 +171,7 @@ describe("PlatformService", () => {
       economicsService as never,
       playerWalletIdentityService as never,
       marketplaceService as never,
+      playerWalletOperationsService as never,
     );
 
     (jest.spyOn(service as any, "verifyNativeDepositTransaction") as any)
@@ -2119,13 +2129,10 @@ describe("PlatformService", () => {
   });
 
   it("playerTransferNFT throws asset not found when NFT not owned by sender", async () => {
-    jest
-      .spyOn(service as never, "resolvePlayerGameWallet")
-      .mockResolvedValueOnce({
-        user: { id: "u1" },
-        gamePlayer: { id: "gp-from" },
-        wallet: {},
-      } as never);
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid-from" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp-from" });
+    walletRepo.findOne.mockResolvedValueOnce({ id: "w-from", balance: "0" });
     nftInstanceRepo.findOne.mockResolvedValueOnce(null);
 
     await expect(
@@ -2139,18 +2146,18 @@ describe("PlatformService", () => {
   it("playerTransferNFT transfers NFT ownership to recipient", async () => {
     const fromPlayer = { id: "gp-from" };
     const toPlayer = { id: "gp-to" };
-    jest
-      .spyOn(service as never, "resolvePlayerGameWallet")
-      .mockResolvedValueOnce({
-        user: { id: "u1" },
-        gamePlayer: fromPlayer,
-        wallet: {},
-      } as never)
-      .mockResolvedValueOnce({
-        user: { id: "u2" },
-        gamePlayer: toPlayer,
-        wallet: {},
-      } as never);
+    gameRepo.findOne
+      .mockResolvedValueOnce({ id: "g1" })
+      .mockResolvedValueOnce({ id: "g1" });
+    walletIdentityRepo.findOne
+      .mockResolvedValueOnce({ id: "wid-from" })
+      .mockResolvedValueOnce({ id: "wid-to" });
+    gamePlayerRepo.findOne
+      .mockResolvedValueOnce(fromPlayer)
+      .mockResolvedValueOnce(toPlayer);
+    walletRepo.findOne
+      .mockResolvedValueOnce({ id: "w-from", balance: "0" })
+      .mockResolvedValueOnce({ id: "w-to", balance: "0" });
 
     const nftInstance = { id: "n1", owner: fromPlayer, template: {} };
     nftInstanceRepo.findOne.mockResolvedValueOnce(nftInstance);
