@@ -34,13 +34,27 @@ export const getMembersCount = (studioId: string) =>
 export const getStudioMembers = (studioId: string) =>
   api.get(`/studios/${studioId}/members`);
 
+export const createStudioMember = (
+  studioId: string,
+  payload: { email: string; password?: string; role?: string; permissions: string[] },
+) => api.post(`/studios/${studioId}/members`, payload);
+
+export const updateStudioMember = (
+  studioId: string,
+  memberId: string,
+  payload: { role?: string; permissions: string[] },
+) => api.patch(`/studios/${studioId}/members/${memberId}`, payload);
+
+export const deleteStudioMember = (studioId: string, memberId: string) =>
+  api.delete(`/studios/${studioId}/members/${memberId}`);
+
 export const linkWallet = (email: string, walletAddress: string) =>
   api.post("/users/link-wallet", { email, walletAddress });
 
 export const getMe = () => api.get<User>("/users/me");
 
 export const devBootstrap = (payload?: {
-  mode?: "player" | "studio";
+  mode?: "player" | "studio" | "admin";
   email?: string;
   password?: string;
   studioName?: string;

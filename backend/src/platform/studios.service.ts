@@ -23,6 +23,11 @@ export interface CreateMemberRequestDto {
   permissions: string[];
 }
 
+export interface UpdateMemberRequestDto {
+  role?: string;
+  permissions: string[];
+}
+
 @Injectable()
 export class StudiosService {
   constructor(
@@ -190,6 +195,88 @@ export class StudiosService {
       ),
       gameAccessIds: saved.gameAccessIds ?? [],
     };
+  }
+
+  async updateMember(
+    studioId: string,
+    actorId: string,
+    memberId: string,
+    dto: UpdateMemberRequestDto,
+  ): Promise<any> {
+    const actor = await this.memberRepository.findOne({
+      where: { user: { id: actorId }, studio: { id: studioId } },
+      relations: ["user", "studio"],
+    });
+
+    if (!actor) {
+      throw new ForbiddenException("Not a member of this studio.");
+    }
+
+    const target = await this.memberRepository.findOne({
+      where: { id: memberId },
+      relations: ["user", "studio"],
+    });
+
+    if (!target || target.studio.id !== studioId) {
+      throw new NotFoundException("Member not found.");
+    }
+
+    const updated = await this.studioMemberService.updateMember(actor.id, memberId, {
+      role: dto.role ? (dto.role as StudioRole) : undefined,
+      permissionsMask: this.permissionsToMask(dto.permissions ?? []),
+    });
+
+    const reloaded =
+      updated.user && updated.studio
+        ? updated
+        : await this.memberRepository.findOne({
+            where: { id: updated.id },
+            relations: ["user", "studio"],
+          });
+
+    if (!reloaded) {
+      throw new NotFoundException("Member not found after update.");
+    }
+
+    return {
+      id: reloaded.id,
+      userId: reloaded.user.id,
+      email: reloaded.user.email,
+      isOwner: reloaded.isOwner,
+      role: reloaded.role,
+      permissions: this.studioMemberService.maskToPermissionStrings(
+        reloaded.permissionsMask,
+      ),
+      gameAccessIds: reloaded.gameAccessIds ?? [],
+      createdAt: reloaded.createdAt,
+    };
+  }
+
+  async deleteMember(
+    studioId: string,
+    actorId: string,
+    memberId: string,
+  ): Promise<{ success: true }> {
+    const actor = await this.memberRepository.findOne({
+      where: { user: { id: actorId }, studio: { id: studioId } },
+      relations: ["user", "studio"],
+    });
+
+    if (!actor) {
+      throw new ForbiddenException("Not a member of this studio.");
+    }
+
+    const target = await this.memberRepository.findOne({
+      where: { id: memberId },
+      relations: ["studio"],
+    });
+
+    if (!target || target.studio.id !== studioId) {
+      throw new NotFoundException("Member not found.");
+    }
+
+    await this.studioMemberService.deleteMember(actor.id, memberId);
+    return { success: true };
   }
 
   private generateTempPassword(): string {

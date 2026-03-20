@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useLanguage } from "../lib/LanguageContext";
-import { api } from "../lib/api";
+import {
+  getStudioMembers,
+  createStudioMember,
+  updateStudioMember,
+  deleteStudioMember,
+} from "../lib/users";
 import { Page, PageHeader, Card, Button, Badge } from "../components/ui/index";
 import "../style/Members.css";
 
@@ -22,7 +27,9 @@ export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -33,6 +40,13 @@ export default function Members() {
       MintNFT: false,
       MakeTransactions: false,
     },
+  });
+  const [editPermissions, setEditPermissions] = useState({
+    ManageMembers: false,
+    ManageGames: false,
+    ManageSettings: false,
+    MintNFT: false,
+    MakeTransactions: false,
   });
 
   const canManageMembers =
@@ -48,9 +62,7 @@ export default function Members() {
   const fetchMembers = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get(
-        `/studios/${studioSession?.studioId}/members`,
-      );
+      const { data } = await getStudioMembers(studioSession!.studioId);
       setMembers(data);
       setError("");
     } catch (err: unknown) {
@@ -89,10 +101,7 @@ export default function Members() {
         payload.password = formData.password;
       }
 
-      await api.post(
-        `/studios/${studioSession?.studioId}/members`,
-        payload,
-      );
+      await createStudioMember(studioSession!.studioId, payload);
 
       setFormData({
         email: "",
@@ -113,6 +122,71 @@ export default function Members() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || t("members.errCreateFailed")
       );
+    }
+  };
+
+  const startEditing = (member: Member) => {
+    setEditingMemberId(member.id);
+    setEditPermissions({
+      ManageMembers: member.permissions.includes("ManageMembers"),
+      ManageGames: member.permissions.includes("ManageGames"),
+      ManageSettings: member.permissions.includes("ManageSettings"),
+      MintNFT: member.permissions.includes("MintNFT"),
+      MakeTransactions: member.permissions.includes("MakeTransactions"),
+    });
+    setError("");
+  };
+
+  const cancelEditing = () => {
+    setEditingMemberId(null);
+    setError("");
+  };
+
+  const saveMemberPermissions = async (member: Member) => {
+    if (!studioSession) return;
+
+    try {
+      setActionLoading(`save:${member.id}`);
+      const permissions = Object.entries(editPermissions)
+        .filter(([, enabled]) => enabled)
+        .map(([name]) => name);
+
+      await updateStudioMember(studioSession.studioId, member.id, {
+        role: member.role,
+        permissions,
+      });
+
+      setEditingMemberId(null);
+      setError("");
+      await fetchMembers();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not update member permissions",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteMember = async (member: Member) => {
+    if (!studioSession) return;
+
+    const confirmed = window.confirm(`Remove ${member.email} from this studio?`);
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(`delete:${member.id}`);
+      await deleteStudioMember(studioSession.studioId, member.id);
+      setError("");
+      await fetchMembers();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not delete member",
+      );
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -233,22 +307,87 @@ export default function Members() {
                     {member.isOwner && (
                       <Badge variant="owner">{t("common.owner")}</Badge>
                     )}
-                    {!member.isOwner && member.permissions.length > 0 && (
+                    {!member.isOwner &&
+                      editingMemberId !== member.id &&
+                      member.permissions.length > 0 &&
                       member.permissions.map((p) => (
                         <Badge key={p} variant="permission">
                           {p}
                         </Badge>
-                      ))
-                    )}
-                    {!member.isOwner && member.permissions.length === 0 && (
+                      ))}
+                    {!member.isOwner &&
+                      editingMemberId !== member.id &&
+                      member.permissions.length === 0 && (
                       <Badge>{t("members.readOnly")}</Badge>
                     )}
                   </div>
                 </div>
-                <small className="members-item-date">
-                  {new Date(member.createdAt).toLocaleDateString("en-US")}
-                </small>
+                <div className="members-item-side">
+                  <small className="members-item-date">
+                    {new Date(member.createdAt).toLocaleDateString("en-US")}
+                  </small>
+                  {!member.isOwner && (
+                    <div className="members-item-actions">
+                      {editingMemberId === member.id ? (
+                        <>
+                          <Button
+                            variant="secondary"
+                            onClick={() => cancelEditing()}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="primary"
+                            onClick={() => saveMemberPermissions(member)}
+                            disabled={actionLoading === `save:${member.id}`}
+                          >
+                            {actionLoading === `save:${member.id}` ? "Saving..." : "Save"}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="secondary"
+                            onClick={() => startEditing(member)}
+                          >
+                            Edit permissions
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => handleDeleteMember(member)}
+                            disabled={actionLoading === `delete:${member.id}`}
+                          >
+                            {actionLoading === `delete:${member.id}` ? "Removing..." : "Remove"}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+              {!member.isOwner && editingMemberId === member.id && (
+                <div className="members-edit-panel">
+                  <p className="members-edit-title">Permissions</p>
+                  <div className="members-permissions-grid">
+                    {Object.entries(editPermissions).map(([perm, checked]) => (
+                      <div key={perm} className="members-permission-checkbox">
+                        <input
+                          type="checkbox"
+                          id={`edit-${member.id}-${perm}`}
+                          checked={checked}
+                          onChange={(e) =>
+                            setEditPermissions({
+                              ...editPermissions,
+                              [perm]: e.target.checked,
+                            })
+                          }
+                        />
+                        <label htmlFor={`edit-${member.id}-${perm}`}>{perm}</label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           ))}
         </div>

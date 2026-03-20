@@ -20,6 +20,8 @@ describe("StudiosController", () => {
     const service = {
       getStudioMembers: jest.fn(),
       createMember: jest.fn().mockResolvedValue({ ok: true }),
+      updateMember: jest.fn(),
+      deleteMember: jest.fn(),
     };
     const controller = new StudiosController(service as never);
 
@@ -33,5 +35,36 @@ describe("StudiosController", () => {
       role: "member",
       permissions: [],
     });
+  });
+
+  it("delegates updateMember and defaults permissions to empty list", async () => {
+    const service = {
+      getStudioMembers: jest.fn(),
+      createMember: jest.fn(),
+      updateMember: jest.fn().mockResolvedValue({ ok: true }),
+      deleteMember: jest.fn(),
+    };
+    const controller = new StudiosController(service as never);
+
+    await controller.updateMember(req({ id: "u1" }), "s1", "m1", {
+      role: "admin",
+    });
+    expect(service.updateMember).toHaveBeenCalledWith("s1", "u1", "m1", {
+      role: "admin",
+      permissions: [],
+    });
+  });
+
+  it("delegates deleteMember", async () => {
+    const service = {
+      getStudioMembers: jest.fn(),
+      createMember: jest.fn(),
+      updateMember: jest.fn(),
+      deleteMember: jest.fn().mockResolvedValue({ success: true }),
+    };
+    const controller = new StudiosController(service as never);
+
+    await controller.deleteMember(req({ id: "u1" }), "s1", "m1");
+    expect(service.deleteMember).toHaveBeenCalledWith("s1", "u1", "m1");
   });
 });

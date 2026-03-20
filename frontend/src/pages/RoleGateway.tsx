@@ -13,10 +13,10 @@ export default function RoleGateway() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { setStudioSession, setMemberSession, setActiveGame } = useAuthState();
-  const [bootstrapping, setBootstrapping] = useState<"player" | "studio" | null>(null);
+  const [bootstrapping, setBootstrapping] = useState<"player" | "studio" | "admin" | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
-  const handleDevQuickstart = async (mode: "player" | "studio") => {
+  const handleDevQuickstart = async (mode: "player" | "studio" | "admin") => {
     try {
       setBootstrapping(mode);
       setBootstrapError(null);
@@ -26,7 +26,14 @@ export default function RoleGateway() {
       setStudioSession(data.studio);
       setMemberSession(data.member);
       setActiveGame(data.game);
-      navigate(data.recommendedLanding || (mode === "studio" ? data.routes.dashboard : data.routes.trade));
+      navigate(
+        data.recommendedLanding ||
+          (mode === "studio"
+            ? data.routes.dashboard
+            : mode === "admin"
+              ? data.routes.admin
+              : data.routes.trade),
+      );
     } catch (error: unknown) {
       const e = error as { response?: { data?: { message?: string } }; message?: string };
       setBootstrapError(
@@ -159,6 +166,24 @@ export default function RoleGateway() {
                   ? "Bootstrapping studio demo..."
                   : "Dev Quickstart: Studio"}
               </button>
+              <button
+                type="button"
+                onClick={() => handleDevQuickstart("admin")}
+                disabled={bootstrapping !== null}
+                style={{
+                  border: "1px solid rgba(255, 184, 107, 0.35)",
+                  background: "rgba(36, 20, 6, 0.88)",
+                  color: "#ffd29d",
+                  padding: "0.9rem 1.2rem",
+                  borderRadius: "999px",
+                  cursor: bootstrapping ? "wait" : "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                {bootstrapping === "admin"
+                  ? "Bootstrapping admin demo..."
+                  : "Dev Quickstart: Admin"}
+              </button>
             </div>
             <div
               style={{
@@ -169,7 +194,8 @@ export default function RoleGateway() {
               }}
             >
               Player quickstart opens game-scoped trade directly. Studio quickstart opens the
-              studio dashboard with the same demo studio, member session, and active game ready.
+              studio dashboard. Admin quickstart opens the Triolith admin view with a demo admin
+              session ready.
             </div>
             {bootstrapError && (
               <div

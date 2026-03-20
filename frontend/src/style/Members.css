@@ -155,6 +155,36 @@
   white-space: nowrap;
 }
 
+.members-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.members-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.members-edit-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--primary-rgb), 0.08);
+}
+
+.members-edit-title {
+  margin: 0 0 12px;
+  font-family: "Orbitron", "Inter", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* ── Error card ── */
 .members-error {
   border-color: rgba(var(--error-rgb, 255,51,102), 0.30) !important;

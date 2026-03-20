@@ -24,6 +24,8 @@ describe("StudiosService", () => {
   let studioMemberService: {
     hasPermission: jest.Mock;
     maskToPermissionStrings: jest.Mock;
+    updateMember: jest.Mock;
+    deleteMember: jest.Mock;
   };
   let service: StudiosService;
   const originalKey = process.env.ENCRYPTION_KEY;
@@ -51,6 +53,8 @@ describe("StudiosService", () => {
     studioMemberService = {
       hasPermission: jest.fn(),
       maskToPermissionStrings: jest.fn().mockReturnValue(["ManageMembers"]),
+      updateMember: jest.fn(),
+      deleteMember: jest.fn(),
     };
     service = new StudiosService(
       studioRepo as never,
@@ -245,6 +249,132 @@ describe("StudiosService", () => {
         role: "admin",
         permissions: ["ManageMembers"],
       }),
+    );
+  });
+
+  it("updateMember rejects actor without membership", async () => {
+    memberRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.updateMember("s1", "actor", "m1", {
+        role: "admin",
+        permissions: [],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("updateMember rejects missing target in studio", async () => {
+    memberRepo.findOne
+      .mockResolvedValueOnce({
+        id: "actor-member",
+        isOwner: true,
+        user: { id: "actor" },
+        studio: { id: "s1" },
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.updateMember("s1", "actor", "m1", {
+        role: "admin",
+        permissions: [],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("updateMember delegates to StudioMemberService and maps response", async () => {
+    memberRepo.findOne
+      .mockResolvedValueOnce({
+        id: "actor-member",
+        isOwner: true,
+        user: { id: "actor" },
+        studio: { id: "s1" },
+      })
+      .mockResolvedValueOnce({
+        id: "m1",
+        studio: { id: "s1" },
+        user: { id: "u1", email: "member@test.com" },
+      });
+
+    studioMemberService.updateMember.mockResolvedValueOnce({
+      id: "m1",
+      user: { id: "u1", email: "member@test.com" },
+      studio: { id: "s1" },
+      isOwner: false,
+      role: StudioRole.ADMIN,
+      permissionsMask: 2n,
+      gameAccessIds: [],
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    studioMemberService.maskToPermissionStrings.mockReturnValueOnce([
+      "ManageGames",
+    ]);
+
+    const result = await service.updateMember("s1", "actor", "m1", {
+      role: "admin",
+      permissions: ["ManageGames"],
+    });
+
+    expect(studioMemberService.updateMember).toHaveBeenCalledWith(
+      "actor-member",
+      "m1",
+      expect.objectContaining({
+        role: "admin",
+        permissionsMask: 2n,
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "m1",
+        email: "member@test.com",
+        permissions: ["ManageGames"],
+      }),
+    );
+  });
+
+  it("deleteMember rejects actor without membership", async () => {
+    memberRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(service.deleteMember("s1", "actor", "m1")).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it("deleteMember rejects missing target in studio", async () => {
+    memberRepo.findOne
+      .mockResolvedValueOnce({
+        id: "actor-member",
+        isOwner: true,
+        user: { id: "actor" },
+        studio: { id: "s1" },
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(service.deleteMember("s1", "actor", "m1")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it("deleteMember delegates to StudioMemberService", async () => {
+    memberRepo.findOne
+      .mockResolvedValueOnce({
+        id: "actor-member",
+        isOwner: true,
+        user: { id: "actor" },
+        studio: { id: "s1" },
+      })
+      .mockResolvedValueOnce({
+        id: "m1",
+        studio: { id: "s1" },
+      });
+
+    studioMemberService.deleteMember.mockResolvedValueOnce(undefined);
+
+    await expect(service.deleteMember("s1", "actor", "m1")).resolves.toEqual({
+      success: true,
+    });
+    expect(studioMemberService.deleteMember).toHaveBeenCalledWith(
+      "actor-member",
+      "m1",
     );
   });
 });

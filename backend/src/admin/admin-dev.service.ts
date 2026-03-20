@@ -9,7 +9,7 @@ import { User } from "../users/user.entity";
 import { UsersService } from "../users/users.service";
 
 interface DevBootstrapOptions {
-  mode?: "player" | "studio";
+  mode?: "player" | "studio" | "admin";
   email?: string;
   password?: string;
   studioName?: string;
@@ -175,12 +175,27 @@ export class AdminDevService {
   async bootstrap(options: DevBootstrapOptions, providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
 
-    const mode = options.mode === "studio" ? "studio" : "player";
-    const email = options.email?.trim() || "dev-owner@triolith.local";
+    const mode =
+      options.mode === "studio"
+        ? "studio"
+        : options.mode === "admin"
+          ? "admin"
+          : "player";
+    const email =
+      options.email?.trim() ||
+      (mode === "admin"
+        ? "dev-admin@triolith.local"
+        : "dev-owner@triolith.local");
     const password = options.password || "DevPass123!";
-    const studioName = options.studioName?.trim() || "Dev Studio";
-    const gameName = options.gameName?.trim() || "Dev Game";
-    const gameSlug = options.gameSlug?.trim() || "dev-game";
+    const studioName =
+      options.studioName?.trim() ||
+      (mode === "admin" ? "Triolith Admin Studio" : "Dev Studio");
+    const gameName =
+      options.gameName?.trim() ||
+      (mode === "admin" ? "Admin Demo Game" : "Dev Game");
+    const gameSlug =
+      options.gameSlug?.trim() ||
+      (mode === "admin" ? "admin-demo-game" : "dev-game");
 
     const existingUser = await this.userRepo.findOne({ where: { email } });
 
@@ -195,6 +210,10 @@ export class AdminDevService {
         await this.purgeStudio(orphanedStudio.id);
       }
       await this.usersService.signup(email, password, studioName);
+    }
+
+    if (mode === "admin") {
+      await this.userRepo.update({ email }, { isAdmin: true });
     }
 
     const session = await this.resolveStudioSession(
@@ -254,9 +273,14 @@ export class AdminDevService {
         dashboard: "/dashboard",
         games: "/games",
         trade: `/player/game/${game.id}/trade`,
+        admin: "/triolith-admin",
       },
       recommendedLanding:
-        mode === "studio" ? "/dashboard" : `/player/game/${game.id}/trade`,
+        mode === "studio"
+          ? "/dashboard"
+          : mode === "admin"
+            ? "/triolith-admin"
+            : `/player/game/${game.id}/trade`,
       mode,
     };
   }

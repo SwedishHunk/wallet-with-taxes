@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -43,5 +45,35 @@ export class StudiosController {
       role: dto.role,
       permissions: dto.permissions ?? [],
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(":studioId/members/:memberId")
+  updateMember(
+    @Req() req: Request,
+    @Param("studioId") studioId: string,
+    @Param("memberId") memberId: string,
+    @Body()
+    dto: {
+      role?: string;
+      permissions?: string[];
+    },
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.studiosService.updateMember(studioId, jwtUser.id, memberId, {
+      role: dto.role,
+      permissions: dto.permissions ?? [],
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(":studioId/members/:memberId")
+  deleteMember(
+    @Req() req: Request,
+    @Param("studioId") studioId: string,
+    @Param("memberId") memberId: string,
+  ) {
+    const jwtUser = req.user as JwtUser;
+    return this.studiosService.deleteMember(studioId, jwtUser.id, memberId);
   }
 }
