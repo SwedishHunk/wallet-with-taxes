@@ -25,6 +25,7 @@ import { ROUTES } from "../routes";
 import { APP_NAME, APP_SHORT_NAME, APP_YEAR } from "../config/app";
 import CyberpunkScene from "./3d/SafeCyberpunkScene";
 import FilmGrainOverlay from "./3d/FilmGrainOverlay";
+import { DevToolsRail } from "../devtools/DevToolsRail";
 import "./AppLayout.css";
 
 export function AppLayout() {
@@ -36,6 +37,7 @@ export function AppLayout() {
       <main className="app-content">
         <Outlet />
       </main>
+      <DevToolsRail />
       <Footer />
     </div>
   );

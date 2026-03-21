@@ -404,4 +404,186 @@ export class AdminDevService {
       created,
     };
   }
+
+  async clearSeedMembers(
+    options: { studioId: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const studio = await this.studioRepo.findOne({ where: { id: studioId } });
+    if (!studio) {
+      throw new AppException("Studio not found", 404);
+    }
+
+    const seededMembers = await this.memberRepo
+      .createQueryBuilder("member")
+      .innerJoinAndSelect("member.user", "user")
+      .innerJoinAndSelect("member.studio", "studio")
+      .where("studio.id = :studioId", { studioId })
+      .andWhere("member.isOwner = false")
+      .andWhere("user.email LIKE :seedPattern", {
+        seedPattern: "seed-member-%@triolith.local",
+      })
+      .getMany();
+
+    let removed = 0;
+    for (const member of seededMembers) {
+      await this.memberRepo.remove(member);
+      removed += 1;
+
+      if (member.user?.id) {
+        const remainingMemberships = await this.memberRepo
+          .createQueryBuilder("member")
+          .innerJoin("member.user", "user")
+          .where("user.id = :userId", { userId: member.user.id })
+          .getCount();
+        if (remainingMemberships === 0) {
+          await this.userRepo.delete({ id: member.user.id });
+        }
+      }
+    }
+
+    return {
+      studioId,
+      removed,
+    };
+  }
+
+  async seedGames(
+    options: { studioId: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const requestedCount = options.count ?? 5;
+    const count = Math.max(1, Math.min(requestedCount, 25));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const studio = await this.studioRepo.findOne({
+      where: { id: studioId },
+      relations: ["members", "members.user"],
+    });
+    if (!studio) {
+      throw new AppException("Studio not found", 404);
+    }
+
+    const actor = studio.members.find((member) => member.isOwner && member.user?.id);
+    if (!actor?.user?.id) {
+      throw new AppException("Studio owner not found for game seeding", 400);
+    }
+
+    const created: Array<{ id: string; name: string; slug: string }> = [];
+    const timestamp = Date.now();
+
+    for (let index = 0; index < count; index += 1) {
+      const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 1000)}`;
+      const name = `Seed Game ${suffix}`;
+      const slug = `seed-game-${suffix}`;
+
+      const game = await this.platformService.createGameForUser(actor.user.id, studioId, {
+        name,
+        slug,
+      });
+
+      created.push({
+        id: game.id,
+        name: game.name,
+        slug: game.slug,
+      });
+    }
+
+    return {
+      studioId,
+      count: created.length,
+      created,
+    };
+  }
+
+  async clearSeedGames(
+    options: { studioId: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const seededGames = await this.gameRepo.find({
+      where: {
+        studio: { id: studioId },
+      },
+    });
+
+    const targets = seededGames.filter((game) => game.slug.startsWith("seed-game-"));
+    let removed = 0;
+
+    for (const game of targets) {
+      await this.purgeGame(game.id);
+      removed += 1;
+    }
+
+    return {
+      studioId,
+      removed,
+    };
+  }
+
+  private async purgeGame(gameId: string): Promise<void> {
+    const q = this.dataSource.createQueryRunner();
+    await q.connect();
+    await q.startTransaction();
+    try {
+      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM player_nonce WHERE "gameId" = $1`, [gameId]);
+      await q.query(
+        `DELETE FROM ledger_entries
+         WHERE "walletId" IN (
+           SELECT gw.id FROM game_wallets gw
+           JOIN game_players gp ON gp.id = gw."gamePlayerId"
+           WHERE gp."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(
+        `DELETE FROM nft_instances
+         WHERE "ownerId" IN (
+           SELECT gp.id FROM game_players gp WHERE gp."gameId" = $1
+         )
+         OR "templateId" IN (
+           SELECT nt.id FROM nft_templates nt WHERE nt."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(
+        `DELETE FROM game_wallets
+         WHERE "gamePlayerId" IN (
+           SELECT gp.id FROM game_players gp WHERE gp."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM nft_templates WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM game_players WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM games WHERE id = $1`, [gameId]);
+      await q.commitTransaction();
+    } catch (err) {
+      await q.rollbackTransaction();
+      throw err;
+    } finally {
+      await q.release();
+    }
+  }
 }

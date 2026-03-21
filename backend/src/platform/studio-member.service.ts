@@ -112,8 +112,9 @@ export class StudioMemberService {
   ): Promise<void> {
     const query = this.memberRepository
       .createQueryBuilder("member")
-      .where("member.studio_id = :studioId", { studioId })
-      .andWhere("member.is_owner = :isOwner", { isOwner: true });
+      .innerJoin("member.studio", "studio")
+      .where("studio.id = :studioId", { studioId })
+      .andWhere("member.isOwner = :isOwner", { isOwner: true });
 
     if (targetMemberId) {
       query.andWhere("member.id != :targetMemberId", { targetMemberId });

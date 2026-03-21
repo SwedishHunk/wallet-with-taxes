@@ -385,6 +385,7 @@ describe("StudioMemberService", () => {
 
   it("deleteMember blocks when operation would remove last owner", async () => {
     const qb = {
+      innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       getCount: jest.fn().mockResolvedValue(0),
@@ -413,6 +414,7 @@ describe("StudioMemberService", () => {
 
   it("deleteMember removes target when owner invariant is satisfied", async () => {
     const qb = {
+      innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       getCount: jest.fn().mockResolvedValue(1),

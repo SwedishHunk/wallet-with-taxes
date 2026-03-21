@@ -16,6 +16,19 @@ interface DevSeedMembersBody {
   count?: number;
 }
 
+interface DevClearSeedMembersBody {
+  studioId: string;
+}
+
+interface DevSeedGamesBody {
+  studioId: string;
+  count?: number;
+}
+
+interface DevClearSeedGamesBody {
+  studioId: string;
+}
+
 function cookieOpts(): CookieOptions {
   return {
     httpOnly: true,
@@ -56,5 +69,29 @@ export class AdminDevController {
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
     return this.adminDevService.seedMembers(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-members")
+  async clearSeedMembers(
+    @Body() body: DevClearSeedMembersBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedMembers(body, devBootstrapKey);
+  }
+
+  @Post("seed-games")
+  async seedGames(
+    @Body() body: DevSeedGamesBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedGames(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-games")
+  async clearSeedGames(
+    @Body() body: DevClearSeedGamesBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedGames(body, devBootstrapKey);
   }
 }

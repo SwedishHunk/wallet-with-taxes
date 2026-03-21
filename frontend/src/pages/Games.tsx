@@ -39,6 +39,17 @@ export default function Games() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const refresh = () => {
+      void loadGames();
+    };
+
+    window.addEventListener("devtools:games:refresh", refresh);
+    return () => {
+      window.removeEventListener("devtools:games:refresh", refresh);
+    };
+  }, []);
+
   const generateSlug = (name: string): string => {
     return name
       .toLowerCase()
