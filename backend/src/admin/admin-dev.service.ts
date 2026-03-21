@@ -16,6 +16,8 @@ import { UsersService } from "../users/users.service";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
 import { encryptPrivateKey } from "../shared/crypto.util";
+import { JwtService } from "@nestjs/jwt";
+import { JwtUser } from "../auth/jwt-user.interface";
 
 interface DevBootstrapOptions {
   mode?: "player" | "studio" | "admin";
@@ -26,6 +28,11 @@ interface DevBootstrapOptions {
   gameSlug?: string;
 }
 
+interface DevSwitchSessionOptions {
+  studioId: string;
+  memberId?: string;
+}
+
 @Injectable()
 export class AdminDevService {
   constructor(
@@ -33,6 +40,7 @@ export class AdminDevService {
     private readonly platformService: PlatformService,
     private readonly studioMemberService: StudioMemberService,
     private readonly dataSource: DataSource,
+    private readonly jwtService: JwtService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     @InjectRepository(Studio)
@@ -42,6 +50,148 @@ export class AdminDevService {
     @InjectRepository(StudioMember)
     private readonly memberRepo: Repository<StudioMember>,
   ) {}
+
+  private verifyJwtToken(token?: string): JwtUser | null {
+    if (!token) return null;
+
+    try {
+      return this.jwtService.verify<JwtUser>(token);
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveAdminActor(
+    currentUser?: JwtUser,
+    returnToken?: string,
+    cookieToken?: string,
+  ): JwtUser {
+    const candidates = [
+      this.verifyJwtToken(returnToken),
+      currentUser ?? null,
+      this.verifyJwtToken(cookieToken),
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate?.isAdmin === true) {
+        return candidate;
+      }
+    }
+
+    throw new AppException(
+      "Triolith admin session required for session switching",
+      403,
+    );
+  }
+
+  private signSessionToken(user: {
+    id: string;
+    email?: string;
+    walletAddress?: string;
+    studioId?: string;
+    role?: "owner" | "admin" | "member";
+    isAdmin: boolean;
+  }) {
+    return this.jwtService.sign({
+      id: user.id,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      studioId: user.studioId,
+      role: user.role,
+      isAdmin: user.isAdmin,
+    });
+  }
+
+  private ensureReturnToken(adminUser: JwtUser, returnToken?: string) {
+    return returnToken || this.signSessionToken(adminUser);
+  }
+
+  private async buildStudioSessionPayload(userId: string, studioId: string) {
+    const studio = await this.studioRepo.findOne({ where: { id: studioId } });
+    if (!studio) {
+      throw new AppException("Studio not found for session switch", 404);
+    }
+
+    const member = await this.usersService.getMemberSession(userId, studioId);
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new AppException("User not found for session switch", 404);
+    }
+
+    const token = this.signSessionToken({
+      id: user.id,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      studioId,
+      role: member.role,
+      isAdmin: user.isAdmin,
+    });
+
+    return {
+      token,
+      studio: {
+        studioId: studio.id,
+        studioName: studio.name,
+        isTriolithAdmin: user.isAdmin === true,
+      },
+      member: {
+        ...member,
+        authenticatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  async getSessionTargets(
+    currentUser?: JwtUser,
+    returnToken?: string,
+    cookieToken?: string,
+  ) {
+    this.assertBootstrapAllowed();
+
+    const adminUser = this.resolveAdminActor(
+      currentUser,
+      returnToken,
+      cookieToken,
+    );
+
+    const studios = await this.studioRepo.find({
+      relations: ["members", "members.user"],
+    });
+
+    return {
+      returnToken: this.ensureReturnToken(adminUser, returnToken),
+      admin: {
+        userId: adminUser.id,
+        email: adminUser.email ?? null,
+        studioId: adminUser.studioId ?? null,
+      },
+      studios: studios
+        .map((studio) => ({
+          id: studio.id,
+          name: studio.name,
+          status: studio.status,
+          members: [...studio.members]
+            .sort((left, right) => {
+              if (left.isOwner !== right.isOwner) {
+                return left.isOwner ? -1 : 1;
+              }
+              return left.createdAt.getTime() - right.createdAt.getTime();
+            })
+            .map((member) => ({
+              id: member.id,
+              userId: member.user.id,
+              email: member.user.email,
+              isOwner: member.isOwner,
+              role: member.role,
+              permissions:
+                this.studioMemberService.maskToPermissionStrings(
+                  member.permissionsMask,
+                ),
+            })),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    };
+  }
 
   private buildRandomPermissionsMask(): bigint {
     const permissionPool = [
@@ -333,6 +483,94 @@ export class AdminDevService {
             ? "/triolith-admin"
             : `/player/game/${game.id}/trade`,
       mode,
+    };
+  }
+
+  async switchSession(
+    options: DevSwitchSessionOptions,
+    currentUser?: JwtUser,
+    returnToken?: string,
+    cookieToken?: string,
+  ) {
+    this.assertBootstrapAllowed();
+
+    const adminUser = this.resolveAdminActor(
+      currentUser,
+      returnToken,
+      cookieToken,
+    );
+
+    const studioId = options.studioId?.trim();
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const targetMember = options.memberId?.trim()
+      ? await this.memberRepo.findOne({
+          where: { id: options.memberId.trim() },
+          relations: ["user", "studio"],
+        })
+      : await this.memberRepo.findOne({
+          where: { studio: { id: studioId }, isOwner: true },
+          relations: ["user", "studio"],
+        });
+
+    if (!targetMember || targetMember.studio.id !== studioId) {
+      throw new AppException("Target member was not found in this studio", 404);
+    }
+
+    const payload = await this.buildStudioSessionPayload(
+      targetMember.user.id,
+      targetMember.studio.id,
+    );
+
+    return {
+      ...payload,
+      returnToken: this.ensureReturnToken(adminUser, returnToken),
+      impersonation: {
+        active: true,
+        targetMemberId: targetMember.id,
+        targetUserId: targetMember.user.id,
+        targetEmail: targetMember.user.email,
+        targetStudioId: targetMember.studio.id,
+        targetStudioName: targetMember.studio.name,
+        targetRole: targetMember.role,
+        isOwner: targetMember.isOwner,
+      },
+    };
+  }
+
+  async restoreSession(
+    returnToken?: string,
+    currentUser?: JwtUser,
+    cookieToken?: string,
+  ) {
+    this.assertBootstrapAllowed();
+
+    const adminUser = this.resolveAdminActor(
+      currentUser,
+      returnToken,
+      cookieToken,
+    );
+
+    if (!adminUser.studioId) {
+      throw new AppException(
+        "Admin return token is missing a studio session",
+        400,
+      );
+    }
+
+    const payload = await this.buildStudioSessionPayload(
+      adminUser.id,
+      adminUser.studioId,
+    );
+
+    return {
+      ...payload,
+      returnToken: this.ensureReturnToken(adminUser, returnToken),
+      impersonation: {
+        active: false,
+      },
     };
   }
 

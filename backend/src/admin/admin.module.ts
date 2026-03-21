@@ -15,6 +15,7 @@ import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
 import { UsersModule } from "../users/users.module";
 import { PlatformModule } from "../platform/platform.module";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PlatformModule } from "../platform/platform.module";
       AdminAuditLog,
     ]),
     TaxModule,
+    AuthModule,
     UsersModule,
     PlatformModule,
   ],

@@ -1,6 +1,15 @@
-import { Body, Controller, Headers, Post, Res } from "@nestjs/common";
-import { Response, CookieOptions } from "express";
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Req,
+  Res,
+} from "@nestjs/common";
+import { Response, CookieOptions, Request } from "express";
 import { AdminDevService } from "./admin-dev.service";
+import { JwtUser } from "../auth/jwt-user.interface";
 
 interface DevBootstrapBody {
   mode?: "player" | "studio" | "admin";
@@ -29,6 +38,15 @@ interface DevClearSeedGamesBody {
   studioId: string;
 }
 
+interface DevSwitchSessionBody {
+  studioId: string;
+  memberId?: string;
+}
+
+interface DevRestoreSessionBody {
+  returnToken?: string;
+}
+
 function cookieOpts(): CookieOptions {
   return {
     httpOnly: true,
@@ -42,6 +60,18 @@ function cookieOpts(): CookieOptions {
 @Controller("admin/dev")
 export class AdminDevController {
   constructor(private readonly adminDevService: AdminDevService) {}
+
+  @Get("session-targets")
+  async getSessionTargets(
+    @Req() req: Request,
+    @Headers("x-admin-return-token") returnToken?: string,
+  ) {
+    return this.adminDevService.getSessionTargets(
+      req.user as JwtUser | undefined,
+      returnToken,
+      req.cookies?.access_token,
+    );
+  }
 
   @Post("bootstrap")
   async bootstrap(
@@ -93,5 +123,45 @@ export class AdminDevController {
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
     return this.adminDevService.clearSeedGames(body, devBootstrapKey);
+  }
+
+  @Post("switch-session")
+  async switchSession(
+    @Body() body: DevSwitchSessionBody,
+    @Req() req: Request,
+    @Headers("x-admin-return-token") returnToken?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const result = await this.adminDevService.switchSession(
+      body,
+      req.user as JwtUser | undefined,
+      returnToken,
+      req.cookies?.access_token,
+    );
+
+    if (res && result.token) {
+      res.cookie("access_token", result.token, cookieOpts());
+    }
+
+    return result;
+  }
+
+  @Post("restore-session")
+  async restoreSession(
+    @Body() body: DevRestoreSessionBody,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const result = await this.adminDevService.restoreSession(
+      body.returnToken,
+      req.user as JwtUser | undefined,
+      req.cookies?.access_token,
+    );
+
+    if (res && result.token) {
+      res.cookie("access_token", result.token, cookieOpts());
+    }
+
+    return result;
   }
 }

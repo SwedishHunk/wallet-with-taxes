@@ -25,3 +25,90 @@ export const devClearSeedGames = (payload: { studioId: string }) =>
   api.post("/admin/dev/clear-seed-games", payload, {
     headers: devHeaders,
   });
+
+const withReturnToken = (returnToken?: string) => ({
+  ...(devHeaders ?? {}),
+  ...(returnToken
+    ? {
+        "x-admin-return-token": returnToken,
+      }
+    : {}),
+});
+
+export type SessionSwitchTarget = {
+  id: string;
+  userId: string;
+  email: string;
+  isOwner: boolean;
+  role: "owner" | "admin" | "member";
+  permissions: string[];
+};
+
+export type SessionSwitchStudio = {
+  id: string;
+  name: string;
+  status: string;
+  members: SessionSwitchTarget[];
+};
+
+export type SessionTargetsResponse = {
+  returnToken: string;
+  admin: {
+    userId: string;
+    email: string | null;
+    studioId: string | null;
+  };
+  studios: SessionSwitchStudio[];
+};
+
+export type SessionSwitchResponse = {
+  returnToken: string;
+  studio: {
+    studioId: string;
+    studioName: string;
+    isTriolithAdmin: boolean;
+  };
+  member: {
+    memberId: string;
+    userId: string;
+    studioId: string;
+    email: string;
+    isOwner: boolean;
+    role: "owner" | "admin" | "member";
+    permissions: string[];
+    gameAccessIds: string[];
+    authenticatedAt: string;
+  };
+  impersonation: {
+    active: boolean;
+    targetMemberId?: string;
+    targetUserId?: string;
+    targetEmail?: string;
+    targetStudioId?: string;
+    targetStudioName?: string;
+    targetRole?: "owner" | "admin" | "member";
+    isOwner?: boolean;
+  };
+};
+
+export const devGetSessionTargets = (returnToken?: string) =>
+  api.get<SessionTargetsResponse>("/admin/dev/session-targets", {
+    headers: withReturnToken(returnToken),
+  });
+
+export const devSwitchSession = (
+  payload: { studioId: string; memberId?: string },
+  returnToken?: string,
+) =>
+  api.post<SessionSwitchResponse>("/admin/dev/switch-session", payload, {
+    headers: withReturnToken(returnToken),
+  });
+
+export const devRestoreSession = (returnToken?: string) =>
+  api.post<SessionSwitchResponse>(
+    "/admin/dev/restore-session",
+    { returnToken },
+    {
+      headers: withReturnToken(returnToken),
+    },
+  );
