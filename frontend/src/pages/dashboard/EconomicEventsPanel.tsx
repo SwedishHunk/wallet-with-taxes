@@ -46,6 +46,14 @@ export default function EconomicEventsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGame]);
 
+  useEffect(() => {
+    const refresh = () => loadEvents();
+    window.addEventListener("devtools:dashboard:refresh", refresh);
+    return () =>
+      window.removeEventListener("devtools:dashboard:refresh", refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGame?.gameId]);
+
   const knownTypes = useMemo(
     () => Array.from(new Set(events.map((e) => e.eventType))).sort(),
     [events],

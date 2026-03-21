@@ -26,6 +26,23 @@ export const devClearSeedGames = (payload: { studioId: string }) =>
     headers: devHeaders,
   });
 
+export const devSeedEconomics = (payload: {
+  studioId: string;
+  gameId?: string;
+  count?: number;
+}) =>
+  api.post("/admin/dev/seed-economics", payload, {
+    headers: devHeaders,
+  });
+
+export const devClearSeedEconomics = (payload: {
+  studioId: string;
+  gameId?: string;
+}) =>
+  api.post("/admin/dev/clear-seed-economics", payload, {
+    headers: devHeaders,
+  });
+
 const withReturnToken = (returnToken?: string) => ({
   ...(devHeaders ?? {}),
   ...(returnToken

@@ -51,6 +51,17 @@
   flex-wrap: wrap;
 }
 
+.dev-tools-section + .dev-tools-section {
+  margin-top: 16px;
+}
+
+.dev-tools-section-title {
+  margin-bottom: 8px;
+  color: var(--text-bright);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 .dev-tools-message {
   margin: 14px 0 0;
   color: var(--muted);

@@ -8,6 +8,8 @@ import {
   devClearSeedMembers,
   devSeedGames,
   devClearSeedGames,
+  devSeedEconomics,
+  devClearSeedEconomics,
 } from "../lib/devtools";
 import "./DevToolsRail.css";
 
@@ -167,6 +169,165 @@ function GamesTools({ studioId }: { studioId: string }) {
   );
 }
 
+function DashboardTools({
+  studioId,
+  gameId,
+  gameName,
+}: {
+  studioId: string;
+  gameId?: string;
+  gameName?: string;
+}) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const refresh = () => {
+    window.dispatchEvent(new CustomEvent("devtools:dashboard:refresh"));
+  };
+
+  const handleSeedStudio = async (count: number) => {
+    try {
+      setActionLoading(`studio-seed:${count}`);
+      setError("");
+      const { data } = await devSeedEconomics({ studioId, count });
+      setMessage(`Created ${data.count} studio economic events`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed studio economic events",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSeedGame = async (count: number) => {
+    if (!gameId) return;
+
+    try {
+      setActionLoading(`game-seed:${count}`);
+      setError("");
+      const { data } = await devSeedEconomics({ studioId, gameId, count });
+      setMessage(`Created ${data.count} events for ${gameName ?? "the active game"}`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed game economic events",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearStudio = async () => {
+    const confirmed = window.confirm(
+      "Remove all seeded studio economic events?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("studio-clear");
+      setError("");
+      const { data } = await devClearSeedEconomics({ studioId });
+      setMessage(`Removed ${data.removed} studio economic events`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear studio economic events",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearGame = async () => {
+    if (!gameId) return;
+
+    const confirmed = window.confirm(
+      `Remove all seeded events for ${gameName ?? "the active game"}?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("game-clear");
+      setError("");
+      const { data } = await devClearSeedEconomics({ studioId, gameId });
+      setMessage(`Removed ${data.removed} events for ${gameName ?? "the active game"}`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear game economic events",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <>
+      <div className="dev-tools-section">
+        <div className="dev-tools-section-title">Studio aggregate</div>
+        <div className="dev-tools-actions">
+          {[5, 10].map((count) => (
+            <Button
+              key={count}
+              variant="secondary"
+              onClick={() => handleSeedStudio(count)}
+              disabled={actionLoading === `studio-seed:${count}`}
+            >
+              {actionLoading === `studio-seed:${count}`
+                ? `Seeding ${count}...`
+                : `Seed ${count}`}
+            </Button>
+          ))}
+          <Button
+            variant="danger"
+            onClick={handleClearStudio}
+            disabled={actionLoading === "studio-clear"}
+          >
+            {actionLoading === "studio-clear" ? "Clearing..." : "Clear studio"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="dev-tools-section">
+        <div className="dev-tools-section-title">
+          Active game{gameName ? ` · ${gameName}` : ""}
+        </div>
+        <div className="dev-tools-actions">
+          {[3, 6].map((count) => (
+            <Button
+              key={count}
+              variant="secondary"
+              onClick={() => handleSeedGame(count)}
+              disabled={!gameId || actionLoading === `game-seed:${count}`}
+            >
+              {actionLoading === `game-seed:${count}`
+                ? `Seeding ${count}...`
+                : `Seed ${count}`}
+            </Button>
+          ))}
+          <Button
+            variant="danger"
+            onClick={handleClearGame}
+            disabled={!gameId || actionLoading === "game-clear"}
+          >
+            {actionLoading === "game-clear" ? "Clearing..." : "Clear game"}
+          </Button>
+        </div>
+      </div>
+
+      {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
+      {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </>
+  );
+}
+
 function EmptyTools() {
   return (
     <p className="dev-tools-message">
@@ -178,7 +339,7 @@ function EmptyTools() {
 
 export function DevToolsRail() {
   const location = useLocation();
-  const { authContext } = useAuthState();
+  const { authContext, activeGame } = useAuthState();
   const studioSession = authContext.studioSession;
   const [showDrawer, setShowDrawer] = useState(false);
 
@@ -201,6 +362,21 @@ export function DevToolsRail() {
       };
     }
 
+    if (location.pathname === "/dashboard") {
+      return {
+        title: "Dev Tools",
+        description:
+          "Seed and clear economic events so the dashboard panels show fresh, attributable tracking data.",
+        content: (
+          <DashboardTools
+            studioId={studioSession.studioId}
+            gameId={activeGame?.gameId}
+            gameName={activeGame?.name}
+          />
+        ),
+      };
+    }
+
     if (authContext.state === "Studio+MemberActive" || authContext.state === "StudioAuthenticated") {
       return {
         title: "Dev Tools",
@@ -210,7 +386,7 @@ export function DevToolsRail() {
     }
 
     return null;
-  }, [authContext.state, location.pathname, studioSession]);
+  }, [activeGame?.gameId, activeGame?.name, authContext.state, location.pathname, studioSession]);
 
   if (!config || typeof document === "undefined") {
     return null;
