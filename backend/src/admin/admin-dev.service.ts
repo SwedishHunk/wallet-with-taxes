@@ -10,6 +10,9 @@ import {
   StudioMember,
   StudioRole,
 } from "../platform/entities/studio-member.entity";
+import { GamePlayer } from "../platform/entities/game-player.entity";
+import { NFTInstance } from "../platform/entities/nft-instance.entity";
+import { NFTTemplate } from "../platform/entities/nft-template.entity";
 import { StudioMemberService } from "../platform/studio-member.service";
 import { User } from "../users/user.entity";
 import { UsersService } from "../users/users.service";
@@ -18,6 +21,7 @@ import { ethers } from "ethers";
 import { encryptPrivateKey } from "../shared/crypto.util";
 import { JwtService } from "@nestjs/jwt";
 import { JwtUser } from "../auth/jwt-user.interface";
+import { NFTInventoryService } from "../platform/nft-inventory.service";
 import {
   EconomicDirection,
   EconomicScopeType,
@@ -44,6 +48,7 @@ export class AdminDevService {
     private readonly usersService: UsersService,
     private readonly platformService: PlatformService,
     private readonly studioMemberService: StudioMemberService,
+    private readonly nftInventoryService: NFTInventoryService,
     private readonly economicsService: EconomicsService,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
@@ -53,6 +58,12 @@ export class AdminDevService {
     private readonly studioRepo: Repository<Studio>,
     @InjectRepository(Game)
     private readonly gameRepo: Repository<Game>,
+    @InjectRepository(GamePlayer)
+    private readonly gamePlayerRepo: Repository<GamePlayer>,
+    @InjectRepository(NFTTemplate)
+    private readonly nftTemplateRepo: Repository<NFTTemplate>,
+    @InjectRepository(NFTInstance)
+    private readonly nftInstanceRepo: Repository<NFTInstance>,
     @InjectRepository(StudioMember)
     private readonly memberRepo: Repository<StudioMember>,
   ) {}
@@ -892,6 +903,279 @@ export class AdminDevService {
     return {
       studioId,
       gameId: gameId ?? null,
+      removed: result.affected ?? 0,
+    };
+  }
+
+  async seedNftTemplates(
+    options: { studioId: string; gameId: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+    const requestedCount = options.count ?? 3;
+    const count = Math.max(1, Math.min(requestedCount, 12));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+      relations: ["studio"],
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const created: Array<{ id: string; name: string; tier: number }> = [];
+    const timestamp = Date.now();
+    const tiers = [1, 2, 3, 4] as const;
+
+    for (let index = 0; index < count; index += 1) {
+      const suffix = `${timestamp}-${index}`;
+      const tier = tiers[index % tiers.length];
+      const template = await this.nftInventoryService.createNFTTemplate(
+        gameId,
+        studioId,
+        {
+          name: `Seed Template ${suffix}`,
+          tier,
+          mintingCost: (10 * tier).toString(),
+          upkeepCostPerDay: tier.toString(),
+          maxMintCount: 25,
+          attributes: {
+            seeded: true,
+            source: "devtools",
+            rarity: tier,
+            suffix,
+          },
+        },
+      );
+
+      created.push({
+        id: template.id,
+        name: template.name,
+        tier: template.tier,
+      });
+    }
+
+    return {
+      studioId,
+      gameId,
+      count: created.length,
+      created,
+    };
+  }
+
+  async clearSeedNftTemplates(
+    options: { studioId: string; gameId: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const seededTemplates = await this.nftTemplateRepo
+      .createQueryBuilder("template")
+      .innerJoin("template.game", "game")
+      .where("game.id = :gameId", { gameId })
+      .andWhere(`template.attributes ->> 'seeded' = 'true'`)
+      .getMany();
+
+    const templateIds = seededTemplates.map((template) => template.id);
+    if (templateIds.length === 0) {
+      return {
+        studioId,
+        gameId,
+        removedTemplates: 0,
+        removedInstances: 0,
+      };
+    }
+
+    const deletedInstances = await this.nftInstanceRepo
+      .createQueryBuilder()
+      .delete()
+      .from(NFTInstance)
+      .where(`"templateId" IN (:...templateIds)`, { templateIds })
+      .execute();
+
+    const deletedTemplates = await this.nftTemplateRepo
+      .createQueryBuilder()
+      .delete()
+      .from(NFTTemplate)
+      .where(`id IN (:...templateIds)`, { templateIds })
+      .execute();
+
+    return {
+      studioId,
+      gameId,
+      removedTemplates: deletedTemplates.affected ?? 0,
+      removedInstances: deletedInstances.affected ?? 0,
+    };
+  }
+
+  async seedNftInstances(
+    options: { studioId: string; gameId: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+    const requestedCount = options.count ?? 4;
+    const count = Math.max(1, Math.min(requestedCount, 20));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const players = await this.gamePlayerRepo.find({
+      where: { game: { id: gameId } },
+      order: { joinedAt: "ASC" },
+    });
+
+    if (players.length === 0) {
+      throw new AppException(
+        "No game players found. Create or register a player before seeding minted NFTs.",
+        400,
+      );
+    }
+
+    let templates = await this.nftTemplateRepo
+      .createQueryBuilder("template")
+      .innerJoin("template.game", "game")
+      .where("game.id = :gameId", { gameId })
+      .andWhere(`template.attributes ->> 'seeded' = 'true'`)
+      .orderBy("template.createdAt", "ASC")
+      .getMany();
+
+    if (templates.length === 0) {
+      await this.seedNftTemplates({ studioId, gameId, count: Math.min(3, count) });
+      templates = await this.nftTemplateRepo
+        .createQueryBuilder("template")
+        .innerJoin("template.game", "game")
+        .where("game.id = :gameId", { gameId })
+        .andWhere(`template.attributes ->> 'seeded' = 'true'`)
+        .orderBy("template.createdAt", "ASC")
+        .getMany();
+    }
+
+    const created: Array<{ id: string; templateId: string; ownerId: string }> = [];
+
+    for (let index = 0; index < count; index += 1) {
+      const template = templates[index % templates.length];
+      const player = players[index % players.length];
+      const minted = await this.nftInventoryService.mintNFTToPlayer(
+        gameId,
+        studioId,
+        template.id,
+        player.id,
+      );
+
+      minted.customAttributes = {
+        ...(minted.customAttributes ?? {}),
+        seeded: true,
+        source: "devtools",
+      };
+      await this.nftInstanceRepo.save(minted);
+
+      created.push({
+        id: minted.id,
+        templateId: template.id,
+        ownerId: player.id,
+      });
+    }
+
+    return {
+      studioId,
+      gameId,
+      count: created.length,
+      created,
+      playerCount: players.length,
+    };
+  }
+
+  async clearSeedNftInstances(
+    options: { studioId: string; gameId: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const seededInstances = await this.nftInstanceRepo
+      .createQueryBuilder("instance")
+      .innerJoin("instance.template", "template")
+      .innerJoin("template.game", "game")
+      .where("game.id = :gameId", { gameId })
+      .andWhere(`instance.customAttributes ->> 'seeded' = 'true'`)
+      .getMany();
+
+    const instanceIds = seededInstances.map((instance) => instance.id);
+    if (instanceIds.length === 0) {
+      return {
+        studioId,
+        gameId,
+        removed: 0,
+      };
+    }
+
+    const result = await this.nftInstanceRepo
+      .createQueryBuilder()
+      .delete()
+      .from(NFTInstance)
+      .where(`id IN (:...instanceIds)`, { instanceIds })
+      .execute();
+
+    return {
+      studioId,
+      gameId,
       removed: result.affected ?? 0,
     };
   }

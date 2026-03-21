@@ -49,6 +49,17 @@ interface DevClearEconomicsBody {
   gameId?: string;
 }
 
+interface DevSeedNftsBody {
+  studioId: string;
+  gameId: string;
+  count?: number;
+}
+
+interface DevClearSeedNftsBody {
+  studioId: string;
+  gameId: string;
+}
+
 interface DevSwitchSessionBody {
   studioId: string;
   memberId?: string;
@@ -161,6 +172,38 @@ export class AdminDevController {
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
     return this.adminDevService.clearSeedEconomics(body, devBootstrapKey);
+  }
+
+  @Post("seed-nft-templates")
+  async seedNftTemplates(
+    @Body() body: DevSeedNftsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedNftTemplates(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-nft-templates")
+  async clearSeedNftTemplates(
+    @Body() body: DevClearSeedNftsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedNftTemplates(body, devBootstrapKey);
+  }
+
+  @Post("seed-nft-instances")
+  async seedNftInstances(
+    @Body() body: DevSeedNftsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedNftInstances(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-nft-instances")
+  async clearSeedNftInstances(
+    @Body() body: DevClearSeedNftsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedNftInstances(body, devBootstrapKey);
   }
 
   @Post("clear-sandbox-data")

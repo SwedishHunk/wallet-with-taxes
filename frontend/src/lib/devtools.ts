@@ -43,6 +43,46 @@ export const devClearSeedEconomics = (payload: {
     headers: devHeaders,
   });
 
+export const devSeedNftTemplates = (payload: {
+  studioId: string;
+  gameId: string;
+  count?: number;
+}) =>
+  api.post("/admin/dev/seed-nft-templates", payload, {
+    headers: devHeaders,
+  });
+
+export const devClearSeedNftTemplates = (payload: {
+  studioId: string;
+  gameId: string;
+}) =>
+  api.post("/admin/dev/clear-seed-nft-templates", payload, {
+    headers: devHeaders,
+  });
+
+export const devSeedNftInstances = (payload: {
+  studioId: string;
+  gameId: string;
+  count?: number;
+}) =>
+  api.post("/admin/dev/seed-nft-instances", payload, {
+    headers: devHeaders,
+  });
+
+export const devClearSeedNftInstances = (payload: {
+  studioId: string;
+  gameId: string;
+}) =>
+  api.post("/admin/dev/clear-seed-nft-instances", payload, {
+    headers: devHeaders,
+  });
+
+export const devSetValuation = (payload: {
+  ethUsd?: number;
+  usdSek?: number;
+}) =>
+  api.post("/api/shop/valuation", payload);
+
 const withReturnToken = (returnToken?: string) => ({
   ...(devHeaders ?? {}),
   ...(returnToken

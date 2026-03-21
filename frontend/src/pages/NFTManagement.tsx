@@ -146,6 +146,17 @@ export default function NFTManagement() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      void load();
+    };
+
+    window.addEventListener("devtools:nfts:refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("devtools:nfts:refresh", handleRefresh);
+    };
+  }, [load]);
+
   // ── Create Template ────────────────────────────────────────────────────────
 
   const handleCreate = async (e: React.FormEvent) => {

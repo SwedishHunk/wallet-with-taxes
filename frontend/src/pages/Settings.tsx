@@ -30,12 +30,27 @@ export default function Settings() {
   const [saveMsg, setSaveMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const loadConfig = () => {
     void api.get<ShopConfig>("/api/shop/config").then((r) => {
       setShopConfig(r.data);
       setEthUsd(String(r.data.valuation?.ethUsd ?? ""));
       setUsdSek(String(r.data.valuation?.usdSek ?? ""));
     });
+  };
+
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadConfig();
+    };
+
+    window.addEventListener("devtools:settings:refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("devtools:settings:refresh", handleRefresh);
+    };
   }, []);
 
   const saveValuation = async () => {

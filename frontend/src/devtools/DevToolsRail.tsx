@@ -10,6 +10,11 @@ import {
   devClearSeedGames,
   devSeedEconomics,
   devClearSeedEconomics,
+  devSeedNftTemplates,
+  devClearSeedNftTemplates,
+  devSeedNftInstances,
+  devClearSeedNftInstances,
+  devSetValuation,
 } from "../lib/devtools";
 import "./DevToolsRail.css";
 
@@ -328,6 +333,241 @@ function DashboardTools({
   );
 }
 
+function NFTManagementTools({
+  studioId,
+  gameId,
+}: {
+  studioId: string;
+  gameId: string;
+}) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const refresh = () => {
+    window.dispatchEvent(new CustomEvent("devtools:nfts:refresh"));
+  };
+
+  const handleSeedTemplates = async (count: number) => {
+    try {
+      setActionLoading(`templates-seed:${count}`);
+      setError("");
+      const { data } = await devSeedNftTemplates({ studioId, gameId, count });
+      setMessage(`Created ${data.count} seeded NFT templates`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed NFT templates",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearTemplates = async () => {
+    const confirmed = window.confirm(
+      "Remove all seeded NFT templates and any instances minted from them?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("templates-clear");
+      setError("");
+      const { data } = await devClearSeedNftTemplates({ studioId, gameId });
+      setMessage(
+        `Removed ${data.removedTemplates} templates and ${data.removedInstances} linked instances`,
+      );
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear seeded NFT templates",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSeedInstances = async (count: number) => {
+    try {
+      setActionLoading(`instances-seed:${count}`);
+      setError("");
+      const { data } = await devSeedNftInstances({ studioId, gameId, count });
+      setMessage(
+        `Minted ${data.count} seeded NFTs across ${data.playerCount} game players`,
+      );
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not mint seeded NFTs",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearInstances = async () => {
+    const confirmed = window.confirm(
+      "Remove all seeded minted NFTs for this game?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("instances-clear");
+      setError("");
+      const { data } = await devClearSeedNftInstances({ studioId, gameId });
+      setMessage(`Removed ${data.removed} seeded minted NFTs`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear seeded NFT instances",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <>
+      <div className="dev-tools-section">
+        <div className="dev-tools-section-title">Templates</div>
+        <div className="dev-tools-actions">
+          {[2, 5].map((count) => (
+            <Button
+              key={count}
+              variant="secondary"
+              onClick={() => handleSeedTemplates(count)}
+              disabled={actionLoading === `templates-seed:${count}`}
+            >
+              {actionLoading === `templates-seed:${count}`
+                ? `Seeding ${count}...`
+                : `Seed ${count}`}
+            </Button>
+          ))}
+          <Button
+            variant="danger"
+            onClick={handleClearTemplates}
+            disabled={actionLoading === "templates-clear"}
+          >
+            {actionLoading === "templates-clear" ? "Clearing..." : "Clear templates"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="dev-tools-section">
+        <div className="dev-tools-section-title">Minted NFTs</div>
+        <div className="dev-tools-actions">
+          {[3, 6].map((count) => (
+            <Button
+              key={count}
+              variant="secondary"
+              onClick={() => handleSeedInstances(count)}
+              disabled={actionLoading === `instances-seed:${count}`}
+            >
+              {actionLoading === `instances-seed:${count}`
+                ? `Minting ${count}...`
+                : `Mint ${count}`}
+            </Button>
+          ))}
+          <Button
+            variant="danger"
+            onClick={handleClearInstances}
+            disabled={actionLoading === "instances-clear"}
+          >
+            {actionLoading === "instances-clear" ? "Clearing..." : "Clear minted"}
+          </Button>
+        </div>
+      </div>
+
+      {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
+      {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </>
+  );
+}
+
+function SettingsTools() {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const refresh = () => {
+    window.dispatchEvent(new CustomEvent("devtools:settings:refresh"));
+  };
+
+  const handlePreset = async (
+    actionKey: string,
+    payload: { ethUsd?: number; usdSek?: number },
+    messageText: string,
+  ) => {
+    try {
+      setActionLoading(actionKey);
+      setError("");
+      await devSetValuation(payload);
+      setMessage(messageText);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not update valuation snapshot",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <>
+      <div className="dev-tools-section">
+        <div className="dev-tools-section-title">Valuation presets</div>
+        <div className="dev-tools-actions">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              handlePreset("preset:base", { ethUsd: 3200, usdSek: 10.5 }, "Loaded base valuation preset")
+            }
+            disabled={actionLoading === "preset:base"}
+          >
+            {actionLoading === "preset:base" ? "Applying..." : "Base preset"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              handlePreset("preset:bull", { ethUsd: 4500, usdSek: 11.2 }, "Loaded higher market preset")
+            }
+            disabled={actionLoading === "preset:bull"}
+          >
+            {actionLoading === "preset:bull" ? "Applying..." : "Higher market"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              handlePreset("preset:bear", { ethUsd: 1800, usdSek: 9.8 }, "Loaded lower market preset")
+            }
+            disabled={actionLoading === "preset:bear"}
+          >
+            {actionLoading === "preset:bear" ? "Applying..." : "Lower market"}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() =>
+              handlePreset("preset:clear", { ethUsd: 0, usdSek: 0 }, "Cleared runtime valuation snapshot")
+            }
+            disabled={actionLoading === "preset:clear"}
+          >
+            {actionLoading === "preset:clear" ? "Clearing..." : "Clear runtime"}
+          </Button>
+        </div>
+      </div>
+
+      {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
+      {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </>
+  );
+}
+
 function EmptyTools() {
   return (
     <p className="dev-tools-message">
@@ -374,6 +614,34 @@ export function DevToolsRail() {
             gameName={activeGame?.name}
           />
         ),
+      };
+    }
+
+    if (location.pathname.startsWith("/games/") && location.pathname.endsWith("/nfts")) {
+      const gameId = location.pathname.split("/")[2];
+      if (!gameId) {
+        return null;
+      }
+
+      return {
+        title: "Dev Tools",
+        description:
+          "Create and clear seeded NFT templates and minted inventory without mixing the controls into the product UI.",
+        content: (
+          <NFTManagementTools
+            studioId={studioSession.studioId}
+            gameId={gameId}
+          />
+        ),
+      };
+    }
+
+    if (location.pathname === "/settings") {
+      return {
+        title: "Dev Tools",
+        description:
+          "Swap valuation snapshots quickly so we can test settings, portfolio and tax-facing UI against fresh runtime inputs.",
+        content: <SettingsTools />,
       };
     }
 
