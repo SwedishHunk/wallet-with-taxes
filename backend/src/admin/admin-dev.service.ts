@@ -18,6 +18,11 @@ import { ethers } from "ethers";
 import { encryptPrivateKey } from "../shared/crypto.util";
 import { JwtService } from "@nestjs/jwt";
 import { JwtUser } from "../auth/jwt-user.interface";
+import {
+  EconomicDirection,
+  EconomicScopeType,
+} from "../economics/entities/economic-event.entity";
+import { EconomicsService } from "../economics/economics.service";
 
 interface DevBootstrapOptions {
   mode?: "player" | "studio" | "admin";
@@ -39,6 +44,7 @@ export class AdminDevService {
     private readonly usersService: UsersService,
     private readonly platformService: PlatformService,
     private readonly studioMemberService: StudioMemberService,
+    private readonly economicsService: EconomicsService,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
     @InjectRepository(User)
@@ -775,6 +781,312 @@ export class AdminDevService {
     return {
       studioId,
       removed,
+    };
+  }
+
+  async seedEconomics(
+    options: { studioId: string; gameId?: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim() || undefined;
+    const requestedCount = options.count ?? 10;
+    const count = Math.max(1, Math.min(requestedCount, 50));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const studio = await this.studioRepo.findOne({ where: { id: studioId } });
+    if (!studio) {
+      throw new AppException("Studio not found", 404);
+    }
+
+    let game: Game | null = null;
+    if (gameId) {
+      game = await this.gameRepo.findOne({
+        where: { id: gameId, studio: { id: studioId } },
+      });
+      if (!game) {
+        throw new AppException("Game not found in studio", 404);
+      }
+    }
+
+    const created: string[] = [];
+    const eventTypes = [
+      "dev_buy",
+      "dev_sell",
+      "dev_reward",
+      "dev_fee",
+    ] as const;
+
+    for (let index = 0; index < count; index += 1) {
+      const direction =
+        index % 4 === 0
+          ? EconomicDirection.OUT
+          : index % 3 === 0
+            ? EconomicDirection.NEUTRAL
+            : EconomicDirection.IN;
+
+      const amount = (10 + index * 3).toFixed(2);
+      const walletAddress = `0x${(1000 + index).toString(16).padStart(40, "0")}`;
+      const eventType = eventTypes[index % eventTypes.length];
+
+      const event = await this.economicsService.logEvent({
+        source: "devtools",
+        eventType,
+        scopeType: game ? EconomicScopeType.GAME : EconomicScopeType.STUDIO,
+        studioId,
+        gameId: game?.id ?? null,
+        walletAddress,
+        assetKey: "tri",
+        assetSymbol: "TRI",
+        amount,
+        direction,
+        metadata: {
+          seeded: true,
+          studioName: studio.name,
+          gameName: game?.name ?? null,
+        },
+      });
+
+      created.push(event.id);
+    }
+
+    return {
+      studioId,
+      gameId: game?.id ?? null,
+      count: created.length,
+    };
+  }
+
+  async clearSeedEconomics(
+    options: { studioId: string; gameId?: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim() || undefined;
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+
+    const query = this.dataSource
+      .getRepository("economic_events")
+      .createQueryBuilder()
+      .delete()
+      .from("economic_events")
+      .where(`metadata ->> 'seeded' = 'true'`)
+      .andWhere(`"studioId" = :studioId`, { studioId });
+
+    if (gameId) {
+      query.andWhere(`"gameId" = :gameId`, { gameId });
+    }
+
+    const result = await query.execute();
+
+    return {
+      studioId,
+      gameId: gameId ?? null,
+      removed: result.affected ?? 0,
+    };
+  }
+
+  async getSystemState(providedKey?: string) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const [
+      users,
+      studios,
+      members,
+      games,
+      sandboxMembers,
+      sandboxGames,
+      sandboxEconomicEvents,
+      transactionsRaw,
+      taxEventsRaw,
+      economicEventsRaw,
+      listingsRaw,
+      nftInstancesRaw,
+    ] = await Promise.all([
+      this.userRepo.count(),
+      this.studioRepo.count(),
+      this.memberRepo.count(),
+      this.gameRepo.count(),
+      this.userRepo.count({
+        where: [],
+      }).then(async () => {
+        const result = await this.userRepo
+          .createQueryBuilder("user")
+          .where("user.email LIKE :seedPattern", {
+            seedPattern: "seed-member-%@triolith.local",
+          })
+          .getCount();
+        return result;
+      }),
+      this.gameRepo
+        .createQueryBuilder("game")
+        .where("game.slug LIKE :seedPattern", {
+          seedPattern: "seed-game-%",
+        })
+        .getCount(),
+      this.dataSource
+        .createQueryBuilder()
+        .select("COUNT(*)", "count")
+        .from("economic_events", "ev")
+        .where(`ev.metadata ->> 'seeded' = 'true'`)
+        .getRawOne<{ count: string }>()
+        .then((row) => Number(row?.count ?? "0")),
+      this.dataSource
+        .query(`SELECT COUNT(*)::text AS count FROM shop_events`)
+        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+      this.dataSource
+        .query(`SELECT COUNT(*)::text AS count FROM "tax_event"`)
+        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0"))
+        .catch(() => 0),
+      this.dataSource
+        .query(`SELECT COUNT(*)::text AS count FROM economic_events`)
+        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+      this.dataSource
+        .query(`SELECT COUNT(*)::text AS count FROM marketplace_listings`)
+        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+      this.dataSource
+        .query(`SELECT COUNT(*)::text AS count FROM nft_instances`)
+        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+    ]);
+
+    return {
+      mode: "local-dev",
+      totals: {
+        users,
+        studios,
+        members,
+        games,
+        transactions: transactionsRaw,
+        taxEvents: taxEventsRaw,
+        economicEvents: economicEventsRaw,
+        listings: listingsRaw,
+        nftInstances: nftInstancesRaw,
+      },
+      sandbox: {
+        members: sandboxMembers,
+        games: sandboxGames,
+        economicEvents: sandboxEconomicEvents,
+      },
+    };
+  }
+
+  async clearSandboxData(providedKey?: string) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const seededGames = await this.gameRepo
+      .createQueryBuilder("game")
+      .leftJoinAndSelect("game.studio", "studio")
+      .where("game.slug LIKE :seedPattern", {
+        seedPattern: "seed-game-%",
+      })
+      .getMany();
+
+    let removedGames = 0;
+    for (const game of seededGames) {
+      await this.purgeGame(game.id);
+      removedGames += 1;
+    }
+
+    const seededMembers = await this.memberRepo
+      .createQueryBuilder("member")
+      .innerJoinAndSelect("member.user", "user")
+      .andWhere("member.isOwner = false")
+      .andWhere("user.email LIKE :seedPattern", {
+        seedPattern: "seed-member-%@triolith.local",
+      })
+      .getMany();
+
+    let removedMembers = 0;
+    let removedUsers = 0;
+    for (const member of seededMembers) {
+      await this.memberRepo.remove(member);
+      removedMembers += 1;
+
+      if (member.user?.id) {
+        const remainingMemberships = await this.memberRepo
+          .createQueryBuilder("member")
+          .innerJoin("member.user", "user")
+          .where("user.id = :userId", { userId: member.user.id })
+          .getCount();
+        if (remainingMemberships === 0) {
+          await this.userRepo.delete({ id: member.user.id });
+          removedUsers += 1;
+        }
+      }
+    }
+
+    const economicsDeleted = await this.dataSource
+      .createQueryBuilder()
+      .delete()
+      .from("economic_events")
+      .where(`metadata ->> 'seeded' = 'true'`)
+      .execute();
+
+    return {
+      removedGames,
+      removedMembers,
+      removedUsers,
+      removedEconomicEvents: economicsDeleted.affected ?? 0,
+    };
+  }
+
+  async fullLocalReset(confirmPhrase?: string, providedKey?: string) {
+    this.assertBootstrapAllowed(providedKey);
+
+    if (confirmPhrase !== "RESET LOCAL DEV DATA") {
+      throw new AppException(
+        'Full reset requires confirmPhrase "RESET LOCAL DEV DATA"',
+        400,
+      );
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await queryRunner.query(`DELETE FROM admin_audit_log`);
+      await queryRunner.query(`DELETE FROM marketplace_listings`);
+      await queryRunner.query(`DELETE FROM ledger_entries`);
+      await queryRunner.query(`DELETE FROM shop_events`);
+      await queryRunner.query(`DELETE FROM economic_events`);
+      await queryRunner.query(`DELETE FROM "tax_event"`);
+      await queryRunner.query(`DELETE FROM "tax_cost_basis"`);
+      await queryRunner.query(`DELETE FROM tax_projection_state`);
+      await queryRunner.query(`DELETE FROM nft_instances`);
+      await queryRunner.query(`DELETE FROM game_wallets`);
+      await queryRunner.query(`DELETE FROM wallet_deposit_intents`);
+      await queryRunner.query(`DELETE FROM player_nonce`);
+      await queryRunner.query(`DELETE FROM game_players`);
+      await queryRunner.query(`DELETE FROM player_wallet_identities`);
+      await queryRunner.query(`DELETE FROM nft_templates`);
+      await queryRunner.query(`DELETE FROM games`);
+      await queryRunner.query(`DELETE FROM studio_members`);
+      await queryRunner.query(`DELETE FROM studio_user`);
+      await queryRunner.query(`DELETE FROM studios`);
+      await queryRunner.query(`DELETE FROM "user" WHERE "isAdmin" = false`);
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    return {
+      success: true,
+      preserved: ["Triolith admin users", "platform config"],
     };
   }
 

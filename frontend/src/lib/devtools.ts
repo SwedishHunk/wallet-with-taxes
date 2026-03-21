@@ -112,3 +112,46 @@ export const devRestoreSession = (returnToken?: string) =>
       headers: withReturnToken(returnToken),
     },
   );
+
+export type DevSystemStateResponse = {
+  mode: string;
+  totals: {
+    users: number;
+    studios: number;
+    members: number;
+    games: number;
+    transactions: number;
+    taxEvents: number;
+    economicEvents: number;
+    listings: number;
+    nftInstances: number;
+  };
+  sandbox: {
+    members: number;
+    games: number;
+    economicEvents: number;
+  };
+};
+
+export const devGetSystemState = () =>
+  api.get<DevSystemStateResponse>("/admin/dev/system-state", {
+    headers: devHeaders,
+  });
+
+export const devClearSandboxData = () =>
+  api.post(
+    "/admin/dev/clear-sandbox-data",
+    {},
+    {
+      headers: devHeaders,
+    },
+  );
+
+export const devFullLocalReset = (confirmPhrase: string) =>
+  api.post(
+    "/admin/dev/full-local-reset",
+    { confirmPhrase },
+    {
+      headers: devHeaders,
+    },
+  );

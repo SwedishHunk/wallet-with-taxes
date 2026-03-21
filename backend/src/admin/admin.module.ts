@@ -16,6 +16,7 @@ import { AdminAuditLog } from "./admin-audit-log.entity";
 import { UsersModule } from "../users/users.module";
 import { PlatformModule } from "../platform/platform.module";
 import { AuthModule } from "../auth/auth.module";
+import { EconomicsModule } from "../economics/economics.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AuthModule } from "../auth/auth.module";
     AuthModule,
     UsersModule,
     PlatformModule,
+    EconomicsModule,
   ],
   controllers: [AdminController, AdminDevController],
   providers: [AdminService, AdminDevService],

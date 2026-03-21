@@ -4,6 +4,13 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { api } from "../../lib/api";
 import { Page, PageHeader, Card } from "../../components/ui/index";
 import { useCountUp } from "../../hooks/useCountUp";
+import {
+  devClearSandboxData,
+  devFullLocalReset,
+  devGetSystemState,
+  type DevSystemStateResponse,
+} from "../../lib/devtools";
+import { getDevtoolsMode, setDevtoolsMode, type DevtoolsMode } from "../../lib/devtoolsMode";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -180,6 +187,11 @@ export default function TriolithAdminPage() {
   const [expandedStudioId, setExpandedStudioId] = useState<string | null>(null);
   const [studioGames, setStudioGames] = useState<Record<string, GameRow[]>>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [devtoolsMode, setDevtoolsModeState] = useState<DevtoolsMode>(() => getDevtoolsMode());
+  const [systemState, setSystemState] = useState<DevSystemStateResponse | null>(null);
+  const [devActionMessage, setDevActionMessage] = useState("");
+  const [resetPhrase, setResetPhrase] = useState("");
+  const [devActionLoading, setDevActionLoading] = useState<string | null>(null);
   const TX_LIMIT = 25;
 
   // Refs for GSAP animations
@@ -190,6 +202,12 @@ export default function TriolithAdminPage() {
   const txRef = useRef<HTMLDivElement>(null);
   const usersRef = useRef<HTMLDivElement>(null);
   const auditRef = useRef<HTMLDivElement>(null);
+
+  const loadSystemState = () => {
+    void devGetSystemState()
+      .then((r) => setSystemState(r.data))
+      .catch(handleError);
+  };
 
   const fetchAuditLog = () => {
     void api
@@ -206,6 +224,7 @@ export default function TriolithAdminPage() {
     void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
     void api.get<StudioEcoRow[]>("/admin/economics/studios").then((r) => setStudioEco(r.data));
     fetchAuditLog();
+    loadSystemState();
     void api
       .get<{ feePercent: number }>("/admin/platform/fee")
       .then((r) => {
@@ -304,6 +323,55 @@ export default function TriolithAdminPage() {
       (err instanceof Error ? err.message : "Action failed");
     setActionError(msg);
     setTimeout(() => setActionError(null), 4000);
+  };
+
+  const handleModeChange = (mode: DevtoolsMode) => {
+    setDevtoolsMode(mode);
+    setDevtoolsModeState(mode);
+    setDevActionMessage(
+      mode === "sandbox"
+        ? "Sandbox mode enabled"
+        : "Live-like mode enabled",
+    );
+    setTimeout(() => setDevActionMessage(""), 2500);
+  };
+
+  const handleClearSandbox = () => {
+    const confirmed = window.confirm(
+      "Clear all seeded sandbox data across the local environment?",
+    );
+    if (!confirmed) return;
+
+    setDevActionLoading("clear-sandbox");
+    setDevActionMessage("");
+    void devClearSandboxData()
+      .then((r) => {
+        setDevActionMessage(
+          `Removed ${r.data.removedMembers} members, ${r.data.removedGames} games, ${r.data.removedEconomicEvents} economic events`,
+        );
+        loadSystemState();
+        fetchAuditLog();
+      })
+      .catch(handleError)
+      .finally(() => setDevActionLoading(null));
+  };
+
+  const handleFullReset = () => {
+    setDevActionLoading("full-reset");
+    setDevActionMessage("");
+    void devFullLocalReset(resetPhrase)
+      .then(() => {
+        setDevActionMessage("Local reset completed");
+        setResetPhrase("");
+        loadSystemState();
+        fetchAuditLog();
+        void api.get<StudioRow[]>("/admin/studios").then((r) => setStudios(r.data));
+        void api.get<UserRow[]>("/admin/users").then((r) => setUsers(r.data));
+        void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
+        void api.get<StudioEcoRow[]>("/admin/economics/studios").then((r) => setStudioEco(r.data));
+      })
+      .catch(handleError)
+      .finally(() => setDevActionLoading(null));
   };
 
   const toggleStudioStatus = (studio: StudioRow) => {
@@ -555,6 +623,140 @@ export default function TriolithAdminPage() {
           )}
         </Card>
       </div>
+
+      <Card style={{ marginBottom: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+          <div style={{ minWidth: "260px", flex: "1 1 320px" }}>
+            <h3 style={{ marginBottom: "0.5rem", fontWeight: 600 }}>
+              Reset & Sandbox
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+              Central control plane for local dev data. Sandbox is the safe default;
+              full reset clears the local environment while preserving admin access.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+              <button
+                onClick={() => handleModeChange("sandbox")}
+                style={btnStyle(devtoolsMode === "sandbox" ? "success" : "neutral")}
+              >
+                Sandbox mode
+              </button>
+              <button
+                onClick={() => handleModeChange("live-like")}
+                style={btnStyle(devtoolsMode === "live-like" ? "neutral" : "neutral")}
+              >
+                Live-like mode
+              </button>
+              <button
+                onClick={loadSystemState}
+                style={btnStyle("neutral")}
+              >
+                Refresh state
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+              <button
+                onClick={handleClearSandbox}
+                style={btnStyle("danger")}
+                disabled={devActionLoading === "clear-sandbox"}
+              >
+                {devActionLoading === "clear-sandbox" ? "Clearing..." : "Clear sandbox data"}
+              </button>
+            </div>
+
+            <div
+              style={{
+                padding: "0.9rem",
+                borderRadius: "12px",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                background: "rgba(239, 68, 68, 0.06)",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: "0.4rem" }}>Full local reset</div>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: "0.6rem" }}>
+                Deletes local platform data, clears users/studios/games/transactions,
+                and keeps platform admin access intact.
+              </p>
+              <input
+                value={resetPhrase}
+                onChange={(e) => setResetPhrase(e.target.value)}
+                placeholder='Type: RESET LOCAL DEV DATA'
+                style={{
+                  width: "100%",
+                  padding: "0.55rem 0.7rem",
+                  fontSize: "0.85rem",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  background: "rgba(255, 255, 255, 0.04)",
+                  color: "var(--text)",
+                  marginBottom: "0.6rem",
+                }}
+              />
+              <button
+                onClick={handleFullReset}
+                style={btnStyle("danger")}
+                disabled={
+                  devActionLoading === "full-reset" ||
+                  resetPhrase !== "RESET LOCAL DEV DATA"
+                }
+              >
+                {devActionLoading === "full-reset" ? "Resetting..." : "Run full local reset"}
+              </button>
+            </div>
+
+            {devActionMessage ? (
+              <p style={{ marginTop: "0.75rem", color: "#7ef7cf", fontSize: "0.85rem" }}>
+                {devActionMessage}
+              </p>
+            ) : null}
+          </div>
+
+          <div style={{ minWidth: "260px", flex: "1 1 320px" }}>
+            <h4 style={{ marginBottom: "0.5rem", fontWeight: 600 }}>Current local state</h4>
+            {systemState ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Users</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.users}</div>
+                </div>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Studios</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.studios}</div>
+                </div>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Games</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.games}</div>
+                </div>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Members</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.members}</div>
+                </div>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Transactions</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.transactions}</div>
+                </div>
+                <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Economic events</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.economicEvents}</div>
+                </div>
+                <div style={{ gridColumn: "1 / -1", padding: "0.8rem", borderRadius: "12px", background: "rgba(0, 212, 255, 0.06)", border: "1px solid rgba(0, 212, 255, 0.14)" }}>
+                  <div style={{ fontWeight: 700, marginBottom: "0.35rem" }}>
+                    Sandbox data
+                  </div>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                    {systemState.sandbox.members} seeded members · {systemState.sandbox.games} seeded games · {systemState.sandbox.economicEvents} seeded economic events
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                Loading system state...
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* ── Economics per Studio ── */}
       <div ref={ecoRef}>

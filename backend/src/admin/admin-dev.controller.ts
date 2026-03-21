@@ -38,6 +38,17 @@ interface DevClearSeedGamesBody {
   studioId: string;
 }
 
+interface DevSeedEconomicsBody {
+  studioId: string;
+  gameId?: string;
+  count?: number;
+}
+
+interface DevClearEconomicsBody {
+  studioId: string;
+  gameId?: string;
+}
+
 interface DevSwitchSessionBody {
   studioId: string;
   memberId?: string;
@@ -45,6 +56,10 @@ interface DevSwitchSessionBody {
 
 interface DevRestoreSessionBody {
   returnToken?: string;
+}
+
+interface DevFullResetBody {
+  confirmPhrase?: string;
 }
 
 function cookieOpts(): CookieOptions {
@@ -71,6 +86,13 @@ export class AdminDevController {
       returnToken,
       req.cookies?.access_token,
     );
+  }
+
+  @Get("system-state")
+  async getSystemState(
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.getSystemState(devBootstrapKey);
   }
 
   @Post("bootstrap")
@@ -123,6 +145,40 @@ export class AdminDevController {
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
     return this.adminDevService.clearSeedGames(body, devBootstrapKey);
+  }
+
+  @Post("seed-economics")
+  async seedEconomics(
+    @Body() body: DevSeedEconomicsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedEconomics(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-economics")
+  async clearSeedEconomics(
+    @Body() body: DevClearEconomicsBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedEconomics(body, devBootstrapKey);
+  }
+
+  @Post("clear-sandbox-data")
+  async clearSandboxData(
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSandboxData(devBootstrapKey);
+  }
+
+  @Post("full-local-reset")
+  async fullLocalReset(
+    @Body() body: DevFullResetBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.fullLocalReset(
+      body.confirmPhrase,
+      devBootstrapKey,
+    );
   }
 
   @Post("switch-session")
