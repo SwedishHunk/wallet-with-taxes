@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, Button } from "../components/ui";
@@ -9,6 +9,7 @@ import {
   devSwitchSession,
   SessionSwitchStudio,
 } from "../lib/devtools";
+import { readDevToolsTargets, writeDevToolsTargets } from "../lib/devtoolsTargets";
 import { ROUTES } from "../routes";
 import "./SessionSwitcherRail.css";
 
@@ -42,6 +43,14 @@ function writeStoredState(state: StoredImpersonationState | null) {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function toDisplayName(email?: string | null) {
+  if (!email) return "Unknown";
+  const localPart = email.split("@")[0] ?? email;
+  return localPart
+    .replace(/[.+_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export function SessionSwitcherRail() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,6 +68,8 @@ export function SessionSwitcherRail() {
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showDrawer, setShowDrawer] = useState(false);
+  const [expandedStudios, setExpandedStudios] = useState<Record<string, boolean>>({});
+  const [targetsState, setTargetsState] = useState(() => readDevToolsTargets());
 
   const isAdminSession = authContext.studioSession?.isTriolithAdmin === true;
   const returnToken = storedState?.returnToken;
@@ -76,20 +87,40 @@ export function SessionSwitcherRail() {
     const roleLabel = storedState.targetRole
       ? ` · ${storedState.targetRole}`
       : "";
-    return `${storedState.targetEmail}${roleLabel}`;
+    return `${toDisplayName(storedState.targetEmail)}${roleLabel}`;
   }, [isAdminSession, storedState]);
 
-  useEffect(() => {
-    if (!canShow) return;
+  const controlledStudioId = authContext.studioSession?.studioId ?? null;
+  const controlledStudioName = authContext.studioSession?.studioName ?? null;
+  const controlledMemberId = authContext.memberSession?.memberId ?? null;
+  const controlledMemberEmail = authContext.memberSession?.email ?? null;
+  const controlledRole = authContext.memberSession?.isOwner
+    ? "owner"
+    : storedState?.targetRole ?? "member";
+  const targetedStudio = studios.find((studio) => studio.id === targetsState.studioId) ?? null;
+  const targetedMember =
+    targetedStudio?.members.find((member) => member.id === targetsState.memberId) ?? null;
+
+  const loadTargets = useCallback(() => {
+    if (!canShow) return Promise.resolve();
 
     let cancelled = false;
     setLoading(true);
     setError("");
 
-    void devGetSessionTargets(returnToken)
+    const request = devGetSessionTargets(returnToken)
       .then(({ data }) => {
         if (cancelled) return;
         setStudios(data.studios);
+        setExpandedStudios((current) => {
+          const next = { ...current };
+          for (const studio of data.studios) {
+            if (!(studio.id in next)) {
+              next[studio.id] = controlledStudioId === studio.id;
+            }
+          }
+          return next;
+        });
 
         if (!storedState && data.returnToken) {
           const nextState = { returnToken: data.returnToken };
@@ -108,10 +139,36 @@ export function SessionSwitcherRail() {
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
+    return request.finally(() => {
       cancelled = true;
+    });
+  }, [canShow, controlledStudioId, returnToken, storedState]);
+
+  useEffect(() => {
+    const syncTargets = () => {
+      setTargetsState(readDevToolsTargets());
     };
-  }, [canShow, returnToken, storedState]);
+
+    window.addEventListener("devtools:targets:change", syncTargets);
+    return () => {
+      window.removeEventListener("devtools:targets:change", syncTargets);
+    };
+  }, []);
+
+  useEffect(() => {
+    void loadTargets();
+  }, [loadTargets]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      void loadTargets();
+    };
+
+    window.addEventListener("devtools:admin:refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("devtools:admin:refresh", handleRefresh);
+    };
+  }, [loadTargets]);
 
   useEffect(() => {
     if (!canShow) {
@@ -194,6 +251,38 @@ export function SessionSwitcherRail() {
     }
   };
 
+  const toggleExpanded = (studioId: string) => {
+    setExpandedStudios((current) => ({
+      ...current,
+      [studioId]: !current[studioId],
+    }));
+  };
+
+  const handleTargetStudio = (studioId: string) => {
+    const currentTargets = readDevToolsTargets();
+    const nextStudioId = currentTargets.studioId === studioId ? undefined : studioId;
+    const nextState = {
+      studioId: nextStudioId,
+      memberId: undefined,
+      gameId: nextStudioId === currentTargets.studioId ? currentTargets.gameId : undefined,
+    };
+    writeDevToolsTargets(nextState);
+    setTargetsState(nextState);
+  };
+
+  const handleTargetMember = (studioId: string, memberId: string) => {
+    const currentTargets = readDevToolsTargets();
+    const sameTarget =
+      currentTargets.studioId === studioId && currentTargets.memberId === memberId;
+    const nextState = {
+      studioId: sameTarget ? undefined : studioId,
+      memberId: sameTarget ? undefined : memberId,
+      gameId: sameTarget ? currentTargets.gameId : undefined,
+    };
+    writeDevToolsTargets(nextState);
+    setTargetsState(nextState);
+  };
+
   if (!canShow || typeof document === "undefined") {
     return null;
   }
@@ -203,9 +292,38 @@ export function SessionSwitcherRail() {
       <div className="session-switcher-eyebrow">Session Switcher</div>
       <h3 className="session-switcher-title">{activeLabel}</h3>
       <p className="session-switcher-copy">
-        Switch into a real studio/member session, then jump back to admin
-        without logging in again.
+        `Target` keeps you in admin. `Enter` switches your actual session.
       </p>
+
+      <div className="session-switcher-summary-grid">
+        {controlledStudioName ? (
+          <div className="session-switcher-current">
+            <div className="session-switcher-current-label">Current session</div>
+            <div className="session-switcher-current-title">{controlledStudioName}</div>
+            <div className="session-switcher-current-meta">
+              {isAdminSession
+                ? "Admin control plane"
+                : controlledMemberEmail
+                  ? `${toDisplayName(controlledMemberEmail)} as ${controlledRole}`
+                  : `Studio session as ${controlledRole}`}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="session-switcher-current session-switcher-target-summary-card">
+          <div className="session-switcher-current-label">Current target</div>
+          <div className="session-switcher-current-title">
+            {targetedStudio ? targetedStudio.name : "No target selected"}
+          </div>
+          <div className="session-switcher-current-meta">
+            {targetedMember
+              ? `${toDisplayName(targetedMember.email)} (${targetedMember.role})`
+              : targetedStudio
+                ? "Studio-level target"
+                : "Choose Target on a studio or member below"}
+          </div>
+        </div>
+      </div>
 
       {!isAdminSession && returnToken ? (
         <Button
@@ -228,51 +346,160 @@ export function SessionSwitcherRail() {
       ) : null}
 
       <div className="session-switcher-groups">
-        {studios.map((studio) => (
-          <section key={studio.id} className="session-switcher-group">
+        {studios.map((studio) => {
+          const primaryTarget =
+            studio.members.find((member) => member.isOwner) ?? studio.members[0] ?? null;
+          const isExpanded = expandedStudios[studio.id] ?? false;
+          const nonOwnerMembers = studio.members.filter((member) => !member.isOwner);
+
+          return (
+          <section
+            key={studio.id}
+            className={`session-switcher-group${
+              controlledStudioId === studio.id ? " session-switcher-group-current" : ""
+            }${studio.status === "suspended" ? " session-switcher-group-suspended" : ""}`}
+          >
             <div className="session-switcher-group-header">
               <div>
-                <div className="session-switcher-group-title">{studio.name}</div>
+                <div className="session-switcher-group-title-row">
+                  <button
+                    type="button"
+                    className="session-switcher-group-toggle"
+                    onClick={() => toggleExpanded(studio.id)}
+                  >
+                    <span>{isExpanded ? "▼" : "▶"}</span>
+                    <span className="session-switcher-group-title">{studio.name}</span>
+                  </button>
+                  {controlledStudioId === studio.id ? (
+                    <span className="session-switcher-badge session-switcher-badge-current">
+                      Current
+                    </span>
+                  ) : null}
+                  {targetsState.studioId === studio.id && !targetsState.memberId ? (
+                    <span className="session-switcher-badge session-switcher-badge-target">
+                      Targeted
+                    </span>
+                  ) : null}
+                  {studio.status === "suspended" ? (
+                    <span className="session-switcher-badge session-switcher-badge-suspended">
+                      Suspended
+                    </span>
+                  ) : null}
+                </div>
                 <div className="session-switcher-group-subtitle">
-                  {studio.status}
+                  Studio status: {studio.status}
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => handleSwitch(studio.id)}
-                disabled={actionKey === `switch:${studio.id}:owner`}
-              >
-                {actionKey === `switch:${studio.id}:owner`
-                  ? "Switching..."
-                  : "As owner"}
-              </Button>
+              <div className="session-switcher-group-actions">
+                <button
+                  type="button"
+                  className={`session-switcher-action-btn${
+                    targetsState.studioId === studio.id && !targetsState.memberId
+                      ? " session-switcher-action-btn-active"
+                      : ""
+                  }`}
+                  onClick={() => handleTargetStudio(studio.id)}
+                  disabled={studio.status === "suspended"}
+                >
+                  {targetsState.studioId === studio.id && !targetsState.memberId
+                    ? "Targeted"
+                    : "Target"}
+                </button>
+                <button
+                  type="button"
+                  className="session-switcher-action-btn"
+                  onClick={() => handleSwitch(studio.id, primaryTarget?.id)}
+                  disabled={
+                    actionKey === `switch:${studio.id}:${primaryTarget?.id ?? "none"}` ||
+                    studio.status === "suspended" ||
+                    !primaryTarget
+                  }
+                >
+                  {actionKey === `switch:${studio.id}:${primaryTarget?.id ?? "none"}`
+                    ? "Entering..."
+                    : studio.status === "suspended"
+                      ? "Suspended"
+                      : primaryTarget
+                        ? "Enter"
+                        : "No member"}
+                </button>
+              </div>
             </div>
 
+            {isExpanded ? (
             <div className="session-switcher-targets">
-              {studio.members
-                .filter((member) => !member.isOwner)
-                .map((member) => (
-                  <button
+              {nonOwnerMembers.length ? (
+                nonOwnerMembers.map((member) => (
+                  <div
                     key={member.id}
-                    type="button"
-                    className="session-switcher-target"
-                    onClick={() => handleSwitch(studio.id, member.id)}
-                    disabled={Boolean(actionKey)}
+                    className={`session-switcher-target-row${
+                      controlledStudioId === studio.id && controlledMemberId === member.id
+                        ? " session-switcher-target-row-current"
+                        : ""
+                    }`}
                   >
-                    <span className="session-switcher-target-email">
-                      {member.email}
-                    </span>
-                    <span className="session-switcher-target-meta">
-                      {member.role}
-                      {member.permissions.length
-                        ? ` · ${member.permissions.join(", ")}`
-                        : " · no extra permissions"}
-                    </span>
-                  </button>
-                ))}
+                    <div className="session-switcher-target-summary">
+                      <div className="session-switcher-target-email">
+                        {toDisplayName(member.email)}
+                      </div>
+                      <div className="session-switcher-target-meta">
+                        {toDisplayName(member.email)}
+                        {" · "}
+                        {member.role}
+                        {member.permissions.length
+                          ? ` · ${member.permissions.length} permission${member.permissions.length === 1 ? "" : "s"}`
+                          : " · no extra permissions"}
+                      </div>
+                      <div className="session-switcher-target-badges">
+                        {controlledStudioId === studio.id && controlledMemberId === member.id ? (
+                          <span className="session-switcher-target-current-label">
+                            Current
+                          </span>
+                        ) : null}
+                        {targetsState.studioId === studio.id &&
+                        targetsState.memberId === member.id ? (
+                          <span className="session-switcher-target-target-label">
+                            Targeted
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="session-switcher-target-actions">
+                      <button
+                        type="button"
+                        className={`session-switcher-action-btn${
+                          targetsState.studioId === studio.id &&
+                          targetsState.memberId === member.id
+                            ? " session-switcher-action-btn-active"
+                            : ""
+                        }`}
+                        onClick={() => handleTargetMember(studio.id, member.id)}
+                        disabled={studio.status === "suspended"}
+                      >
+                        {targetsState.studioId === studio.id &&
+                        targetsState.memberId === member.id
+                          ? "Targeted"
+                          : "Target"}
+                      </button>
+                      <button
+                        type="button"
+                        className="session-switcher-action-btn"
+                        onClick={() => handleSwitch(studio.id, member.id)}
+                        disabled={Boolean(actionKey) || studio.status === "suspended"}
+                      >
+                        Enter
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="session-switcher-target-empty">No extra members in this studio yet.</div>
+              )}
             </div>
+            ) : null}
           </section>
-        ))}
+          );
+        })}
       </div>
     </Card>
   );

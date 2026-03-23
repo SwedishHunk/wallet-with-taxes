@@ -1,5 +1,5 @@
-import { ButtonHTMLAttributes, ReactNode } from "react";
-import { motion } from "framer-motion";
+import { ReactNode } from "react";
+import { motion, type HTMLMotionProps } from "framer-motion";
 import "./ui.css";
 
 type Variant = "primary" | "secondary" | "danger";
@@ -7,7 +7,7 @@ type Variant = "primary" | "secondary" | "danger";
 type ButtonProps = {
   variant?: Variant;
   children: ReactNode;
-} & ButtonHTMLAttributes<HTMLButtonElement>;
+} & Omit<HTMLMotionProps<"button">, "children">;
 
 export function Button({
   variant = "primary",

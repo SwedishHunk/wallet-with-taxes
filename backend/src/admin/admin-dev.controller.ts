@@ -25,6 +25,14 @@ interface DevSeedMembersBody {
   count?: number;
 }
 
+interface DevSeedStudiosBody {
+  count?: number;
+}
+
+interface DevClearSeedStudiosBody {
+  includeAdminBootstrap?: boolean;
+}
+
 interface DevClearSeedMembersBody {
   studioId: string;
 }
@@ -34,6 +42,17 @@ interface DevSeedGamesBody {
   count?: number;
 }
 
+interface DevSeedPlayersBody {
+  studioId: string;
+  gameId: string;
+  count?: number;
+}
+
+interface DevClearSeedPlayersBody {
+  studioId: string;
+  gameId: string;
+}
+
 interface DevClearSeedGamesBody {
   studioId: string;
 }
@@ -41,12 +60,14 @@ interface DevClearSeedGamesBody {
 interface DevSeedEconomicsBody {
   studioId: string;
   gameId?: string;
+  excludeGameId?: string;
   count?: number;
 }
 
 interface DevClearEconomicsBody {
   studioId: string;
   gameId?: string;
+  excludeGameId?: string;
 }
 
 interface DevSeedNftsBody {
@@ -134,6 +155,22 @@ export class AdminDevController {
     return this.adminDevService.seedMembers(body, devBootstrapKey);
   }
 
+  @Post("seed-studios")
+  async seedStudios(
+    @Body() body: DevSeedStudiosBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedStudios(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-studios")
+  async clearSeedStudios(
+    @Body() body: DevClearSeedStudiosBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedStudios(body, devBootstrapKey);
+  }
+
   @Post("clear-seed-members")
   async clearSeedMembers(
     @Body() body: DevClearSeedMembersBody,
@@ -148,6 +185,22 @@ export class AdminDevController {
     @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
   ) {
     return this.adminDevService.seedGames(body, devBootstrapKey);
+  }
+
+  @Post("seed-players")
+  async seedPlayers(
+    @Body() body: DevSeedPlayersBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.seedPlayers(body, devBootstrapKey);
+  }
+
+  @Post("clear-seed-players")
+  async clearSeedPlayers(
+    @Body() body: DevClearSeedPlayersBody,
+    @Headers("x-dev-bootstrap-key") devBootstrapKey?: string,
+  ) {
+    return this.adminDevService.clearSeedPlayers(body, devBootstrapKey);
   }
 
   @Post("clear-seed-games")

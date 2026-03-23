@@ -11,6 +11,16 @@ export const devSeedMembers = (payload: { studioId: string; count?: number }) =>
     headers: devHeaders,
   });
 
+export const devSeedStudios = (payload?: { count?: number }) =>
+  api.post("/admin/dev/seed-studios", payload ?? {}, {
+    headers: devHeaders,
+  });
+
+export const devClearSeedStudios = (payload?: { includeAdminBootstrap?: boolean }) =>
+  api.post("/admin/dev/clear-seed-studios", payload ?? {}, {
+    headers: devHeaders,
+  });
+
 export const devClearSeedMembers = (payload: { studioId: string }) =>
   api.post("/admin/dev/clear-seed-members", payload, {
     headers: devHeaders,
@@ -18,6 +28,23 @@ export const devClearSeedMembers = (payload: { studioId: string }) =>
 
 export const devSeedGames = (payload: { studioId: string; count?: number }) =>
   api.post("/admin/dev/seed-games", payload, {
+    headers: devHeaders,
+  });
+
+export const devSeedPlayers = (payload: {
+  studioId: string;
+  gameId: string;
+  count?: number;
+}) =>
+  api.post("/admin/dev/seed-players", payload, {
+    headers: devHeaders,
+  });
+
+export const devClearSeedPlayers = (payload: {
+  studioId: string;
+  gameId: string;
+}) =>
+  api.post("/admin/dev/clear-seed-players", payload, {
     headers: devHeaders,
   });
 
@@ -29,6 +56,7 @@ export const devClearSeedGames = (payload: { studioId: string }) =>
 export const devSeedEconomics = (payload: {
   studioId: string;
   gameId?: string;
+  excludeGameId?: string;
   count?: number;
 }) =>
   api.post("/admin/dev/seed-economics", payload, {
@@ -38,6 +66,7 @@ export const devSeedEconomics = (payload: {
 export const devClearSeedEconomics = (payload: {
   studioId: string;
   gameId?: string;
+  excludeGameId?: string;
 }) =>
   api.post("/admin/dev/clear-seed-economics", payload, {
     headers: devHeaders,
@@ -184,6 +213,7 @@ export type DevSystemStateResponse = {
     nftInstances: number;
   };
   sandbox: {
+    studios?: number;
     members: number;
     games: number;
     economicEvents: number;

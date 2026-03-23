@@ -138,7 +138,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* ── Nav links — identical style to player page ── */
@@ -178,12 +179,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   padding: 6px 14px;
   background: rgba(var(--primary-rgb), 0.06);
   border: 1px solid rgba(var(--primary-rgb), 0.12);
-  border-radius: 999px;
+  border-radius: 18px;
   font-size: 0.8rem;
-  max-width: 420px;
+  max-width: min(760px, 48vw);
   flex-shrink: 1;
   min-width: 0;
 }
@@ -201,10 +203,12 @@
   color: var(--text-bright);
   font-weight: 600;
   font-size: 0.8rem;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .member-info-compact .divider {
@@ -224,17 +228,23 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
   padding: 0.4rem 0.875rem;
   background: rgba(var(--primary-rgb), 0.06);
   border: 1px solid rgba(var(--primary-rgb), 0.15);
-  border-radius: 999px;
+  border-radius: 18px;
   animation: fadeIn 0.5s ease both;
+  max-width: min(560px, 38vw);
+  min-width: 0;
 }
 
 .studio-name {
   font-weight: 500;
   color: var(--text);
   font-size: 0.875rem;
+  white-space: normal;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .status-badge {
@@ -457,6 +467,18 @@
 
   .admin-links {
     width: 100%;
+    justify-content: center;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .member-info-compact,
+  .studio-info {
+    max-width: 100%;
     justify-content: center;
   }
 

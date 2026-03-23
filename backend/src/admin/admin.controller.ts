@@ -98,6 +98,30 @@ export class AdminController {
     return this.adminService.getStudioGames(id);
   }
 
+  @Get("studios/:id/members")
+  @UseGuards(TriolithGuard)
+  async getStudioMembers(@Param("id") id: string) {
+    return this.adminService.getStudioMembers(id);
+  }
+
+  @Get("studios/:id/players")
+  @UseGuards(TriolithGuard)
+  async getStudioPlayers(@Param("id") id: string) {
+    return this.adminService.getStudioPlayers(id);
+  }
+
+  @Get("studios/:id/transactions")
+  @UseGuards(TriolithGuard)
+  async getStudioTransactions(
+    @Param("id") id: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getStudioTransactions(
+      id,
+      Math.min(limit ? parseInt(limit, 10) : 25, 100),
+    );
+  }
+
   @Patch("users/:id/admin")
   @UseGuards(TriolithGuard)
   async setUserAdmin(
@@ -159,6 +183,24 @@ export class AdminController {
     return this.adminService.getAllGames();
   }
 
+  @Get("games/:id/players")
+  @UseGuards(TriolithGuard)
+  async getGamePlayers(@Param("id") id: string) {
+    return this.adminService.getGamePlayers(id);
+  }
+
+  @Get("games/:id/transactions")
+  @UseGuards(TriolithGuard)
+  async getGameTransactions(
+    @Param("id") id: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.getGameTransactions(
+      id,
+      Math.min(limit ? parseInt(limit, 10) : 25, 100),
+    );
+  }
+
   @Patch("games/:id/status")
   @UseGuards(TriolithGuard)
   async setGameStatus(
@@ -172,6 +214,12 @@ export class AdminController {
       req.user.id,
       req.user.email,
     );
+  }
+
+  @Delete("games/:id")
+  @UseGuards(TriolithGuard)
+  async deleteGame(@Param("id") id: string, @Request() req: AuthRequest) {
+    return this.adminService.deleteGame(id, req.user.id, req.user.email);
   }
 
   @Get("audit-log")

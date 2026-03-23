@@ -1,13 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { Card, Button } from "../components/ui";
 import { useAuthState } from "../lib/AuthContext";
+import { api } from "../lib/api";
 import {
+  devSeedStudios,
+  devClearSeedStudios,
   devSeedMembers,
   devClearSeedMembers,
   devSeedGames,
   devClearSeedGames,
+  devSeedPlayers,
+  devClearSeedPlayers,
   devSeedEconomics,
   devClearSeedEconomics,
   devSeedNftTemplates,
@@ -16,6 +21,7 @@ import {
   devClearSeedNftInstances,
   devSetValuation,
 } from "../lib/devtools";
+import { readDevToolsTargets, writeDevToolsTargets } from "../lib/devtoolsTargets";
 import "./DevToolsRail.css";
 
 type RailConfig = {
@@ -24,13 +30,93 @@ type RailConfig = {
   content: React.ReactNode;
 };
 
+type AdminStudioOption = {
+  id: string;
+  name: string;
+  status: string;
+};
+
+type AdminGameOption = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  studioId: string | null;
+};
+
+function dispatchDevtoolsRefreshBurst(eventNames: string[]) {
+  const uniqueEvents = [...new Set(eventNames)];
+  const delays = [0, 180, 500];
+
+  for (const delay of delays) {
+    window.setTimeout(() => {
+      for (const eventName of uniqueEvents) {
+        window.dispatchEvent(new CustomEvent(eventName));
+      }
+    }, delay);
+  }
+}
+
+function DevToolsSection({
+  title,
+  help,
+  children,
+}: {
+  title: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  const [showHelp, setShowHelp] = useState(false);
+
+  return (
+    <div className="dev-tools-section">
+      <div className="dev-tools-section-header">
+        <div className="dev-tools-section-title">{title}</div>
+        {help ? (
+          <button
+            type="button"
+            className="dev-tools-section-help"
+            onClick={() => setShowHelp((current) => !current)}
+            aria-label={`Toggle help for ${title}`}
+            aria-expanded={showHelp}
+          >
+            ?
+          </button>
+        ) : null}
+      </div>
+      {help && showHelp ? <div className="dev-tools-info">{help}</div> : null}
+      {children}
+    </div>
+  );
+}
+
+function DevToolsStage({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="dev-tools-stage">
+      <div className="dev-tools-stage-header">
+        <div className="dev-tools-stage-title">{title}</div>
+        <div className="dev-tools-stage-subtitle">{subtitle}</div>
+      </div>
+      <div className="dev-tools-stage-content">{children}</div>
+    </section>
+  );
+}
+
 function MembersTools({ studioId }: { studioId: string }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   const refresh = () => {
-    window.dispatchEvent(new CustomEvent("devtools:members:refresh"));
+    dispatchDevtoolsRefreshBurst(["devtools:members:refresh", "devtools:admin:refresh"]);
   };
 
   const handleSeed = async (count: number) => {
@@ -87,6 +173,7 @@ function MembersTools({ studioId }: { studioId: string }) {
         ))}
         <Button
           variant="danger"
+          className="dev-tools-action-clear"
           onClick={handleClear}
           disabled={actionLoading === "clear"}
         >
@@ -105,7 +192,7 @@ function GamesTools({ studioId }: { studioId: string }) {
   const [error, setError] = useState<string>("");
 
   const refresh = () => {
-    window.dispatchEvent(new CustomEvent("devtools:games:refresh"));
+    dispatchDevtoolsRefreshBurst(["devtools:games:refresh", "devtools:admin:refresh"]);
   };
 
   const handleSeed = async (count: number) => {
@@ -162,6 +249,7 @@ function GamesTools({ studioId }: { studioId: string }) {
         ))}
         <Button
           variant="danger"
+          className="dev-tools-action-clear"
           onClick={handleClear}
           disabled={actionLoading === "clear"}
         >
@@ -170,6 +258,439 @@ function GamesTools({ studioId }: { studioId: string }) {
       </div>
       {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
       {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </>
+  );
+}
+
+function AdminStudiosTools() {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const refresh = () => {
+    dispatchDevtoolsRefreshBurst(["devtools:admin:refresh"]);
+  };
+
+  const handleSeed = async (count: number) => {
+    try {
+      setActionLoading(`seed:${count}`);
+      setError("");
+      const { data } = await devSeedStudios({ count });
+      setMessage(`Created ${data.count} seeded studio${data.count === 1 ? "" : "s"}`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed studios",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClear = async () => {
+    const confirmed = window.confirm("Remove all seeded studios and their seeded owners/games?");
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("clear");
+      setError("");
+      const { data } = await devClearSeedStudios();
+      setMessage(`Removed ${data.removedStudios} seeded studios and ${data.removedUsers} seeded users`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear seeded studios",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <DevToolsSection
+      title="Studios"
+      help="Creates fresh studios with seeded owners so the admin overview has real studio data to inspect and manage."
+    >
+      <div className="dev-tools-actions">
+        {[1, 5].map((count) => (
+          <Button
+            key={count}
+            variant="secondary"
+            onClick={() => handleSeed(count)}
+            disabled={actionLoading === `seed:${count}`}
+          >
+            {actionLoading === `seed:${count}` ? `Seeding ${count}...` : `Seed ${count}`}
+          </Button>
+        ))}
+        <Button
+          variant="danger"
+          className="dev-tools-action-clear"
+          onClick={handleClear}
+          disabled={actionLoading === "clear"}
+        >
+          {actionLoading === "clear" ? "Clearing..." : "Clear seeded"}
+        </Button>
+      </div>
+      {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
+      {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </DevToolsSection>
+  );
+}
+
+function PlayersTools({ studioId, gameId, gameName }: { studioId: string; gameId: string; gameName?: string }) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const refresh = () => {
+    dispatchDevtoolsRefreshBurst(["devtools:admin:refresh", "devtools:nfts:refresh"]);
+  };
+
+  const handleSeed = async (count: number) => {
+    try {
+      setActionLoading(`seed:${count}`);
+      setError("");
+      const { data } = await devSeedPlayers({ studioId, gameId, count });
+      setMessage(`Created ${data.count} seeded players for ${gameName ?? "the selected game"}`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not seed players",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClear = async () => {
+    const confirmed = window.confirm(`Remove all seeded players from ${gameName ?? "the selected game"}?`);
+    if (!confirmed) return;
+
+    try {
+      setActionLoading("clear");
+      setError("");
+      const { data } = await devClearSeedPlayers({ studioId, gameId });
+      setMessage(`Removed ${data.removedPlayers} seeded players and ${data.removedUsers} seeded users`);
+      refresh();
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Could not clear seeded players",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <DevToolsSection
+      title="Players in active game"
+      help="Creates disposable players inside the selected game. Use this before NFT seeding or game-specific transactions when you need real players to attach data to."
+    >
+      <div className="dev-tools-actions">
+        {[1, 5, 10].map((count) => (
+          <Button
+            key={count}
+            variant="secondary"
+            onClick={() => handleSeed(count)}
+            disabled={actionLoading === `seed:${count}`}
+          >
+            {actionLoading === `seed:${count}` ? `Seeding ${count}...` : `Seed ${count}`}
+          </Button>
+        ))}
+        <Button
+          variant="danger"
+          className="dev-tools-action-clear"
+          onClick={handleClear}
+          disabled={actionLoading === "clear"}
+        >
+          {actionLoading === "clear" ? "Clearing..." : "Clear seeded"}
+        </Button>
+      </div>
+      {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
+      {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+    </DevToolsSection>
+  );
+}
+
+function AdminTools({
+  studioId,
+  gameId,
+  gameName,
+}: {
+  studioId: string;
+  gameId?: string;
+  gameName?: string;
+}) {
+  return (
+    <>
+      <AdminStudiosTools />
+      <DevToolsSection
+        title="Members in current studio"
+        help="Creates temporary members with different permissions so we can test list size, permission editing, and removal without touching real accounts."
+      >
+        <MembersTools studioId={studioId} />
+      </DevToolsSection>
+      <DevToolsSection
+        title="Games in current studio"
+        help="Creates temporary games in the current studio so we can test game management and active-game switching against fresh data."
+      >
+        <GamesTools studioId={studioId} />
+      </DevToolsSection>
+      {gameId ? (
+        <>
+          <PlayersTools studioId={studioId} gameId={gameId} gameName={gameName} />
+          <DashboardTools studioId={studioId} gameId={gameId} gameName={gameName} />
+          <NFTManagementTools studioId={studioId} gameId={gameId} />
+        </>
+      ) : (
+        <DevToolsSection title="Current studio context">
+          <div className="dev-tools-info">
+            Choose an active game if you want to seed players, transactions, or NFTs. Studio
+            seeding and game seeding work without that, but game-scoped data needs a concrete game.
+          </div>
+        </DevToolsSection>
+      )}
+    </>
+  );
+}
+
+function AdminToolsTargeted({
+  defaultStudioId,
+  defaultGameId,
+}: {
+  defaultStudioId: string;
+  defaultGameId?: string;
+}) {
+  const [studios, setStudios] = useState<AdminStudioOption[]>([]);
+  const [games, setGames] = useState<AdminGameOption[]>([]);
+  const initialTargets = readDevToolsTargets();
+  const [selectedStudioId, setSelectedStudioId] = useState(
+    initialTargets.studioId ?? defaultStudioId,
+  );
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(
+    initialTargets.memberId ?? "",
+  );
+  const [selectedGameId, setSelectedGameId] = useState<string>(
+    initialTargets.gameId ?? defaultGameId ?? "",
+  );
+  const [showTargetTools, setShowTargetTools] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+
+    Promise.all([
+      api.get<AdminStudioOption[]>("/admin/studios"),
+      api.get<AdminGameOption[]>("/admin/games"),
+    ])
+      .then(([studioResponse, gameResponse]) => {
+        if (cancelled) return;
+        setStudios(studioResponse.data);
+        setGames(gameResponse.data);
+
+        const storedTargets = readDevToolsTargets();
+        const preferredStudioId = storedTargets.studioId ?? defaultStudioId;
+        const hasPreferredStudio = studioResponse.data.some((studio) => studio.id === preferredStudioId);
+        const nextStudioId = hasPreferredStudio
+          ? preferredStudioId
+          : studioResponse.data.find((studio) => studio.status === "active")?.id ?? "";
+        setSelectedStudioId(nextStudioId);
+
+        const matchingGames = gameResponse.data.filter((game) => game.studioId === nextStudioId);
+        const preferredGameId = storedTargets.gameId ?? defaultGameId;
+        const hasPreferredGame = matchingGames.some((game) => game.id === preferredGameId);
+        setSelectedGameId(hasPreferredGame ? preferredGameId ?? "" : matchingGames[0]?.id ?? "");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            "Could not load admin seed targets",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    const refresh = () => {
+      void Promise.all([
+        api.get<AdminStudioOption[]>("/admin/studios"),
+        api.get<AdminGameOption[]>("/admin/games"),
+      ]).then(([studioResponse, gameResponse]) => {
+        if (cancelled) return;
+        setStudios(studioResponse.data);
+        setGames(gameResponse.data);
+      });
+    };
+
+    window.addEventListener("devtools:admin:refresh", refresh);
+    const syncTargets = () => {
+      const nextTargets = readDevToolsTargets();
+      if (nextTargets.studioId) {
+        setSelectedStudioId(nextTargets.studioId);
+      }
+      setSelectedMemberId(nextTargets.memberId ?? "");
+      if (nextTargets.gameId !== undefined) {
+        setSelectedGameId(nextTargets.gameId);
+      }
+    };
+    window.addEventListener("devtools:targets:change", syncTargets);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("devtools:admin:refresh", refresh);
+      window.removeEventListener("devtools:targets:change", syncTargets);
+    };
+  }, [defaultGameId, defaultStudioId]);
+
+  useEffect(() => {
+    if (!selectedStudioId) {
+      setSelectedGameId("");
+      return;
+    }
+
+    const studioGames = games.filter((game) => game.studioId === selectedStudioId);
+    if (!studioGames.some((game) => game.id === selectedGameId)) {
+      setSelectedGameId(studioGames[0]?.id ?? "");
+    }
+  }, [games, selectedGameId, selectedStudioId]);
+
+  useEffect(() => {
+    writeDevToolsTargets({
+      studioId: selectedStudioId || undefined,
+      memberId: selectedMemberId || undefined,
+      gameId: selectedGameId || undefined,
+    });
+  }, [selectedGameId, selectedMemberId, selectedStudioId]);
+
+  const selectedGame = games.find((game) => game.id === selectedGameId);
+
+  return (
+    <>
+      <DevToolsStage
+        title="1. Studio"
+        subtitle="Create studios first, then work against the studio you have target-selected in Session Switcher."
+      >
+        <DevToolsSection
+          title="Current studio"
+          help="Studio and member targeting live in Session Switcher on the left. This section only reflects what is currently targeted."
+        >
+          {selectedStudioId ? (
+            <div className="dev-tools-message dev-tools-message-success">
+              Targeting studio {studios.find((studio) => studio.id === selectedStudioId)?.name ?? "selected studio"}
+              {selectedMemberId ? " with a specific member target" : ""}.
+            </div>
+          ) : (
+            <p className="dev-tools-message">
+              Set a target studio in Session Switcher first.
+            </p>
+          )}
+          {loading ? <p className="dev-tools-message">Loading targets...</p> : null}
+          {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
+        </DevToolsSection>
+
+        <AdminStudiosTools />
+
+        {selectedStudioId ? (
+          <DevToolsSection
+            title="Members"
+            help="Creates temporary members inside the targeted studio so the admin overview has real people, permissions, and session targets to inspect."
+          >
+            <MembersTools studioId={selectedStudioId} />
+          </DevToolsSection>
+        ) : null}
+
+        {selectedStudioId ? (
+          <DevToolsSection
+            title="Games"
+            help="Creates temporary games inside the targeted studio so the admin overview can drill into real game structures without leaving admin."
+          >
+            <GamesTools studioId={selectedStudioId} />
+          </DevToolsSection>
+        ) : null}
+      </DevToolsStage>
+
+      <DevToolsStage
+        title="2. Game"
+        subtitle="Choose which game inside the targeted studio the next tools should work on."
+      >
+        <DevToolsSection
+          title="Current game"
+          help="This only sets the game target for admin-side tools. It does not switch your actual session."
+        >
+          {selectedStudioId ? (
+            <>
+              {selectedGame ? (
+                <div className="dev-tools-message dev-tools-message-success">
+                  Target game: <strong>{selectedGame.name}</strong>
+                </div>
+              ) : (
+                <p className="dev-tools-message">No target game selected yet.</p>
+              )}
+              <div className="dev-tools-actions">
+                <Button
+                  variant="secondary"
+                  className="dev-tools-action-inline"
+                  onClick={() => setShowTargetTools((current) => !current)}
+                >
+                  {showTargetTools ? "Hide game picker" : "Set target game"}
+                </Button>
+              </div>
+              {showTargetTools ? (
+                <div className="dev-tools-fieldset">
+                  <label className="dev-tools-field">
+                    <span>Target game</span>
+                    <select
+                      value={selectedGameId}
+                      onChange={(event) => setSelectedGameId(event.target.value)}
+                      className="dev-tools-select"
+                      disabled={games.every((game) => game.studioId !== selectedStudioId)}
+                    >
+                      <option value="">No game selected</option>
+                      {games
+                        .filter((game) => game.studioId === selectedStudioId)
+                        .map((game) => (
+                          <option key={game.id} value={game.id}>
+                            {game.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="dev-tools-message">
+              Choose a target studio first.
+            </p>
+          )}
+        </DevToolsSection>
+      </DevToolsStage>
+
+      <DevToolsStage
+        title="3. Game Data"
+        subtitle="Once a game is targeted, create players, transactions, and NFTs for that game."
+      >
+        {selectedStudioId && selectedGameId ? (
+          <>
+            <PlayersTools studioId={selectedStudioId} gameId={selectedGameId} gameName={selectedGame?.name} />
+            <DashboardTools studioId={selectedStudioId} gameId={selectedGameId} gameName={selectedGame?.name} />
+            <NFTManagementTools studioId={selectedStudioId} gameId={selectedGameId} />
+          </>
+        ) : (
+          <DevToolsSection title="Game data unavailable">
+            <div className="dev-tools-info">
+              Pick a target studio and a target game above before seeding players, transactions, or NFTs.
+            </div>
+          </DevToolsSection>
+        )}
+      </DevToolsStage>
     </>
   );
 }
@@ -188,20 +709,26 @@ function DashboardTools({
   const [error, setError] = useState("");
 
   const refresh = () => {
-    window.dispatchEvent(new CustomEvent("devtools:dashboard:refresh"));
+    dispatchDevtoolsRefreshBurst(["devtools:dashboard:refresh", "devtools:admin:refresh"]);
   };
 
   const handleSeedStudio = async (count: number) => {
     try {
       setActionLoading(`studio-seed:${count}`);
       setError("");
-      const { data } = await devSeedEconomics({ studioId, count });
-      setMessage(`Created ${data.count} studio economic events`);
+      const { data } = await devSeedEconomics({
+        studioId,
+        excludeGameId: gameId,
+        count,
+      });
+      setMessage(
+        `Created ${data.count} events across ${data.targetGameCount} other studio game${data.targetGameCount === 1 ? "" : "s"}`,
+      );
       refresh();
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Could not seed studio economic events",
+          ?.message || "Could not seed whole-studio events",
       );
     } finally {
       setActionLoading(null);
@@ -236,13 +763,16 @@ function DashboardTools({
     try {
       setActionLoading("studio-clear");
       setError("");
-      const { data } = await devClearSeedEconomics({ studioId });
-      setMessage(`Removed ${data.removed} studio economic events`);
+      const { data } = await devClearSeedEconomics({
+        studioId,
+        excludeGameId: gameId,
+      });
+      setMessage(`Removed ${data.removed} whole-studio seeded events`);
       refresh();
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Could not clear studio economic events",
+          ?.message || "Could not clear whole-studio events",
       );
     } finally {
       setActionLoading(null);
@@ -275,8 +805,10 @@ function DashboardTools({
 
   return (
     <>
-      <div className="dev-tools-section">
-        <div className="dev-tools-section-title">Studio aggregate</div>
+      <DevToolsSection
+        title="Other studio games"
+        help="Creates real game events in the other games that belong to this studio. Use this to check that the studio-wide panel grows while the selected game's panel stays focused on the game you are working in now."
+      >
         <div className="dev-tools-actions">
           {[5, 10].map((count) => (
             <Button
@@ -292,18 +824,19 @@ function DashboardTools({
           ))}
           <Button
             variant="danger"
+            className="dev-tools-action-clear"
             onClick={handleClearStudio}
             disabled={actionLoading === "studio-clear"}
           >
             {actionLoading === "studio-clear" ? "Clearing..." : "Clear studio"}
           </Button>
         </div>
-      </div>
+      </DevToolsSection>
 
-      <div className="dev-tools-section">
-        <div className="dev-tools-section-title">
-          Active game{gameName ? ` · ${gameName}` : ""}
-        </div>
+      <DevToolsSection
+        title={`Selected game${gameName ? ` · ${gameName}` : ""}`}
+        help="Creates real game events in the game you currently have selected. Use this to check that the game-specific panel reacts to this game only."
+      >
         <div className="dev-tools-actions">
           {[3, 6].map((count) => (
             <Button
@@ -319,13 +852,14 @@ function DashboardTools({
           ))}
           <Button
             variant="danger"
+            className="dev-tools-action-clear"
             onClick={handleClearGame}
             disabled={!gameId || actionLoading === "game-clear"}
           >
             {actionLoading === "game-clear" ? "Clearing..." : "Clear game"}
           </Button>
         </div>
-      </div>
+      </DevToolsSection>
 
       {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
       {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
@@ -345,7 +879,7 @@ function NFTManagementTools({
   const [error, setError] = useState("");
 
   const refresh = () => {
-    window.dispatchEvent(new CustomEvent("devtools:nfts:refresh"));
+    dispatchDevtoolsRefreshBurst(["devtools:nfts:refresh", "devtools:admin:refresh"]);
   };
 
   const handleSeedTemplates = async (count: number) => {
@@ -432,8 +966,10 @@ function NFTManagementTools({
 
   return (
     <>
-      <div className="dev-tools-section">
-        <div className="dev-tools-section-title">Templates</div>
+      <DevToolsSection
+        title="Templates"
+        help="Creates temporary NFT templates so we can test template creation, tier display, mint limits, and basic NFT inventory setup without filling everything in by hand."
+      >
         <div className="dev-tools-actions">
           {[2, 5].map((count) => (
             <Button
@@ -449,16 +985,19 @@ function NFTManagementTools({
           ))}
           <Button
             variant="danger"
+            className="dev-tools-action-clear"
             onClick={handleClearTemplates}
             disabled={actionLoading === "templates-clear"}
           >
             {actionLoading === "templates-clear" ? "Clearing..." : "Clear templates"}
           </Button>
         </div>
-      </div>
+      </DevToolsSection>
 
-      <div className="dev-tools-section">
-        <div className="dev-tools-section-title">Minted NFTs</div>
+      <DevToolsSection
+        title="Minted NFTs"
+        help="Mints temporary NFTs into existing players in this game so we can check ownership, minted inventory, and readiness for later flows like the marketplace."
+      >
         <div className="dev-tools-actions">
           {[3, 6].map((count) => (
             <Button
@@ -474,13 +1013,14 @@ function NFTManagementTools({
           ))}
           <Button
             variant="danger"
+            className="dev-tools-action-clear"
             onClick={handleClearInstances}
             disabled={actionLoading === "instances-clear"}
           >
             {actionLoading === "instances-clear" ? "Clearing..." : "Clear minted"}
           </Button>
         </div>
-      </div>
+      </DevToolsSection>
 
       {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
       {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
@@ -494,7 +1034,7 @@ function SettingsTools() {
   const [error, setError] = useState("");
 
   const refresh = () => {
-    window.dispatchEvent(new CustomEvent("devtools:settings:refresh"));
+    dispatchDevtoolsRefreshBurst(["devtools:settings:refresh"]);
   };
 
   const handlePreset = async (
@@ -520,8 +1060,10 @@ function SettingsTools() {
 
   return (
     <>
-      <div className="dev-tools-section">
-        <div className="dev-tools-section-title">Valuation presets</div>
+      <DevToolsSection
+        title="Valuation presets"
+        help="Loads quick price presets so we can see whether settings, portfolio, and tax-facing views react correctly when valuation numbers change."
+      >
         <div className="dev-tools-actions">
           <Button
             variant="secondary"
@@ -552,6 +1094,7 @@ function SettingsTools() {
           </Button>
           <Button
             variant="danger"
+            className="dev-tools-action-clear"
             onClick={() =>
               handlePreset("preset:clear", { ethUsd: 0, usdSek: 0 }, "Cleared runtime valuation snapshot")
             }
@@ -560,7 +1103,7 @@ function SettingsTools() {
             {actionLoading === "preset:clear" ? "Clearing..." : "Clear runtime"}
           </Button>
         </div>
-      </div>
+      </DevToolsSection>
 
       {message ? <p className="dev-tools-message dev-tools-message-success">{message}</p> : null}
       {error ? <p className="dev-tools-message dev-tools-message-error">{error}</p> : null}
@@ -577,14 +1120,37 @@ function EmptyTools() {
   );
 }
 
+function DashboardSetupTools() {
+  return (
+    <div className="dev-tools-info">
+      Choose an active game first. The dashboard only shows player and studio
+      economic panels when a game is selected, so the seed/clear event tools
+      stay hidden until this page can actually display the result.
+    </div>
+  );
+}
+
 export function DevToolsRail() {
   const location = useLocation();
   const { authContext, activeGame } = useAuthState();
   const studioSession = authContext.studioSession;
   const [showDrawer, setShowDrawer] = useState(false);
-
   const config = useMemo<RailConfig | null>(() => {
     if (!import.meta.env.DEV || !studioSession) return null;
+
+    if (location.pathname === "/triolith-admin") {
+      return {
+        title: "Dev Tools",
+        description:
+          "Create fresh studios, games, players, transactions, and NFTs so the admin control plane has real material to inspect.",
+        content: (
+          <AdminToolsTargeted
+            defaultStudioId={studioSession.studioId}
+            defaultGameId={activeGame?.gameId}
+          />
+        ),
+      };
+    }
 
     if (location.pathname === "/members") {
       return {
@@ -603,6 +1169,15 @@ export function DevToolsRail() {
     }
 
     if (location.pathname === "/dashboard") {
+      if (!activeGame?.gameId) {
+        return {
+          title: "Dev Tools",
+          description:
+            "This page needs an active game before the dashboard can show economic tracking data.",
+          content: <DashboardSetupTools />,
+        };
+      }
+
       return {
         title: "Dev Tools",
         description:
@@ -672,7 +1247,9 @@ export function DevToolsRail() {
 
       <aside className="dev-tools-rail" aria-label="Dev tools">
         <Card className="dev-tools-panel">
-          <div className="dev-tools-eyebrow">{config.title}</div>
+          <div className="dev-tools-header">
+            <div className="dev-tools-eyebrow">{config.title}</div>
+          </div>
           <h3 className="dev-tools-title">Local testing only</h3>
           <p className="dev-tools-copy">{config.description}</p>
           {config.content}
@@ -687,7 +1264,9 @@ export function DevToolsRail() {
             aria-label="Dev tools"
           >
             <Card className="dev-tools-panel">
-              <div className="dev-tools-eyebrow">{config.title}</div>
+              <div className="dev-tools-header">
+                <div className="dev-tools-eyebrow">{config.title}</div>
+              </div>
               <h3 className="dev-tools-title">Local testing only</h3>
               <p className="dev-tools-copy">{config.description}</p>
               {config.content}

@@ -44,6 +44,45 @@ interface DevSwitchSessionOptions {
 
 @Injectable()
 export class AdminDevService {
+  private readonly seedStudioNames = [
+    "North Forge",
+    "Silver Arcade",
+    "Echo Harbor",
+    "Atlas Play",
+    "Neon Vale",
+    "Iron Pixel",
+    "Golden Circuit",
+    "Nova Works",
+    "Frost Lantern",
+    "Rune Harbor",
+  ];
+
+  private readonly seedGameNames = [
+    "Sky Arena",
+    "Dust Raiders",
+    "Signal Run",
+    "Moon Circuit",
+    "Shard Quest",
+    "Iron Tides",
+    "Night Relay",
+    "Echo Drift",
+    "Pulse Garden",
+    "Star Keep",
+  ];
+
+  private readonly seedMemberHandles = [
+    "alex.rune",
+    "mira.lane",
+    "leo.frost",
+    "nina.cove",
+    "felix.ash",
+    "iris.wren",
+    "jon.kite",
+    "sara.bloom",
+    "omar.steel",
+    "tova.river",
+  ];
+
   constructor(
     private readonly usersService: UsersService,
     private readonly platformService: PlatformService,
@@ -158,6 +197,40 @@ export class AdminDevService {
     };
   }
 
+  private async resolveStudioSessionIdForUser(
+    userId: string,
+    preferredStudioId?: string | null,
+  ) {
+    if (preferredStudioId) {
+      const preferredMembership = await this.memberRepo.findOne({
+        where: {
+          user: { id: userId },
+          studio: { id: preferredStudioId },
+        },
+        relations: ["studio"],
+      });
+
+      if (preferredMembership?.studio?.id) {
+        return preferredMembership.studio.id;
+      }
+    }
+
+    const fallbackMembership = await this.memberRepo.findOne({
+      where: { user: { id: userId } },
+      relations: ["studio"],
+      order: { createdAt: "ASC" },
+    });
+
+    if (!fallbackMembership?.studio?.id) {
+      throw new AppException(
+        "No valid studio session could be found for this user",
+        404,
+      );
+    }
+
+    return fallbackMembership.studio.id;
+  }
+
   async getSessionTargets(
     currentUser?: JwtUser,
     returnToken?: string,
@@ -227,6 +300,10 @@ export class AdminDevService {
     }
 
     return mask;
+  }
+
+  private pickSeedName(pool: string[], index: number) {
+    return pool[index % pool.length];
   }
 
   private async buildSeedUser(email: string, password: string) {
@@ -536,6 +613,13 @@ export class AdminDevService {
       throw new AppException("Target member was not found in this studio", 404);
     }
 
+    if (targetMember.studio.status === "suspended") {
+      throw new AppException(
+        "Cannot switch into a suspended studio. Reactivate it from Triolith Admin first.",
+        403,
+      );
+    }
+
     const payload = await this.buildStudioSessionPayload(
       targetMember.user.id,
       targetMember.studio.id,
@@ -570,16 +654,13 @@ export class AdminDevService {
       cookieToken,
     );
 
-    if (!adminUser.studioId) {
-      throw new AppException(
-        "Admin return token is missing a studio session",
-        400,
-      );
-    }
-
-    const payload = await this.buildStudioSessionPayload(
+    const studioId = await this.resolveStudioSessionIdForUser(
       adminUser.id,
       adminUser.studioId,
+    );
+    const payload = await this.buildStudioSessionPayload(
+      adminUser.id,
+      studioId,
     );
 
     return {
@@ -621,7 +702,8 @@ export class AdminDevService {
 
     for (let index = 0; index < count; index += 1) {
       const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 10000)}`;
-      const email = `seed-member-${suffix}@triolith.local`;
+      const handle = this.pickSeedName(this.seedMemberHandles, index).replace(/\s+/g, "-");
+      const email = `${handle}+${index + 1}@triolith.local`;
       const password = `SeedPass-${suffix}`;
       const user = await this.userRepo.save(
         await this.buildSeedUser(email, password),
@@ -683,7 +765,7 @@ export class AdminDevService {
       .where("studio.id = :studioId", { studioId })
       .andWhere("member.isOwner = false")
       .andWhere("user.email LIKE :seedPattern", {
-        seedPattern: "seed-member-%@triolith.local",
+        seedPattern: "%+%@triolith.local",
       })
       .getMany();
 
@@ -707,6 +789,100 @@ export class AdminDevService {
     return {
       studioId,
       removed,
+    };
+  }
+
+  async seedStudios(
+    options: { count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const requestedCount = options.count ?? 1;
+    const count = Math.max(1, Math.min(requestedCount, 10));
+    const timestamp = Date.now();
+    const created: Array<{
+      studioId: string;
+      studioName: string;
+      ownerEmail: string;
+    }> = [];
+
+    for (let index = 0; index < count; index += 1) {
+      const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 1000)}`;
+      const baseStudioName = this.pickSeedName(this.seedStudioNames, index);
+      const studioName = `${baseStudioName} ${index + 1}`;
+      const ownerHandle = this.pickSeedName(this.seedMemberHandles, index).replace(/\s+/g, "-");
+      const ownerEmail = `${ownerHandle}.owner+${suffix}@triolith.local`;
+      const password = `SeedStudioPass-${suffix}!`;
+
+      await this.usersService.signup(ownerEmail, password, studioName);
+      const result = await this.resolveStudioSession(ownerEmail, studioName, password);
+
+      created.push({
+        studioId: result.studioId,
+        studioName,
+        ownerEmail,
+      });
+    }
+
+    return {
+      count: created.length,
+      created,
+    };
+  }
+
+  async clearSeedStudios(
+    options: { includeAdminBootstrap?: boolean } = {},
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studios = await this.studioRepo.find({
+      relations: ["members", "members.user"],
+    });
+
+    const targets = studios.filter((studio) => {
+      const nameMatch = this.seedStudioNames.some((name) =>
+        studio.name.startsWith(name),
+      );
+      const ownerMatch = studio.members.some((member) =>
+        member.user?.email?.includes(".owner+"),
+      );
+      const adminBootstrapMatch =
+        options.includeAdminBootstrap === true &&
+        studio.name === "Triolith Admin Studio";
+
+      return nameMatch || ownerMatch || adminBootstrapMatch;
+    });
+
+    let removedStudios = 0;
+    let removedUsers = 0;
+
+    for (const studio of targets) {
+      const userIds = studio.members
+        .map((member) => member.user?.id)
+        .filter((value): value is string => Boolean(value));
+
+      await this.purgeStudio(studio.id);
+      removedStudios += 1;
+
+      for (const userId of userIds) {
+        const remainingMemberships = await this.memberRepo
+          .createQueryBuilder("member")
+          .innerJoin("member.user", "user")
+          .where("user.id = :userId", { userId })
+          .getCount();
+
+        if (remainingMemberships === 0) {
+          await this.userRepo.delete({ id: userId });
+          removedUsers += 1;
+        }
+      }
+    }
+
+    return {
+      removedStudios,
+      removedUsers,
     };
   }
 
@@ -742,7 +918,8 @@ export class AdminDevService {
 
     for (let index = 0; index < count; index += 1) {
       const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 1000)}`;
-      const name = `Seed Game ${suffix}`;
+      const baseGameName = this.pickSeedName(this.seedGameNames, index);
+      const name = `${baseGameName} ${index + 1}`;
       const slug = `seed-game-${suffix}`;
 
       const game = await this.platformService.createGameForUser(actor.user.id, studioId, {
@@ -761,6 +938,178 @@ export class AdminDevService {
       studioId,
       count: created.length,
       created,
+    };
+  }
+
+  async seedPlayers(
+    options: { studioId: string; gameId: string; count?: number },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+    const requestedCount = options.count ?? 5;
+    const count = Math.max(1, Math.min(requestedCount, 25));
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+      relations: ["studio"],
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const created: Array<{ playerId: string; userId: string; email: string }> = [];
+    const timestamp = Date.now();
+    const defaultPassword = process.env.DEV_BOOTSTRAP_PASSWORD || "dev123456";
+
+    for (let index = 0; index < count; index += 1) {
+      const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 1000)}`;
+      const email = `seed-player-${suffix}@triolith.local`;
+      const user = await this.userRepo.save(
+        await this.buildSeedUser(email, defaultPassword),
+      );
+
+      const player = await this.gamePlayerRepo.save(
+        this.gamePlayerRepo.create({
+          user,
+          game,
+          level: 1 + (index % 8),
+          exp: index * 125,
+        }),
+      );
+
+      created.push({
+        playerId: player.id,
+        userId: user.id,
+        email: user.email,
+      });
+    }
+
+    return {
+      studioId,
+      gameId,
+      count: created.length,
+      created,
+    };
+  }
+
+  async clearSeedPlayers(
+    options: { studioId: string; gameId: string },
+    providedKey?: string,
+  ) {
+    this.assertBootstrapAllowed(providedKey);
+
+    const studioId = options.studioId?.trim();
+    const gameId = options.gameId?.trim();
+
+    if (!studioId) {
+      throw new AppException("studioId is required", 400);
+    }
+    if (!gameId) {
+      throw new AppException("gameId is required", 400);
+    }
+
+    const game = await this.gameRepo.findOne({
+      where: { id: gameId, studio: { id: studioId } },
+    });
+    if (!game) {
+      throw new AppException("Game not found in studio", 404);
+    }
+
+    const targets = await this.gamePlayerRepo
+      .createQueryBuilder("player")
+      .innerJoinAndSelect("player.user", "user")
+      .innerJoin("player.game", "game")
+      .where("game.id = :gameId", { gameId })
+      .andWhere("user.email LIKE :emailPrefix", {
+        emailPrefix: "%+%@triolith.local",
+      })
+      .getMany();
+    const playerIds = targets.map((player) => player.id);
+    const userIds = targets
+      .map((player) => player.user?.id)
+      .filter((value): value is string => Boolean(value));
+    const walletAddresses = targets
+      .map((player) => player.user?.walletAddress)
+      .filter((value): value is string => Boolean(value));
+
+    if (playerIds.length === 0) {
+      return {
+        studioId,
+        gameId,
+        removedPlayers: 0,
+        removedUsers: 0,
+      };
+    }
+
+    await this.dataSource.query(
+      `DELETE FROM marketplace_listings
+       WHERE "sellerId" = ANY($1::uuid[]) OR "buyerId" = ANY($1::uuid[])`,
+      [playerIds],
+    );
+    await this.dataSource.query(
+      `DELETE FROM ledger_entries
+       WHERE "walletId" IN (
+         SELECT id FROM game_wallets WHERE "gamePlayerId" = ANY($1::uuid[])
+       )`,
+      [playerIds],
+    );
+    await this.dataSource.query(
+      `DELETE FROM game_wallets WHERE "gamePlayerId" = ANY($1::uuid[])`,
+      [playerIds],
+    );
+    await this.dataSource.query(
+      `DELETE FROM nft_instances WHERE "ownerId" = ANY($1::uuid[])`,
+      [playerIds],
+    );
+    if (walletAddresses.length > 0) {
+      await this.dataSource
+        .getRepository("economic_events")
+        .createQueryBuilder()
+        .delete()
+        .from("economic_events")
+        .where(`metadata ->> 'seeded' = 'true'`)
+        .andWhere(`"gameId" = :gameId`, { gameId })
+        .andWhere(`"walletAddress" IN (:...walletAddresses)`, { walletAddresses })
+        .execute();
+    }
+
+    const deletedPlayers = await this.gamePlayerRepo
+      .createQueryBuilder()
+      .delete()
+      .from(GamePlayer)
+      .where(`id IN (:...playerIds)`, { playerIds })
+      .execute();
+
+    let removedUsers = 0;
+    for (const userId of userIds) {
+      const remainingMemberships = await this.memberRepo.count({
+        where: { user: { id: userId } },
+      });
+      const remainingPlayers = await this.gamePlayerRepo.count({
+        where: { user: { id: userId } },
+      });
+
+      if (remainingMemberships === 0 && remainingPlayers === 0) {
+        await this.userRepo.delete({ id: userId });
+        removedUsers += 1;
+      }
+    }
+
+    return {
+      studioId,
+      gameId,
+      removedPlayers: deletedPlayers.affected ?? 0,
+      removedUsers,
     };
   }
 
@@ -796,13 +1145,19 @@ export class AdminDevService {
   }
 
   async seedEconomics(
-    options: { studioId: string; gameId?: string; count?: number },
+    options: {
+      studioId: string;
+      gameId?: string;
+      excludeGameId?: string;
+      count?: number;
+    },
     providedKey?: string,
   ) {
     this.assertBootstrapAllowed(providedKey);
 
     const studioId = options.studioId?.trim();
     const gameId = options.gameId?.trim() || undefined;
+    const excludeGameId = options.excludeGameId?.trim() || undefined;
     const requestedCount = options.count ?? 10;
     const count = Math.max(1, Math.min(requestedCount, 50));
 
@@ -816,12 +1171,27 @@ export class AdminDevService {
     }
 
     let game: Game | null = null;
+    let targetGames: Game[] = [];
     if (gameId) {
       game = await this.gameRepo.findOne({
         where: { id: gameId, studio: { id: studioId } },
       });
       if (!game) {
         throw new AppException("Game not found in studio", 404);
+      }
+    } else {
+      const studioGames = await this.gameRepo.find({
+        where: { studio: { id: studioId } },
+      });
+      targetGames = studioGames.filter((candidate) => candidate.id !== excludeGameId);
+
+      if (targetGames.length === 0) {
+        throw new AppException(
+          excludeGameId
+            ? "Create at least one additional game in this studio before seeding whole-studio events."
+            : "At least one game is required before seeding whole-studio events.",
+          400,
+        );
       }
     }
 
@@ -844,13 +1214,14 @@ export class AdminDevService {
       const amount = (10 + index * 3).toFixed(2);
       const walletAddress = `0x${(1000 + index).toString(16).padStart(40, "0")}`;
       const eventType = eventTypes[index % eventTypes.length];
+      const targetGame = game ?? targetGames[index % targetGames.length];
 
       const event = await this.economicsService.logEvent({
         source: "devtools",
         eventType,
-        scopeType: game ? EconomicScopeType.GAME : EconomicScopeType.STUDIO,
+        scopeType: EconomicScopeType.GAME,
         studioId,
-        gameId: game?.id ?? null,
+        gameId: targetGame.id,
         walletAddress,
         assetKey: "tri",
         assetSymbol: "TRI",
@@ -858,8 +1229,9 @@ export class AdminDevService {
         direction,
         metadata: {
           seeded: true,
+          seededMode: game ? "selected-game" : "other-studio-games",
           studioName: studio.name,
-          gameName: game?.name ?? null,
+          gameName: targetGame.name,
         },
       });
 
@@ -869,18 +1241,20 @@ export class AdminDevService {
     return {
       studioId,
       gameId: game?.id ?? null,
+      targetGameCount: game ? 1 : targetGames.length,
       count: created.length,
     };
   }
 
   async clearSeedEconomics(
-    options: { studioId: string; gameId?: string },
+    options: { studioId: string; gameId?: string; excludeGameId?: string },
     providedKey?: string,
   ) {
     this.assertBootstrapAllowed(providedKey);
 
     const studioId = options.studioId?.trim();
     const gameId = options.gameId?.trim() || undefined;
+    const excludeGameId = options.excludeGameId?.trim() || undefined;
 
     if (!studioId) {
       throw new AppException("studioId is required", 400);
@@ -896,6 +1270,9 @@ export class AdminDevService {
 
     if (gameId) {
       query.andWhere(`"gameId" = :gameId`, { gameId });
+    } else if (excludeGameId) {
+      query.andWhere(`"gameId" IS NOT NULL`)
+        .andWhere(`"gameId" != :excludeGameId`, { excludeGameId });
     }
 
     const result = await query.execute();
@@ -1188,6 +1565,7 @@ export class AdminDevService {
       studios,
       members,
       games,
+      sandboxStudios,
       sandboxMembers,
       sandboxGames,
       sandboxEconomicEvents,
@@ -1201,13 +1579,23 @@ export class AdminDevService {
       this.studioRepo.count(),
       this.memberRepo.count(),
       this.gameRepo.count(),
-      this.userRepo.count({
-        where: [],
-      }).then(async () => {
+      this.studioRepo
+        .createQueryBuilder("studio")
+        .where(
+          new Array(this.seedStudioNames.length)
+            .fill(0)
+            .map((_, index) => `studio.name LIKE :studioName${index}`)
+            .join(" OR "),
+          Object.fromEntries(
+            this.seedStudioNames.map((name, index) => [`studioName${index}`, `${name}%`]),
+          ),
+        )
+        .getCount(),
+      Promise.resolve().then(async () => {
         const result = await this.userRepo
           .createQueryBuilder("user")
           .where("user.email LIKE :seedPattern", {
-            seedPattern: "seed-member-%@triolith.local",
+            seedPattern: "%+%@triolith.local",
           })
           .getCount();
         return result;
@@ -1257,6 +1645,7 @@ export class AdminDevService {
         nftInstances: nftInstancesRaw,
       },
       sandbox: {
+        studios: sandboxStudios,
         members: sandboxMembers,
         games: sandboxGames,
         economicEvents: sandboxEconomicEvents,
@@ -1266,6 +1655,8 @@ export class AdminDevService {
 
   async clearSandboxData(providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
+
+    const clearedStudios = await this.clearSeedStudios({}, providedKey);
 
     const seededGames = await this.gameRepo
       .createQueryBuilder("game")
@@ -1286,7 +1677,7 @@ export class AdminDevService {
       .innerJoinAndSelect("member.user", "user")
       .andWhere("member.isOwner = false")
       .andWhere("user.email LIKE :seedPattern", {
-        seedPattern: "seed-member-%@triolith.local",
+        seedPattern: "%+%@triolith.local",
       })
       .getMany();
 
@@ -1317,9 +1708,10 @@ export class AdminDevService {
       .execute();
 
     return {
+      removedStudios: clearedStudios.removedStudios,
       removedGames,
       removedMembers,
-      removedUsers,
+      removedUsers: removedUsers + clearedStudios.removedUsers,
       removedEconomicEvents: economicsDeleted.affected ?? 0,
     };
   }

@@ -9,11 +9,12 @@ import { ShopEvent } from "../tokenshop/entities/shop-event.entity";
 import { User } from "../users/user.entity";
 import { Studio } from "../platform/entities/studio.entity";
 import { Game } from "../platform/entities/game.entity";
+import { GamePlayer } from "../platform/entities/game-player.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
 import { ethers } from "ethers";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import {
   REVENUE_SPLIT_DEV,
   REVENUE_SPLIT_TRIOLITH,
@@ -45,6 +46,9 @@ export class AdminService {
     @InjectRepository(Game)
     private readonly gameRepo: Repository<Game>,
 
+    @InjectRepository(GamePlayer)
+    private readonly gamePlayerRepo: Repository<GamePlayer>,
+
     @InjectRepository(EconomicEvent)
     private readonly economicEventRepo: Repository<EconomicEvent>,
 
@@ -53,6 +57,8 @@ export class AdminService {
 
     @InjectRepository(AdminAuditLog)
     private readonly auditLogRepo: Repository<AdminAuditLog>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   private async writeAudit(
@@ -330,8 +336,16 @@ export class AdminService {
   async deleteStudio(id: string, adminId: string, adminEmail: string) {
     const studio = await this.studioRepo.findOne({ where: { id } });
     if (!studio) throw new NotFoundException(`Studio ${id} not found`);
-    await this.studioRepo.delete(id);
+    await this.purgeStudio(id);
     await this.writeAudit(adminId, adminEmail, "deleteStudio", "studio", id);
+    return { id, deleted: true };
+  }
+
+  async deleteGame(id: string, adminId: string, adminEmail: string) {
+    const game = await this.gameRepo.findOne({ where: { id } });
+    if (!game) throw new NotFoundException(`Game ${id} not found`);
+    await this.purgeGame(id);
+    await this.writeAudit(adminId, adminEmail, "deleteGame", "game", id);
     return { id, deleted: true };
   }
 
@@ -355,6 +369,119 @@ export class AdminService {
       order: { createdAt: "DESC" },
     });
     return games;
+  }
+
+  async getStudioMembers(studioId: string) {
+    const studio = await this.studioRepo.findOne({
+      where: { id: studioId },
+      relations: ["members", "members.user"],
+    });
+    if (!studio) {
+      throw new NotFoundException(`Studio ${studioId} not found`);
+    }
+
+    return [...studio.members]
+      .sort((left, right) => {
+        if (left.isOwner !== right.isOwner) {
+          return left.isOwner ? -1 : 1;
+        }
+        return right.createdAt.getTime() - left.createdAt.getTime();
+      })
+      .map((member) => ({
+        id: member.id,
+        userId: member.user.id,
+        email: member.user.email,
+        isOwner: member.isOwner,
+        role: member.role,
+        permissions: member.permissionsMask.toString(),
+        createdAt: member.createdAt,
+      }));
+  }
+
+  async getStudioPlayers(studioId: string) {
+    const players = await this.gamePlayerRepo.find({
+      where: { game: { studio: { id: studioId } } },
+      relations: ["game", "user", "walletIdentity"],
+      order: { joinedAt: "DESC" },
+    });
+
+    return players.map((player) => ({
+      id: player.id,
+      gameId: player.game?.id ?? null,
+      gameName: player.game?.name ?? null,
+      userId: player.user?.id ?? null,
+      email: player.user?.email ?? null,
+      walletAddress:
+        player.user?.walletAddress ?? player.walletIdentity?.walletAddress ?? null,
+      joinedAt: player.joinedAt,
+      level: player.level,
+      exp: player.exp,
+      source: player.user ? "user" : player.walletIdentity ? "wallet" : "unknown",
+    }));
+  }
+
+  async getStudioTransactions(studioId: string, limit = 25) {
+    const events = await this.economicEventRepo.find({
+      where: { studioId },
+      order: { timestamp: "DESC", createdAt: "DESC" },
+      take: Math.min(limit, 100),
+    });
+
+    return events.map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      source: event.source,
+      direction: event.direction,
+      amount: event.amount,
+      assetKey: event.assetKey,
+      walletAddress: event.walletAddress,
+      gameId: event.gameId,
+      timestamp: event.timestamp,
+      metadata: event.metadata ?? null,
+    }));
+  }
+
+  async getGamePlayers(gameId: string) {
+    const players = await this.gamePlayerRepo.find({
+      where: { game: { id: gameId } },
+      relations: ["game", "user", "walletIdentity"],
+      order: { joinedAt: "DESC" },
+    });
+
+    return players.map((player) => ({
+      id: player.id,
+      gameId: player.game?.id ?? null,
+      gameName: player.game?.name ?? null,
+      userId: player.user?.id ?? null,
+      email: player.user?.email ?? null,
+      walletAddress:
+        player.user?.walletAddress ?? player.walletIdentity?.walletAddress ?? null,
+      joinedAt: player.joinedAt,
+      level: player.level,
+      exp: player.exp,
+      source: player.user ? "user" : player.walletIdentity ? "wallet" : "unknown",
+    }));
+  }
+
+  async getGameTransactions(gameId: string, limit = 25) {
+    const events = await this.economicEventRepo.find({
+      where: { gameId },
+      order: { timestamp: "DESC", createdAt: "DESC" },
+      take: Math.min(limit, 100),
+    });
+
+    return events.map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      source: event.source,
+      direction: event.direction,
+      amount: event.amount,
+      assetKey: event.assetKey,
+      walletAddress: event.walletAddress,
+      gameId: event.gameId,
+      timestamp: event.timestamp,
+      metadata: event.metadata ?? null,
+    }));
   }
 
   async getAllGames() {
@@ -414,6 +541,139 @@ export class AdminService {
       totalIn: parseFloat(r.totalIn ?? "0"),
       totalOut: parseFloat(r.totalOut ?? "0"),
       lastSeen: r.lastSeen,
-    }));
+      }));
+  }
+
+  private async purgeStudio(studioId: string): Promise<void> {
+    const q = this.dataSource.createQueryRunner();
+    await q.connect();
+    await q.startTransaction();
+    try {
+      await q.query(
+        `DELETE FROM marketplace_listings
+         WHERE "sellerId" IN (
+           SELECT gp.id FROM game_players gp
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         ) OR "buyerId" IN (
+           SELECT gp.id FROM game_players gp
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         )`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM ledger_entries
+         WHERE "walletId" IN (
+           SELECT gw.id FROM game_wallets gw
+           JOIN game_players gp ON gp.id = gw."gamePlayerId"
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         )`,
+        [studioId],
+      );
+      await q.query(`DELETE FROM economic_events WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM "tax_event" WHERE "studioId" = $1`, [studioId]);
+      await q.query(
+        `DELETE FROM player_nonce
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM nft_instances
+         WHERE "ownerId" IN (
+           SELECT gp.id FROM game_players gp
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         )
+         OR "templateId" IN (
+           SELECT nt.id FROM nft_templates nt
+           JOIN games g ON g.id = nt."gameId"
+           WHERE g."studioId" = $1
+         )`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM game_wallets
+         WHERE "gamePlayerId" IN (
+           SELECT gp.id FROM game_players gp
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         )`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM wallet_deposit_intents
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM game_players
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+        [studioId],
+      );
+      await q.query(
+        `DELETE FROM nft_templates
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+        [studioId],
+      );
+      await q.query(`DELETE FROM studio_members WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM "studio_user" WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM games WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM studios WHERE id = $1`, [studioId]);
+      await q.commitTransaction();
+    } catch (err) {
+      await q.rollbackTransaction();
+      throw err;
+    } finally {
+      await q.release();
+    }
+  }
+
+  private async purgeGame(gameId: string): Promise<void> {
+    const q = this.dataSource.createQueryRunner();
+    await q.connect();
+    await q.startTransaction();
+    try {
+      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM player_nonce WHERE "gameId" = $1`, [gameId]);
+      await q.query(
+        `DELETE FROM ledger_entries
+         WHERE "walletId" IN (
+           SELECT gw.id FROM game_wallets gw
+           JOIN game_players gp ON gp.id = gw."gamePlayerId"
+           WHERE gp."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(
+        `DELETE FROM nft_instances
+         WHERE "ownerId" IN (
+           SELECT gp.id FROM game_players gp WHERE gp."gameId" = $1
+         )
+         OR "templateId" IN (
+           SELECT nt.id FROM nft_templates nt WHERE nt."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(
+        `DELETE FROM game_wallets
+         WHERE "gamePlayerId" IN (
+           SELECT gp.id FROM game_players gp WHERE gp."gameId" = $1
+         )`,
+        [gameId],
+      );
+      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM nft_templates WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM game_players WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM games WHERE id = $1`, [gameId]);
+      await q.commitTransaction();
+    } catch (err) {
+      await q.rollbackTransaction();
+      throw err;
+    } finally {
+      await q.release();
+    }
   }
 }

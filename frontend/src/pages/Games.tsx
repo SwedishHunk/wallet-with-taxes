@@ -209,8 +209,9 @@ export default function Games() {
                   <div
                     key={game.gameId}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      gap: "1rem",
                       alignItems: "center",
                       padding: "0.75rem",
                       border: "1px solid var(--border, #ccc)",
@@ -220,13 +221,26 @@ export default function Games() {
                           ? "var(--primary-light, #e3f2fd)"
                           : "transparent",
                     }}>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <strong>{game.name}</strong>
-                      <div style={{ fontSize: "0.875rem", color: "#666" }}>
+                      <div
+                        style={{
+                          fontSize: "0.875rem",
+                          color: "#666",
+                          overflowWrap: "anywhere",
+                        }}>
                         Slug: {game.slug} | ID: {game.gameId}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, max-content)",
+                        gap: "0.5rem",
+                        alignItems: "center",
+                        justifyContent: "end",
+                        flexShrink: 0,
+                      }}>
                       <Button onClick={() => handleOpenTrade(game)}>
                         Open Trade
                       </Button>

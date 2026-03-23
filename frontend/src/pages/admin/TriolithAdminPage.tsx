@@ -11,6 +11,9 @@ import {
   type DevSystemStateResponse,
 } from "../../lib/devtools";
 import { getDevtoolsMode, setDevtoolsMode, type DevtoolsMode } from "../../lib/devtoolsMode";
+import { devBootstrap } from "../../lib/users";
+import { useAuthState } from "../../lib/AuthContext";
+import { writeDevToolsTargets } from "../../lib/devtoolsTargets";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -34,6 +37,42 @@ type StudioRow = {
   status: string;
   memberCount: number;
   createdAt: string;
+};
+
+type StudioPlayerRow = {
+  id: string;
+  gameId: string | null;
+  gameName: string | null;
+  userId: string | null;
+  email: string | null;
+  walletAddress: string | null;
+  joinedAt: string;
+  level: number;
+  exp: number;
+  source: string;
+};
+
+type StudioMemberRow = {
+  id: string;
+  userId: string;
+  email: string;
+  isOwner: boolean;
+  role: string;
+  permissions: string;
+  createdAt: string;
+};
+
+type AdminEconomicEventRow = {
+  id: string;
+  eventType: string;
+  source: string;
+  direction: "in" | "out" | "neutral";
+  amount: string;
+  assetKey: string;
+  walletAddress: string | null;
+  gameId: string | null;
+  timestamp: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 type TransactionRow = {
@@ -171,6 +210,7 @@ function StatValue({
 /* ─── Main Component ──────────────────────────────────────── */
 
 export default function TriolithAdminPage() {
+  const { setStudioSession, setMemberSession, setActiveGame } = useAuthState();
   const [fees, setFees] = useState<FeeStats | null>(null);
   const [revenue, setRevenue] = useState<RevenueSplit | null>(null);
   const [studios, setStudios] = useState<StudioRow[]>([]);
@@ -184,15 +224,45 @@ export default function TriolithAdminPage() {
   const [platformFee, setPlatformFee] = useState<number | null>(null);
   const [feeInput, setFeeInput] = useState("");
   const [feeMsg, setFeeMsg] = useState("");
+  const [studioSearch, setStudioSearch] = useState("");
+  const [studioStatusFilter, setStudioStatusFilter] = useState<"all" | "active" | "suspended">("all");
+  const [studioSort, setStudioSort] = useState<"newest" | "oldest" | "name">("newest");
   const [expandedStudioId, setExpandedStudioId] = useState<string | null>(null);
   const [studioGames, setStudioGames] = useState<Record<string, GameRow[]>>({});
+  const [studioMembers, setStudioMembers] = useState<Record<string, StudioMemberRow[]>>({});
+  const [studioPlayers, setStudioPlayers] = useState<Record<string, StudioPlayerRow[]>>({});
+  const [studioTransactions, setStudioTransactions] = useState<Record<string, AdminEconomicEventRow[]>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [devtoolsMode, setDevtoolsModeState] = useState<DevtoolsMode>(() => getDevtoolsMode());
   const [systemState, setSystemState] = useState<DevSystemStateResponse | null>(null);
   const [devActionMessage, setDevActionMessage] = useState("");
-  const [resetPhrase, setResetPhrase] = useState("");
   const [devActionLoading, setDevActionLoading] = useState<string | null>(null);
   const TX_LIMIT = 25;
+  const visibleUsers = users.filter((user) => !user.isAdmin);
+
+  const filteredStudios = [...studios]
+    .filter((studio) => {
+      if (studioStatusFilter !== "all" && studio.status !== studioStatusFilter) {
+        return false;
+      }
+
+      const q = studioSearch.trim().toLowerCase();
+      if (!q) return true;
+
+      return (
+        studio.name.toLowerCase().includes(q) ||
+        studio.email.toLowerCase().includes(q)
+      );
+    })
+    .sort((left, right) => {
+      if (studioSort === "name") {
+        return left.name.localeCompare(right.name);
+      }
+
+      const leftTime = new Date(left.createdAt).getTime();
+      const rightTime = new Date(right.createdAt).getTime();
+      return studioSort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+    });
 
   // Refs for GSAP animations
   const statsRowRef = useRef<HTMLDivElement>(null);
@@ -216,6 +286,35 @@ export default function TriolithAdminPage() {
       .catch(() => {});
   };
 
+  const loadStudioDetails = (studioId: string) => {
+    const fetchDetails = () => {
+      void api
+        .get<GameRow[]>(`/admin/studios/${studioId}/games`)
+        .then((r) => setStudioGames((prev) => ({ ...prev, [studioId]: r.data })))
+        .catch(handleError);
+      void api
+        .get<StudioMemberRow[]>(`/admin/studios/${studioId}/members`)
+        .then((r) =>
+          setStudioMembers((prev) => ({
+            ...prev,
+            [studioId]: r.data.filter((member) => !member.email.includes("dev-admin@triolith.local")),
+          })),
+        )
+        .catch(handleError);
+      void api
+        .get<StudioPlayerRow[]>(`/admin/studios/${studioId}/players`)
+        .then((r) => setStudioPlayers((prev) => ({ ...prev, [studioId]: r.data })))
+        .catch(handleError);
+      void api
+        .get<AdminEconomicEventRow[]>(`/admin/studios/${studioId}/transactions?limit=12`)
+        .then((r) => setStudioTransactions((prev) => ({ ...prev, [studioId]: r.data })))
+        .catch(handleError);
+    };
+
+    fetchDetails();
+    window.setTimeout(fetchDetails, 250);
+  };
+
   useEffect(() => {
     void api.get<FeeStats>("/admin/fees").then((r) => setFees(r.data));
     void api.get<RevenueSplit>("/admin/revenue").then((r) => setRevenue(r.data));
@@ -231,6 +330,17 @@ export default function TriolithAdminPage() {
         setPlatformFee(r.data.feePercent);
         setFeeInput(String(r.data.feePercent));
       });
+  }, []);
+
+  useEffect(() => {
+    const handleAdminRefresh = () => {
+      refreshAdminCollections();
+    };
+
+    window.addEventListener("devtools:admin:refresh", handleAdminRefresh);
+    return () => {
+      window.removeEventListener("devtools:admin:refresh", handleAdminRefresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -347,28 +457,69 @@ export default function TriolithAdminPage() {
     void devClearSandboxData()
       .then((r) => {
         setDevActionMessage(
-          `Removed ${r.data.removedMembers} members, ${r.data.removedGames} games, ${r.data.removedEconomicEvents} economic events`,
+          `Removed ${r.data.removedStudios ?? 0} studios, ${r.data.removedMembers} members, ${r.data.removedGames} games, ${r.data.removedEconomicEvents} economic events`,
         );
-        loadSystemState();
-        fetchAuditLog();
+        refreshAdminCollections();
       })
       .catch(handleError)
       .finally(() => setDevActionLoading(null));
   };
 
+  const refreshAdminCollections = () => {
+    const fetchCollections = () =>
+      Promise.all([
+        api.get<StudioRow[]>("/admin/studios"),
+        api.get<UserRow[]>("/admin/users"),
+        api.get<GameRow[]>("/admin/games"),
+        api.get<StudioEcoRow[]>("/admin/economics/studios"),
+      ])
+        .then(([studiosResponse, usersResponse, gamesResponse, ecoResponse]) => {
+          setStudios(studiosResponse.data);
+          setUsers(usersResponse.data);
+          setGames(gamesResponse.data);
+          setStudioEco(ecoResponse.data);
+        })
+        .catch(handleError);
+
+    loadSystemState();
+    fetchAuditLog();
+    void fetchCollections();
+    window.setTimeout(() => {
+      void fetchCollections();
+    }, 250);
+    setStudioGames({});
+    setStudioMembers({});
+    setStudioPlayers({});
+    setStudioTransactions({});
+    if (expandedStudioId) {
+      window.setTimeout(() => {
+        loadStudioDetails(expandedStudioId);
+      }, 120);
+    }
+  };
+
   const handleFullReset = () => {
+    const confirmed = window.confirm(
+      "Run a full local reset? This clears local users, studios, games, transactions and test data, while keeping admin access intact.",
+    );
+    if (!confirmed) return;
+
     setDevActionLoading("full-reset");
     setDevActionMessage("");
-    void devFullLocalReset(resetPhrase)
-      .then(() => {
-        setDevActionMessage("Local reset completed");
-        setResetPhrase("");
-        loadSystemState();
-        fetchAuditLog();
-        void api.get<StudioRow[]>("/admin/studios").then((r) => setStudios(r.data));
-        void api.get<UserRow[]>("/admin/users").then((r) => setUsers(r.data));
-        void api.get<GameRow[]>("/admin/games").then((r) => setGames(r.data));
-        void api.get<StudioEcoRow[]>("/admin/economics/studios").then((r) => setStudioEco(r.data));
+    void devFullLocalReset("RESET LOCAL DEV DATA")
+      .then(async () => {
+        writeDevToolsTargets({});
+        const bootstrap = await devBootstrap({ mode: "admin" });
+        setStudioSession({
+          ...bootstrap.data.studio,
+          authenticatedAt: new Date().toISOString(),
+        });
+        setMemberSession(bootstrap.data.member);
+        setActiveGame(bootstrap.data.game);
+        setExpandedStudioId(null);
+        setDevActionMessage("Local reset completed and admin was restored");
+        refreshAdminCollections();
+        window.dispatchEvent(new CustomEvent("devtools:admin:refresh"));
       })
       .catch(handleError)
       .finally(() => setDevActionLoading(null));
@@ -386,7 +537,24 @@ export default function TriolithAdminPage() {
     if (!window.confirm(`Delete studio "${studio.name}"? This cannot be undone.`)) return;
     void api
       .delete<{ id: string; deleted: boolean }>(`/admin/studios/${studio.id}`)
-      .then(() => { setStudios((prev) => prev.filter((s) => s.id !== studio.id)); fetchAuditLog(); })
+      .then(() => {
+        setStudios((prev) => prev.filter((s) => s.id !== studio.id));
+        setExpandedStudioId((current) => (current === studio.id ? null : current));
+        refreshAdminCollections();
+        fetchAuditLog();
+      })
+      .catch(handleError);
+  };
+
+  const deleteGame = (game: GameRow) => {
+    if (!window.confirm(`Delete game "${game.name}"? This cannot be undone.`)) return;
+    void api
+      .delete<{ id: string; deleted: boolean }>(`/admin/games/${game.id}`)
+      .then(() => {
+        setGames((prev) => prev.filter((g) => g.id !== game.id));
+        refreshAdminCollections();
+        fetchAuditLog();
+      })
       .catch(handleError);
   };
 
@@ -396,11 +564,13 @@ export default function TriolithAdminPage() {
       return;
     }
     setExpandedStudioId(studioId);
-    if (!studioGames[studioId]) {
-      void api
-        .get<GameRow[]>(`/admin/studios/${studioId}/games`)
-        .then((r) => setStudioGames((prev) => ({ ...prev, [studioId]: r.data })))
-        .catch(handleError);
+    if (
+      !studioGames[studioId] ||
+      !studioMembers[studioId] ||
+      !studioPlayers[studioId] ||
+      !studioTransactions[studioId]
+    ) {
+      loadStudioDetails(studioId);
     }
   };
 
@@ -631,8 +801,8 @@ export default function TriolithAdminPage() {
               Reset & Sandbox
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-              Central control plane for local dev data. Sandbox is the safe default;
-              full reset clears the local environment while preserving admin access.
+              Central control plane for local reset behavior. Seeding lives in the Dev Tools rail
+              so it stays separate from destructive environment controls.
             </p>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
               <button
@@ -678,28 +848,10 @@ export default function TriolithAdminPage() {
                 Deletes local platform data, clears users/studios/games/transactions,
                 and keeps platform admin access intact.
               </p>
-              <input
-                value={resetPhrase}
-                onChange={(e) => setResetPhrase(e.target.value)}
-                placeholder='Type: RESET LOCAL DEV DATA'
-                style={{
-                  width: "100%",
-                  padding: "0.55rem 0.7rem",
-                  fontSize: "0.85rem",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  background: "rgba(255, 255, 255, 0.04)",
-                  color: "var(--text)",
-                  marginBottom: "0.6rem",
-                }}
-              />
               <button
                 onClick={handleFullReset}
                 style={btnStyle("danger")}
-                disabled={
-                  devActionLoading === "full-reset" ||
-                  resetPhrase !== "RESET LOCAL DEV DATA"
-                }
+                disabled={devActionLoading === "full-reset"}
               >
                 {devActionLoading === "full-reset" ? "Resetting..." : "Run full local reset"}
               </button>
@@ -718,7 +870,7 @@ export default function TriolithAdminPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
                   <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Users</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{systemState.totals.users}</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{visibleUsers.length}</div>
                 </div>
                 <div style={{ padding: "0.8rem", borderRadius: "12px", background: "rgba(255,255,255,0.04)" }}>
                   <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Studios</div>
@@ -745,7 +897,7 @@ export default function TriolithAdminPage() {
                     Sandbox data
                   </div>
                   <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                    {systemState.sandbox.members} seeded members · {systemState.sandbox.games} seeded games · {systemState.sandbox.economicEvents} seeded economic events
+                    {systemState.sandbox.studios ?? 0} seeded studios · {systemState.sandbox.members} seeded members · {systemState.sandbox.games} seeded games · {systemState.sandbox.economicEvents} seeded economic events
                   </div>
                 </div>
               </div>
@@ -801,12 +953,70 @@ export default function TriolithAdminPage() {
       {/* ── Studios (scroll-triggered) ── */}
       <div ref={studiosRef}>
         <Card style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
-            All Studios ({studios.length})
-          </h3>
-          {studios.length === 0 ? (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+            <div>
+              <h3 style={{ marginBottom: "0.35rem", fontWeight: 600 }}>
+                All Studios ({filteredStudios.length})
+              </h3>
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                Expand a studio to inspect its games, players and recent transactions.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <input
+                value={studioSearch}
+                onChange={(e) => setStudioSearch(e.target.value)}
+                placeholder="Search studios"
+                style={{
+                  minWidth: "180px",
+                  padding: "0.35rem 0.6rem",
+                  fontSize: "0.82rem",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "#0f1b31",
+                  color: "var(--text)",
+                  colorScheme: "dark",
+                }}
+              />
+              <select
+                value={studioStatusFilter}
+                onChange={(e) => setStudioStatusFilter(e.target.value as "all" | "active" | "suspended")}
+                style={{
+                  padding: "0.35rem 0.6rem",
+                  fontSize: "0.82rem",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "#0f1b31",
+                  color: "var(--text)",
+                  colorScheme: "dark",
+                }}
+              >
+                <option value="all" style={{ background: "#0f1b31", color: "#f3f7ff" }}>All statuses</option>
+                <option value="active" style={{ background: "#0f1b31", color: "#f3f7ff" }}>Active</option>
+                <option value="suspended" style={{ background: "#0f1b31", color: "#f3f7ff" }}>Suspended</option>
+              </select>
+              <select
+                value={studioSort}
+                onChange={(e) => setStudioSort(e.target.value as "newest" | "oldest" | "name")}
+                style={{
+                  padding: "0.35rem 0.6rem",
+                  fontSize: "0.82rem",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "#0f1b31",
+                  color: "var(--text)",
+                  colorScheme: "dark",
+                }}
+              >
+                <option value="newest" style={{ background: "#0f1b31", color: "#f3f7ff" }}>Newest first</option>
+                <option value="oldest" style={{ background: "#0f1b31", color: "#f3f7ff" }}>Oldest first</option>
+                <option value="name" style={{ background: "#0f1b31", color: "#f3f7ff" }}>A-Z</option>
+              </select>
+            </div>
+          </div>
+          {filteredStudios.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
-              No studios yet.
+              No studios match the current filters.
             </p>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -829,7 +1039,7 @@ export default function TriolithAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {studios.map((s) => (
+                  {filteredStudios.map((s) => (
                     <Fragment key={s.id}>
                       <tr
                         style={{ borderBottom: "1px solid var(--border)", transition: "background 0.2s" }}
@@ -886,23 +1096,77 @@ export default function TriolithAdminPage() {
                       {expandedStudioId === s.id && (
                         <tr style={{ background: "rgba(255, 255, 255, 0.02)" }}>
                           <td colSpan={6} style={{ padding: "0.5rem 1.5rem 0.75rem" }}>
-                            {studioGames[s.id] === undefined ? (
-                              <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                                Loading games...
-                              </span>
-                            ) : studioGames[s.id].length === 0 ? (
-                              <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                                No games for this studio.
-                              </span>
-                            ) : (
-                              <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.8rem" }}>
-                                {studioGames[s.id].map((g) => (
-                                  <li key={g.id} style={{ marginBottom: "0.2rem" }}>
-                                    <strong>{g.name}</strong> ({g.slug}) — {g.status}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
+                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Games</div>
+                                {studioGames[s.id] === undefined ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading games...</span>
+                                ) : studioGames[s.id].length === 0 ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No games for this studio.</span>
+                                ) : (
+                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
+                                    {studioGames[s.id].map((g) => (
+                                      <li key={g.id} style={{ marginBottom: "0.25rem" }}>
+                                        <strong>{g.name}</strong> ({g.slug}) — {g.status}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+
+                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Members</div>
+                                {studioMembers[s.id] === undefined ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading members...</span>
+                                ) : studioMembers[s.id].length === 0 ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No members in this studio.</span>
+                                ) : (
+                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
+                                    {studioMembers[s.id].slice(0, 8).map((member) => (
+                                      <li key={member.id} style={{ marginBottom: "0.25rem" }}>
+                                        <strong>{member.email}</strong>
+                                        {member.isOwner ? " · owner" : ` · ${member.role}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+
+                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Players</div>
+                                {studioPlayers[s.id] === undefined ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading players...</span>
+                                ) : studioPlayers[s.id].length === 0 ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No players in this studio yet.</span>
+                                ) : (
+                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
+                                    {studioPlayers[s.id].slice(0, 8).map((player) => (
+                                      <li key={player.id} style={{ marginBottom: "0.25rem" }}>
+                                        <strong>{player.email ?? player.walletAddress ?? "Unknown player"}</strong>
+                                        {player.gameName ? ` · ${player.gameName}` : ""}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+
+                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Recent transactions</div>
+                                {studioTransactions[s.id] === undefined ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading transactions...</span>
+                                ) : studioTransactions[s.id].length === 0 ? (
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No studio transactions yet.</span>
+                                ) : (
+                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
+                                    {studioTransactions[s.id].slice(0, 8).map((tx) => (
+                                      <li key={tx.id} style={{ marginBottom: "0.3rem" }}>
+                                        <strong>{tx.eventType}</strong> · {tx.direction === "out" ? "-" : tx.direction === "in" ? "+" : ""}{tx.amount} {tx.assetKey.toUpperCase()}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -976,12 +1240,17 @@ export default function TriolithAdminPage() {
                         {new Date(g.createdAt).toLocaleDateString()}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem" }}>
-                        <button
-                          onClick={() => toggleGameStatus(g)}
-                          style={btnStyle(g.status === "active" ? "danger" : "success")}
-                        >
-                          {g.status === "active" ? "Suspend" : "Activate"}
-                        </button>
+                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => toggleGameStatus(g)}
+                            style={btnStyle(g.status === "active" ? "danger" : "success")}
+                          >
+                            {g.status === "active" ? "Suspend" : "Activate"}
+                          </button>
+                          <button onClick={() => deleteGame(g)} style={btnStyle("danger")}>
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1107,9 +1376,9 @@ export default function TriolithAdminPage() {
       <div ref={usersRef}>
         <Card style={{ marginBottom: "1.5rem" }}>
           <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
-            All Users ({users.length})
+            All Users ({visibleUsers.length})
           </h3>
-          {users.length === 0 ? (
+          {visibleUsers.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
               No users yet.
             </p>
@@ -1134,7 +1403,7 @@ export default function TriolithAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
+                  {visibleUsers.map((u) => (
                     <tr
                       key={u.id}
                       style={{
