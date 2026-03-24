@@ -238,7 +238,7 @@ export default function TriolithAdminPage() {
   const [devActionMessage, setDevActionMessage] = useState("");
   const [devActionLoading, setDevActionLoading] = useState<string | null>(null);
   const TX_LIMIT = 25;
-  const visibleUsers = users.filter((user) => !user.isAdmin);
+  const visibleUsers = users;
 
   const filteredStudios = [...studios]
     .filter((studio) => {
@@ -397,7 +397,7 @@ export default function TriolithAdminPage() {
 
   // GSAP ScrollTrigger for table sections
   useEffect(() => {
-    const sections = [studiosRef, gamesRef, ecoRef, txRef, usersRef, auditRef];
+    const sections = [studiosRef, ecoRef, txRef, usersRef, auditRef];
     const triggers: ScrollTrigger[] = [];
 
     sections.forEach((ref) => {
@@ -602,7 +602,17 @@ export default function TriolithAdminPage() {
     const next: "active" | "inactive" = game.status === "active" ? "inactive" : "active";
     void api
       .patch<{ id: string; status: string }>(`/admin/games/${game.id}/status`, { status: next })
-      .then(() => { setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, status: next } : g))); fetchAuditLog(); })
+      .then(() => {
+        setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, status: next } : g)));
+        setStudioGames((prev) => {
+          const updated: Record<string, GameRow[]> = {};
+          for (const sid of Object.keys(prev)) {
+            updated[sid] = prev[sid].map((g) => (g.id === game.id ? { ...g, status: next } : g));
+          }
+          return updated;
+        });
+        fetchAuditLog();
+      })
       .catch(handleError);
   };
 
@@ -956,10 +966,10 @@ export default function TriolithAdminPage() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap", marginBottom: "0.75rem" }}>
             <div>
               <h3 style={{ marginBottom: "0.35rem", fontWeight: 600 }}>
-                All Studios ({filteredStudios.length})
+                Studios ({filteredStudios.length})
               </h3>
               <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                Expand a studio to inspect its games, players and recent transactions.
+                Studios are the organizational hub. Expand to manage games, members, and players for each studio.
               </p>
             </div>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -1104,13 +1114,23 @@ export default function TriolithAdminPage() {
                                 ) : studioGames[s.id].length === 0 ? (
                                   <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No games for this studio.</span>
                                 ) : (
-                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                                     {studioGames[s.id].map((g) => (
-                                      <li key={g.id} style={{ marginBottom: "0.25rem" }}>
-                                        <strong>{g.name}</strong> ({g.slug}) — {g.status}
-                                      </li>
+                                      <div key={g.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem" }}>
+                                        <span style={{ flex: 1 }}>
+                                          <strong>{g.name}</strong>
+                                          <span style={{ color: "var(--text-muted)" }}> ({g.slug})</span>
+                                          <span style={{ marginLeft: "0.4rem", color: g.status === "active" ? "var(--success, #22c55e)" : "var(--text-muted)" }}>
+                                            {g.status}
+                                          </span>
+                                        </span>
+                                        <button onClick={() => toggleGameStatus(g)} style={btnStyle(g.status === "active" ? "danger" : "success")}>
+                                          {g.status === "active" ? "Suspend" : "Activate"}
+                                        </button>
+                                        <button onClick={() => deleteGame(g)} style={btnStyle("danger")}>Delete</button>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
                                 )}
                               </div>
 
@@ -1171,88 +1191,6 @@ export default function TriolithAdminPage() {
                         </tr>
                       )}
                     </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* ── Games (scroll-triggered) ── */}
-      <div ref={gamesRef}>
-        <Card style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
-            All Games ({games.length})
-          </h3>
-          {games.length === 0 ? (
-            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
-              No games yet.
-            </p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Name", "Slug", "Studio", "Status", "Created", "Action"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: "left",
-                          padding: "0.4rem 0.6rem",
-                          color: "var(--text-muted)",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {games.map((g) => (
-                    <tr
-                      key={g.id}
-                      style={{ borderBottom: "1px solid var(--border)" }}
-                      onMouseEnter={rowHoverEnter}
-                      onMouseLeave={rowHoverLeave}
-                    >
-                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>
-                        {g.name}
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", color: "var(--text-muted)" }}>
-                        {g.slug}
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
-                        {g.studioName ?? "—"}
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem" }}>
-                        <span
-                          style={{
-                            color: g.status === "active" ? "var(--success, #22c55e)" : "var(--text-muted)",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {g.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem", color: "var(--text-muted)" }}>
-                        {new Date(g.createdAt).toLocaleDateString()}
-                      </td>
-                      <td style={{ padding: "0.4rem 0.6rem" }}>
-                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => toggleGameStatus(g)}
-                            style={btnStyle(g.status === "active" ? "danger" : "success")}
-                          >
-                            {g.status === "active" ? "Suspend" : "Activate"}
-                          </button>
-                          <button onClick={() => deleteGame(g)} style={btnStyle("danger")}>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -1372,12 +1310,18 @@ export default function TriolithAdminPage() {
         </Card>
       </div>
 
-      {/* ── Users (scroll-triggered) ── */}
+      {/* ── Platform Accounts (scroll-triggered) ── */}
       <div ref={usersRef}>
         <Card style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
-            All Users ({visibleUsers.length})
-          </h3>
+          <div style={{ marginBottom: "0.75rem" }}>
+            <h3 style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
+              Platform Accounts ({visibleUsers.length})
+            </h3>
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem" }}>
+              All registered login accounts — platform-level controls only (KYC, admin flag, suspend).
+              Studio owners also appear in their studio&apos;s member list above.
+            </p>
+          </div>
           {visibleUsers.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
               No users yet.
