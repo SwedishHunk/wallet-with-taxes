@@ -416,47 +416,6 @@ function PlayersTools({ studioId, gameId, gameName }: { studioId: string; gameId
   );
 }
 
-function AdminTools({
-  studioId,
-  gameId,
-  gameName,
-}: {
-  studioId: string;
-  gameId?: string;
-  gameName?: string;
-}) {
-  return (
-    <>
-      <AdminStudiosTools />
-      <DevToolsSection
-        title="Members in current studio"
-        help="Creates temporary members with different permissions so we can test list size, permission editing, and removal without touching real accounts."
-      >
-        <MembersTools studioId={studioId} />
-      </DevToolsSection>
-      <DevToolsSection
-        title="Games in current studio"
-        help="Creates temporary games in the current studio so we can test game management and active-game switching against fresh data."
-      >
-        <GamesTools studioId={studioId} />
-      </DevToolsSection>
-      {gameId ? (
-        <>
-          <PlayersTools studioId={studioId} gameId={gameId} gameName={gameName} />
-          <DashboardTools studioId={studioId} gameId={gameId} gameName={gameName} />
-          <NFTManagementTools studioId={studioId} gameId={gameId} />
-        </>
-      ) : (
-        <DevToolsSection title="Current studio context">
-          <div className="dev-tools-info">
-            Choose an active game if you want to seed players, transactions, or NFTs. Studio
-            seeding and game seeding work without that, but game-scoped data needs a concrete game.
-          </div>
-        </DevToolsSection>
-      )}
-    </>
-  );
-}
 
 function AdminToolsTargeted({
   defaultStudioId,

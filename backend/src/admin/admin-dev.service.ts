@@ -705,7 +705,7 @@ export class AdminDevService {
         /\s+/g,
         "-",
       );
-      const email = `${handle}+${index + 1}@triolith.local`;
+      const email = `${handle}+${suffix}@triolith.local`;
       const password = `SeedPass-${suffix}`;
       const user = await this.userRepo.save(
         await this.buildSeedUser(email, password),
