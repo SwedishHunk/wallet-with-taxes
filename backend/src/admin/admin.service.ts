@@ -559,41 +559,22 @@ export class AdminService {
     const q = this.dataSource.createQueryRunner();
     await q.connect();
     await q.startTransaction();
+
+    const step = async (label: string, sql: string, params: unknown[]) => {
+      try {
+        await q.query(sql, params);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[purgeStudio] FAILED at step "${label}": ${msg}`);
+        throw new Error(`purgeStudio failed at "${label}": ${msg}`);
+      }
+    };
+
     try {
-      await q.query(
-        `DELETE FROM marketplace_listings
-         WHERE "sellerId" IN (
-           SELECT gp.id FROM game_players gp
-           JOIN games g ON g.id = gp."gameId"
-           WHERE g."studioId" = $1
-         ) OR "buyerId" IN (
-           SELECT gp.id FROM game_players gp
-           JOIN games g ON g.id = gp."gameId"
-           WHERE g."studioId" = $1
-         )`,
-        [studioId],
-      );
-      await q.query(
-        `DELETE FROM ledger_entries
-         WHERE "walletId" IN (
-           SELECT gw.id FROM game_wallets gw
-           JOIN game_players gp ON gp.id = gw."gamePlayerId"
-           JOIN games g ON g.id = gp."gameId"
-           WHERE g."studioId" = $1
-         )`,
-        [studioId],
-      );
-      await q.query(`DELETE FROM economic_events WHERE "studioId" = $1`, [
-        studioId,
-      ]);
-      // tax_event rows are keyed by wallet address (on-chain records), not by studio —
-      // they are immutable compliance records and must not be deleted in a studio purge.
-      await q.query(
-        `DELETE FROM player_nonce
-         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
-        [studioId],
-      );
-      await q.query(
+      // 1. nft_instances — must come before marketplace_listings (listing.nftInstance FK)
+      //    and before game_wallets/game_players
+      await step(
+        "nft_instances",
         `DELETE FROM nft_instances
          WHERE "ownerId" IN (
            SELECT gp.id FROM game_players gp
@@ -607,7 +588,59 @@ export class AdminService {
          )`,
         [studioId],
       );
-      await q.query(
+
+      // 2. marketplace_listings — by gameId (covers game FK) AND by seller/buyer (covers player FK)
+      await step(
+        "marketplace_listings",
+        `DELETE FROM marketplace_listings
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)
+            OR "sellerId" IN (
+                 SELECT gp.id FROM game_players gp
+                 JOIN games g ON g.id = gp."gameId"
+                 WHERE g."studioId" = $1
+               )
+            OR "buyerId" IN (
+                 SELECT gp.id FROM game_players gp
+                 JOIN games g ON g.id = gp."gameId"
+                 WHERE g."studioId" = $1
+               )`,
+        [studioId],
+      );
+
+      // 3. ledger_entries
+      await step(
+        "ledger_entries",
+        `DELETE FROM ledger_entries
+         WHERE "walletId" IN (
+           SELECT gw.id FROM game_wallets gw
+           JOIN game_players gp ON gp.id = gw."gamePlayerId"
+           JOIN games g ON g.id = gp."gameId"
+           WHERE g."studioId" = $1
+         )`,
+        [studioId],
+      );
+
+      // 4. economic_events — plain studioId varchar column, no FK
+      await step(
+        "economic_events",
+        `DELETE FROM economic_events WHERE "studioId" = $1`,
+        [studioId],
+      );
+
+      // tax_event rows are keyed by wallet address (on-chain records), not by studio —
+      // they are immutable compliance records and must not be deleted in a studio purge.
+
+      // 5. player_nonce — plain gameId varchar column, no FK
+      await step(
+        "player_nonce",
+        `DELETE FROM player_nonce
+         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+        [studioId],
+      );
+
+      // 6. game_wallets
+      await step(
+        "game_wallets",
         `DELETE FROM game_wallets
          WHERE "gamePlayerId" IN (
            SELECT gp.id FROM game_players gp
@@ -616,29 +649,53 @@ export class AdminService {
          )`,
         [studioId],
       );
-      await q.query(
+
+      // 7. wallet_deposit_intents
+      await step(
+        "wallet_deposit_intents",
         `DELETE FROM wallet_deposit_intents
          WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
         [studioId],
       );
-      await q.query(
+
+      // 8. game_players
+      await step(
+        "game_players",
         `DELETE FROM game_players
          WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
         [studioId],
       );
-      await q.query(
+
+      // 9. nft_templates
+      await step(
+        "nft_templates",
         `DELETE FROM nft_templates
          WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
         [studioId],
       );
-      await q.query(`DELETE FROM studio_members WHERE "studioId" = $1`, [
+
+      // 10. studio_members (onDelete CASCADE from studio, but explicit is safer)
+      await step(
+        "studio_members",
+        `DELETE FROM studio_members WHERE "studioId" = $1`,
+        [studioId],
+      );
+
+      // 11. studio_user (onDelete CASCADE from studio, but explicit is safer)
+      await step(
+        "studio_user",
+        `DELETE FROM studio_user WHERE "studioId" = $1`,
+        [studioId],
+      );
+
+      // 12. games
+      await step("games", `DELETE FROM games WHERE "studioId" = $1`, [
         studioId,
       ]);
-      await q.query(`DELETE FROM "studio_user" WHERE "studioId" = $1`, [
-        studioId,
-      ]);
-      await q.query(`DELETE FROM games WHERE "studioId" = $1`, [studioId]);
-      await q.query(`DELETE FROM studios WHERE id = $1`, [studioId]);
+
+      // 13. studios
+      await step("studios", `DELETE FROM studios WHERE id = $1`, [studioId]);
+
       await q.commitTransaction();
     } catch (err) {
       await q.rollbackTransaction();

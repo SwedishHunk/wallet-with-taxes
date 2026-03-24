@@ -514,6 +514,7 @@ export default function TriolithAdminPage() {
   const [devActionLoading, setDevActionLoading] = useState<string | null>(null);
   const TX_LIMIT = 25;
   const visibleUsers = users;
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const filteredStudios = [...studios]
     .filter((studio) => {
@@ -1627,38 +1628,24 @@ export default function TriolithAdminPage() {
                 </thead>
                 <tbody>
                   {visibleUsers.map((u) => (
+                    <Fragment key={u.id}>
                     <tr
-                      key={u.id}
                       style={{
-                        borderBottom: "1px solid var(--border)",
+                        borderBottom: expandedUserId === u.id ? "none" : "1px solid var(--border)",
                         opacity: u.isSuspended ? 0.6 : 1,
+                        cursor: "pointer",
                       }}
+                      onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
                       onMouseEnter={rowHoverEnter}
                       onMouseLeave={rowHoverLeave}
                     >
                       <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>
                         {u.email}
                       </td>
-                      <td style={{ padding: "0.4rem 0.6rem", maxWidth: "220px" }}>
-                        {u.walletAddress ? (
-                          <button
-                            title="Click to copy"
-                            onClick={() => { void navigator.clipboard.writeText(u.walletAddress); }}
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: "0.72rem",
-                              color: "var(--text-muted)",
-                              background: "none",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              wordBreak: "break-all",
-                              textAlign: "left",
-                            }}
-                          >
-                            {u.walletAddress}
-                          </button>
-                        ) : "—"}
+                      <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.72rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        {u.walletAddress
+                          ? `${u.walletAddress.slice(0, 8)}…${u.walletAddress.slice(-6)}`
+                          : "—"}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem" }}>{u.custodyMode}</td>
                       <td style={{ padding: "0.4rem 0.6rem" }}>
@@ -1686,20 +1673,20 @@ export default function TriolithAdminPage() {
                       <td style={{ padding: "0.4rem 0.6rem" }}>
                         <div style={{ display: "flex", gap: "0.35rem" }}>
                           <button
-                            onClick={() => toggleUserAdmin(u)}
+                            onClick={(e) => { e.stopPropagation(); toggleUserAdmin(u); }}
                             style={btnStyle(u.isAdmin ? "danger" : "neutral")}
                             title={u.isAdmin ? "Revoke admin" : "Grant admin"}
                           >
                             {u.isAdmin ? "Revoke Admin" : "Make Admin"}
                           </button>
                           <button
-                            onClick={() => toggleUserSuspended(u)}
+                            onClick={(e) => { e.stopPropagation(); toggleUserSuspended(u); }}
                             style={btnStyle(u.isSuspended ? "success" : "danger")}
                           >
                             {u.isSuspended ? "Unsuspend" : "Suspend"}
                           </button>
                           <button
-                            onClick={() => deleteUser(u)}
+                            onClick={(e) => { e.stopPropagation(); deleteUser(u); }}
                             style={btnStyle("danger")}
                           >
                             Delete
@@ -1707,6 +1694,28 @@ export default function TriolithAdminPage() {
                         </div>
                       </td>
                     </tr>
+                    {expandedUserId === u.id && (
+                      <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                        <td colSpan={7} style={{ padding: "0.5rem 0.75rem 0.65rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Wallet</span>
+                            <code style={{ fontFamily: "monospace", fontSize: "0.78rem", letterSpacing: "0.02em", userSelect: "all" }}>
+                              {u.walletAddress ?? "—"}
+                            </code>
+                            {u.walletAddress && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); void navigator.clipboard.writeText(u.walletAddress); }}
+                                style={{ ...btnStyle("neutral"), fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}
+                                title="Copy to clipboard"
+                              >
+                                Copy
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
