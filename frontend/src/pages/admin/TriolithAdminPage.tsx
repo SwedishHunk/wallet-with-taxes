@@ -93,7 +93,6 @@ type UserRow = {
   email: string;
   walletAddress: string;
   custodyMode: string;
-  kycStatus: string;
   isAdmin: boolean;
   isSuspended: boolean;
   createdAt: string;
@@ -1598,8 +1597,8 @@ export default function TriolithAdminPage() {
               Platform Accounts ({visibleUsers.length})
             </h3>
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem" }}>
-              All registered login accounts — platform-level controls only (KYC, admin flag, suspend).
-              Studio owners also appear in their studio&apos;s member list above.
+              All registered login accounts. &ldquo;Make Admin&rdquo; grants Triolith platform-admin access
+              — only grant to Triolith staff. Studio owners also appear in their studio&apos;s member list above.
             </p>
           </div>
           {visibleUsers.length === 0 ? (
@@ -1611,7 +1610,7 @@ export default function TriolithAdminPage() {
               <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Email", "Wallet", "Custody", "KYC", "Admin", "Status", "Created", "Actions"].map((h) => (
+                    {["Email", "Wallet", "Custody", "Admin", "Status", "Created", "Actions"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -1640,19 +1639,28 @@ export default function TriolithAdminPage() {
                       <td style={{ padding: "0.4rem 0.6rem", fontWeight: 500 }}>
                         {u.email}
                       </td>
-                      <td style={{ padding: "0.4rem 0.6rem", fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                        {u.walletAddress ? u.walletAddress.slice(0, 10) + "..." : "—"}
+                      <td style={{ padding: "0.4rem 0.6rem", maxWidth: "220px" }}>
+                        {u.walletAddress ? (
+                          <button
+                            title="Click to copy"
+                            onClick={() => { void navigator.clipboard.writeText(u.walletAddress); }}
+                            style={{
+                              fontFamily: "monospace",
+                              fontSize: "0.72rem",
+                              color: "var(--text-muted)",
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              wordBreak: "break-all",
+                              textAlign: "left",
+                            }}
+                          >
+                            {u.walletAddress}
+                          </button>
+                        ) : "—"}
                       </td>
                       <td style={{ padding: "0.4rem 0.6rem" }}>{u.custodyMode}</td>
-                      <td style={{ padding: "0.4rem 0.6rem" }}>
-                        <span
-                          style={{
-                            color: u.kycStatus === "verified" ? "var(--success, #22c55e)" : "var(--text-muted)",
-                          }}
-                        >
-                          {u.kycStatus}
-                        </span>
-                      </td>
                       <td style={{ padding: "0.4rem 0.6rem" }}>
                         <span
                           style={{

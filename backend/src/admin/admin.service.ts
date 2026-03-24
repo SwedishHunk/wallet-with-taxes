@@ -155,7 +155,6 @@ export class AdminService {
         "email",
         "walletAddress",
         "custodyMode",
-        "kycStatus",
         "isAdmin",
         "isSuspended",
         "createdAt",
