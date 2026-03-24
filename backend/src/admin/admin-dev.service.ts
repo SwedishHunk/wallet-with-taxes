@@ -273,10 +273,9 @@ export class AdminDevService {
               email: member.user.email,
               isOwner: member.isOwner,
               role: member.role,
-              permissions:
-                this.studioMemberService.maskToPermissionStrings(
-                  member.permissionsMask,
-                ),
+              permissions: this.studioMemberService.maskToPermissionStrings(
+                member.permissionsMask,
+              ),
             })),
         }))
         .sort((left, right) => left.name.localeCompare(right.name)),
@@ -702,7 +701,10 @@ export class AdminDevService {
 
     for (let index = 0; index < count; index += 1) {
       const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 10000)}`;
-      const handle = this.pickSeedName(this.seedMemberHandles, index).replace(/\s+/g, "-");
+      const handle = this.pickSeedName(this.seedMemberHandles, index).replace(
+        /\s+/g,
+        "-",
+      );
       const email = `${handle}+${index + 1}@triolith.local`;
       const password = `SeedPass-${suffix}`;
       const user = await this.userRepo.save(
@@ -729,9 +731,8 @@ export class AdminDevService {
         userId: user.id,
         email: user.email,
         role,
-        permissions: this.studioMemberService.maskToPermissionStrings(
-          permissionsMask,
-        ),
+        permissions:
+          this.studioMemberService.maskToPermissionStrings(permissionsMask),
       });
     }
 
@@ -742,10 +743,7 @@ export class AdminDevService {
     };
   }
 
-  async clearSeedMembers(
-    options: { studioId: string },
-    providedKey?: string,
-  ) {
+  async clearSeedMembers(options: { studioId: string }, providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
 
     const studioId = options.studioId?.trim();
@@ -792,10 +790,7 @@ export class AdminDevService {
     };
   }
 
-  async seedStudios(
-    options: { count?: number },
-    providedKey?: string,
-  ) {
+  async seedStudios(options: { count?: number }, providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
 
     const requestedCount = options.count ?? 1;
@@ -811,12 +806,19 @@ export class AdminDevService {
       const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 1000)}`;
       const baseStudioName = this.pickSeedName(this.seedStudioNames, index);
       const studioName = `${baseStudioName} ${index + 1}`;
-      const ownerHandle = this.pickSeedName(this.seedMemberHandles, index).replace(/\s+/g, "-");
+      const ownerHandle = this.pickSeedName(
+        this.seedMemberHandles,
+        index,
+      ).replace(/\s+/g, "-");
       const ownerEmail = `${ownerHandle}.owner+${suffix}@triolith.local`;
       const password = `SeedStudioPass-${suffix}!`;
 
       await this.usersService.signup(ownerEmail, password, studioName);
-      const result = await this.resolveStudioSession(ownerEmail, studioName, password);
+      const result = await this.resolveStudioSession(
+        ownerEmail,
+        studioName,
+        password,
+      );
 
       created.push({
         studioId: result.studioId,
@@ -908,7 +910,9 @@ export class AdminDevService {
       throw new AppException("Studio not found", 404);
     }
 
-    const actor = studio.members.find((member) => member.isOwner && member.user?.id);
+    const actor = studio.members.find(
+      (member) => member.isOwner && member.user?.id,
+    );
     if (!actor?.user?.id) {
       throw new AppException("Studio owner not found for game seeding", 400);
     }
@@ -922,10 +926,14 @@ export class AdminDevService {
       const name = `${baseGameName} ${index + 1}`;
       const slug = `seed-game-${suffix}`;
 
-      const game = await this.platformService.createGameForUser(actor.user.id, studioId, {
-        name,
-        slug,
-      });
+      const game = await this.platformService.createGameForUser(
+        actor.user.id,
+        studioId,
+        {
+          name,
+          slug,
+        },
+      );
 
       created.push({
         id: game.id,
@@ -967,7 +975,8 @@ export class AdminDevService {
       throw new AppException("Game not found in studio", 404);
     }
 
-    const created: Array<{ playerId: string; userId: string; email: string }> = [];
+    const created: Array<{ playerId: string; userId: string; email: string }> =
+      [];
     const timestamp = Date.now();
     const defaultPassword = process.env.DEV_BOOTSTRAP_PASSWORD || "dev123456";
 
@@ -1079,7 +1088,9 @@ export class AdminDevService {
         .from("economic_events")
         .where(`metadata ->> 'seeded' = 'true'`)
         .andWhere(`"gameId" = :gameId`, { gameId })
-        .andWhere(`"walletAddress" IN (:...walletAddresses)`, { walletAddresses })
+        .andWhere(`"walletAddress" IN (:...walletAddresses)`, {
+          walletAddresses,
+        })
         .execute();
     }
 
@@ -1113,10 +1124,7 @@ export class AdminDevService {
     };
   }
 
-  async clearSeedGames(
-    options: { studioId: string },
-    providedKey?: string,
-  ) {
+  async clearSeedGames(options: { studioId: string }, providedKey?: string) {
     this.assertBootstrapAllowed(providedKey);
 
     const studioId = options.studioId?.trim();
@@ -1130,7 +1138,9 @@ export class AdminDevService {
       },
     });
 
-    const targets = seededGames.filter((game) => game.slug.startsWith("seed-game-"));
+    const targets = seededGames.filter((game) =>
+      game.slug.startsWith("seed-game-"),
+    );
     let removed = 0;
 
     for (const game of targets) {
@@ -1183,7 +1193,9 @@ export class AdminDevService {
       const studioGames = await this.gameRepo.find({
         where: { studio: { id: studioId } },
       });
-      targetGames = studioGames.filter((candidate) => candidate.id !== excludeGameId);
+      targetGames = studioGames.filter(
+        (candidate) => candidate.id !== excludeGameId,
+      );
 
       if (targetGames.length === 0) {
         throw new AppException(
@@ -1271,7 +1283,8 @@ export class AdminDevService {
     if (gameId) {
       query.andWhere(`"gameId" = :gameId`, { gameId });
     } else if (excludeGameId) {
-      query.andWhere(`"gameId" IS NOT NULL`)
+      query
+        .andWhere(`"gameId" IS NOT NULL`)
         .andWhere(`"gameId" != :excludeGameId`, { excludeGameId });
     }
 
@@ -1458,7 +1471,11 @@ export class AdminDevService {
       .getMany();
 
     if (templates.length === 0) {
-      await this.seedNftTemplates({ studioId, gameId, count: Math.min(3, count) });
+      await this.seedNftTemplates({
+        studioId,
+        gameId,
+        count: Math.min(3, count),
+      });
       templates = await this.nftTemplateRepo
         .createQueryBuilder("template")
         .innerJoin("template.game", "game")
@@ -1468,7 +1485,8 @@ export class AdminDevService {
         .getMany();
     }
 
-    const created: Array<{ id: string; templateId: string; ownerId: string }> = [];
+    const created: Array<{ id: string; templateId: string; ownerId: string }> =
+      [];
 
     for (let index = 0; index < count; index += 1) {
       const template = templates[index % templates.length];
@@ -1587,7 +1605,10 @@ export class AdminDevService {
             .map((_, index) => `studio.name LIKE :studioName${index}`)
             .join(" OR "),
           Object.fromEntries(
-            this.seedStudioNames.map((name, index) => [`studioName${index}`, `${name}%`]),
+            this.seedStudioNames.map((name, index) => [
+              `studioName${index}`,
+              `${name}%`,
+            ]),
           ),
         )
         .getCount(),
@@ -1615,20 +1636,28 @@ export class AdminDevService {
         .then((row) => Number(row?.count ?? "0")),
       this.dataSource
         .query(`SELECT COUNT(*)::text AS count FROM shop_events`)
-        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+        .then((rows: Array<{ count: string }>) =>
+          Number(rows[0]?.count ?? "0"),
+        ),
       this.dataSource
         .query(`SELECT COUNT(*)::text AS count FROM "tax_event"`)
         .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0"))
         .catch(() => 0),
       this.dataSource
         .query(`SELECT COUNT(*)::text AS count FROM economic_events`)
-        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+        .then((rows: Array<{ count: string }>) =>
+          Number(rows[0]?.count ?? "0"),
+        ),
       this.dataSource
         .query(`SELECT COUNT(*)::text AS count FROM marketplace_listings`)
-        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+        .then((rows: Array<{ count: string }>) =>
+          Number(rows[0]?.count ?? "0"),
+        ),
       this.dataSource
         .query(`SELECT COUNT(*)::text AS count FROM nft_instances`)
-        .then((rows: Array<{ count: string }>) => Number(rows[0]?.count ?? "0")),
+        .then((rows: Array<{ count: string }>) =>
+          Number(rows[0]?.count ?? "0"),
+        ),
     ]);
 
     return {
@@ -1771,8 +1800,12 @@ export class AdminDevService {
     await q.connect();
     await q.startTransaction();
     try {
-      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [gameId]);
-      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [
+        gameId,
+      ]);
+      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [
+        gameId,
+      ]);
       await q.query(`DELETE FROM player_nonce WHERE "gameId" = $1`, [gameId]);
       await q.query(
         `DELETE FROM ledger_entries
@@ -1800,7 +1833,9 @@ export class AdminDevService {
          )`,
         [gameId],
       );
-      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [
+        gameId,
+      ]);
       await q.query(`DELETE FROM nft_templates WHERE "gameId" = $1`, [gameId]);
       await q.query(`DELETE FROM game_players WHERE "gameId" = $1`, [gameId]);
       await q.query(`DELETE FROM games WHERE id = $1`, [gameId]);

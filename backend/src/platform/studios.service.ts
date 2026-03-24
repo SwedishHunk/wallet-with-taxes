@@ -221,10 +221,14 @@ export class StudiosService {
       throw new NotFoundException("Member not found.");
     }
 
-    const updated = await this.studioMemberService.updateMember(actor.id, memberId, {
-      role: dto.role ? (dto.role as StudioRole) : undefined,
-      permissionsMask: this.permissionsToMask(dto.permissions ?? []),
-    });
+    const updated = await this.studioMemberService.updateMember(
+      actor.id,
+      memberId,
+      {
+        role: dto.role ? (dto.role as StudioRole) : undefined,
+        permissionsMask: this.permissionsToMask(dto.permissions ?? []),
+      },
+    );
 
     const reloaded =
       updated.user && updated.studio

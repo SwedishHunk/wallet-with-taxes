@@ -412,11 +412,17 @@ export class AdminService {
       userId: player.user?.id ?? null,
       email: player.user?.email ?? null,
       walletAddress:
-        player.user?.walletAddress ?? player.walletIdentity?.walletAddress ?? null,
+        player.user?.walletAddress ??
+        player.walletIdentity?.walletAddress ??
+        null,
       joinedAt: player.joinedAt,
       level: player.level,
       exp: player.exp,
-      source: player.user ? "user" : player.walletIdentity ? "wallet" : "unknown",
+      source: player.user
+        ? "user"
+        : player.walletIdentity
+          ? "wallet"
+          : "unknown",
     }));
   }
 
@@ -455,11 +461,17 @@ export class AdminService {
       userId: player.user?.id ?? null,
       email: player.user?.email ?? null,
       walletAddress:
-        player.user?.walletAddress ?? player.walletIdentity?.walletAddress ?? null,
+        player.user?.walletAddress ??
+        player.walletIdentity?.walletAddress ??
+        null,
       joinedAt: player.joinedAt,
       level: player.level,
       exp: player.exp,
-      source: player.user ? "user" : player.walletIdentity ? "wallet" : "unknown",
+      source: player.user
+        ? "user"
+        : player.walletIdentity
+          ? "wallet"
+          : "unknown",
     }));
   }
 
@@ -541,7 +553,7 @@ export class AdminService {
       totalIn: parseFloat(r.totalIn ?? "0"),
       totalOut: parseFloat(r.totalOut ?? "0"),
       lastSeen: r.lastSeen,
-      }));
+    }));
   }
 
   private async purgeStudio(studioId: string): Promise<void> {
@@ -572,8 +584,11 @@ export class AdminService {
          )`,
         [studioId],
       );
-      await q.query(`DELETE FROM economic_events WHERE "studioId" = $1`, [studioId]);
-      await q.query(`DELETE FROM "tax_event" WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM economic_events WHERE "studioId" = $1`, [
+        studioId,
+      ]);
+      // tax_event rows are keyed by wallet address (on-chain records), not by studio —
+      // they are immutable compliance records and must not be deleted in a studio purge.
       await q.query(
         `DELETE FROM player_nonce
          WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
@@ -617,8 +632,12 @@ export class AdminService {
          WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
         [studioId],
       );
-      await q.query(`DELETE FROM studio_members WHERE "studioId" = $1`, [studioId]);
-      await q.query(`DELETE FROM "studio_user" WHERE "studioId" = $1`, [studioId]);
+      await q.query(`DELETE FROM studio_members WHERE "studioId" = $1`, [
+        studioId,
+      ]);
+      await q.query(`DELETE FROM "studio_user" WHERE "studioId" = $1`, [
+        studioId,
+      ]);
       await q.query(`DELETE FROM games WHERE "studioId" = $1`, [studioId]);
       await q.query(`DELETE FROM studios WHERE id = $1`, [studioId]);
       await q.commitTransaction();
@@ -635,8 +654,12 @@ export class AdminService {
     await q.connect();
     await q.startTransaction();
     try {
-      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [gameId]);
-      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM marketplace_listings WHERE "gameId" = $1`, [
+        gameId,
+      ]);
+      await q.query(`DELETE FROM economic_events WHERE "gameId" = $1`, [
+        gameId,
+      ]);
       await q.query(`DELETE FROM player_nonce WHERE "gameId" = $1`, [gameId]);
       await q.query(
         `DELETE FROM ledger_entries
@@ -664,7 +687,9 @@ export class AdminService {
          )`,
         [gameId],
       );
-      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [gameId]);
+      await q.query(`DELETE FROM wallet_deposit_intents WHERE "gameId" = $1`, [
+        gameId,
+      ]);
       await q.query(`DELETE FROM nft_templates WHERE "gameId" = $1`, [gameId]);
       await q.query(`DELETE FROM game_players WHERE "gameId" = $1`, [gameId]);
       await q.query(`DELETE FROM games WHERE id = $1`, [gameId]);

@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Post,
-  Req,
-  Res,
-} from "@nestjs/common";
+import { Body, Controller, Get, Headers, Post, Req, Res } from "@nestjs/common";
 import { Response, CookieOptions, Request } from "express";
 import { AdminDevService } from "./admin-dev.service";
 import { JwtUser } from "../auth/jwt-user.interface";
@@ -116,7 +108,7 @@ export class AdminDevController {
     return this.adminDevService.getSessionTargets(
       req.user as JwtUser | undefined,
       returnToken,
-      req.cookies?.access_token,
+      req.cookies?.access_token as string | undefined,
     );
   }
 
@@ -288,7 +280,7 @@ export class AdminDevController {
       body,
       req.user as JwtUser | undefined,
       returnToken,
-      req.cookies?.access_token,
+      req.cookies?.access_token as string | undefined,
     );
 
     if (res && result.token) {
@@ -307,7 +299,7 @@ export class AdminDevController {
     const result = await this.adminDevService.restoreSession(
       body.returnToken,
       req.user as JwtUser | undefined,
-      req.cookies?.access_token,
+      req.cookies?.access_token as string | undefined,
     );
 
     if (res && result.token) {

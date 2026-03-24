@@ -334,9 +334,9 @@ describe("StudiosService", () => {
   it("deleteMember rejects actor without membership", async () => {
     memberRepo.findOne.mockResolvedValueOnce(null);
 
-    await expect(service.deleteMember("s1", "actor", "m1")).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.deleteMember("s1", "actor", "m1"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("deleteMember rejects missing target in studio", async () => {
@@ -349,9 +349,9 @@ describe("StudiosService", () => {
       })
       .mockResolvedValueOnce(null);
 
-    await expect(service.deleteMember("s1", "actor", "m1")).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.deleteMember("s1", "actor", "m1"),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("deleteMember delegates to StudioMemberService", async () => {
