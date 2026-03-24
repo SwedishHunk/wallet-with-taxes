@@ -630,11 +630,11 @@ export class AdminService {
       // tax_event rows are keyed by wallet address (on-chain records), not by studio —
       // they are immutable compliance records and must not be deleted in a studio purge.
 
-      // 5. player_nonce — plain gameId varchar column, no FK
+      // 5. player_nonce — gameId is varchar; cast uuid to text for comparison
       await step(
         "player_nonce",
         `DELETE FROM player_nonce
-         WHERE "gameId" IN (SELECT id FROM games WHERE "studioId" = $1)`,
+         WHERE "gameId" IN (SELECT id::text FROM games WHERE "studioId" = $1)`,
         [studioId],
       );
 
