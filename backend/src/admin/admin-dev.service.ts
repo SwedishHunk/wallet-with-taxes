@@ -703,7 +703,7 @@ export class AdminDevService {
     for (let index = 0; index < count; index += 1) {
       const suffix = `${timestamp}-${index}-${Math.floor(Math.random() * 10000)}`;
       const handle = this.pickSeedName(this.seedMemberHandles, index).replace(/\s+/g, "-");
-      const email = `${handle}+${index + 1}@triolith.local`;
+      const email = `${handle}+${suffix}@triolith.local`;
       const password = `SeedPass-${suffix}`;
       const user = await this.userRepo.save(
         await this.buildSeedUser(email, password),

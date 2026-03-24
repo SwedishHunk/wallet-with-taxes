@@ -207,6 +207,262 @@ function StatValue({
   );
 }
 
+const detailCardStyle: React.CSSProperties = {
+  padding: "0.9rem 1rem",
+  borderRadius: "14px",
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.08)",
+};
+
+function formatCompactAmount(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return value;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+}
+
+function DetailSection({
+  title,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      style={{
+        ...detailCardStyle,
+        overflow: "hidden",
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          listStyle: "none",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "0.75rem",
+          fontWeight: 700,
+        }}
+      >
+        <span>{title}</span>
+        {typeof count === "number" ? (
+          <span
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              padding: "0.18rem 0.5rem",
+              borderRadius: "999px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {count}
+          </span>
+        ) : null}
+      </summary>
+      <div style={{ marginTop: "0.85rem" }}>{children}</div>
+    </details>
+  );
+}
+
+function StudioGameTree({
+  games,
+  players,
+  transactions,
+}: {
+  games: GameRow[] | undefined;
+  players: StudioPlayerRow[] | undefined;
+  transactions: AdminEconomicEventRow[] | undefined;
+}) {
+  if (games === undefined) {
+    return <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading games...</span>;
+  }
+
+  if (games.length === 0) {
+    return <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No games for this studio.</span>;
+  }
+
+  const playersByGame = (players ?? []).reduce<Record<string, StudioPlayerRow[]>>((acc, player) => {
+    const key = player.gameId ?? "__ungrouped__";
+    acc[key] = [...(acc[key] ?? []), player];
+    return acc;
+  }, {});
+
+  const transactionsByGame = (transactions ?? []).reduce<Record<string, AdminEconomicEventRow[]>>((acc, tx) => {
+    const key = tx.gameId ?? "__studio__";
+    acc[key] = [...(acc[key] ?? []), tx];
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ display: "grid", gap: "0.7rem" }}>
+      {games.map((game, index) => {
+        const gamePlayers = playersByGame[game.id] ?? [];
+        const gameTransactions = transactionsByGame[game.id] ?? [];
+
+        return (
+          <details
+            key={game.id}
+            open={index === 0}
+            style={{
+              borderRadius: "12px",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(7, 13, 27, 0.45)",
+              padding: "0.8rem 0.9rem",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700 }}>{game.name}</div>
+                <div style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
+                  {game.slug} · {game.status}
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.4rem",
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
+                  {gamePlayers.length} players
+                </span>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
+                  {gameTransactions.length} transactions
+                </span>
+              </div>
+            </summary>
+
+            <div style={{ display: "grid", gap: "0.7rem", marginTop: "0.8rem" }}>
+              <DetailSection title="Players" count={gamePlayers.length}>
+                {players === undefined ? (
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading players...</span>
+                ) : gamePlayers.length === 0 ? (
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No players in this game yet.</span>
+                ) : (
+                  <div style={{ display: "grid", gap: "0.45rem" }}>
+                    {gamePlayers.map((player) => (
+                      <div
+                        key={player.id}
+                        style={{
+                          padding: "0.55rem 0.7rem",
+                          borderRadius: "10px",
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600 }}>
+                          {player.email ?? player.walletAddress ?? "Unknown player"}
+                        </div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}>
+                          Level {player.level} · XP {player.exp} · {new Date(player.joinedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </DetailSection>
+
+              <DetailSection title="Transactions" count={gameTransactions.length}>
+                {transactions === undefined ? (
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading transactions...</span>
+                ) : gameTransactions.length === 0 ? (
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No transactions for this game yet.</span>
+                ) : (
+                  <div style={{ display: "grid", gap: "0.45rem" }}>
+                    {gameTransactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        style={{
+                          padding: "0.55rem 0.7rem",
+                          borderRadius: "10px",
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
+                          <strong>{tx.eventType}</strong>
+                          <span
+                            style={{
+                              color:
+                                tx.direction === "in"
+                                  ? "var(--success, #22c55e)"
+                                  : tx.direction === "out"
+                                    ? "var(--danger, #ef4444)"
+                                    : "var(--text-muted)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {tx.direction === "out" ? "-" : tx.direction === "in" ? "+" : ""}
+                            {formatCompactAmount(tx.amount)} {tx.assetKey.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}>
+                          {new Date(tx.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </DetailSection>
+            </div>
+          </details>
+        );
+      })}
+
+      {(transactionsByGame.__studio__ ?? []).length > 0 ? (
+        <DetailSection title="Studio-level transactions" count={transactionsByGame.__studio__.length}>
+          <div style={{ display: "grid", gap: "0.45rem" }}>
+            {transactionsByGame.__studio__.map((tx) => (
+              <div
+                key={tx.id}
+                style={{
+                  padding: "0.55rem 0.7rem",
+                  borderRadius: "10px",
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <strong>{tx.eventType}</strong>
+                  <span>{formatCompactAmount(tx.amount)} {tx.assetKey.toUpperCase()}</span>
+                </div>
+                <div style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}>
+                  {new Date(tx.timestamp).toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DetailSection>
+      ) : null}
+    </div>
+  );
+}
+
 /* ─── Main Component ──────────────────────────────────────── */
 
 export default function TriolithAdminPage() {
@@ -1096,76 +1352,94 @@ export default function TriolithAdminPage() {
                       {expandedStudioId === s.id && (
                         <tr style={{ background: "rgba(255, 255, 255, 0.02)" }}>
                           <td colSpan={6} style={{ padding: "0.5rem 1.5rem 0.75rem" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
-                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Games</div>
-                                {studioGames[s.id] === undefined ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading games...</span>
-                                ) : studioGames[s.id].length === 0 ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No games for this studio.</span>
-                                ) : (
-                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
-                                    {studioGames[s.id].map((g) => (
-                                      <li key={g.id} style={{ marginBottom: "0.25rem" }}>
-                                        <strong>{g.name}</strong> ({g.slug}) — {g.status}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
+                            <div style={{ display: "grid", gap: "0.85rem" }}>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                                  gap: "0.6rem",
+                                }}
+                              >
+                                {[
+                                  {
+                                    label: "Games",
+                                    value: studioGames[s.id]?.length,
+                                  },
+                                  {
+                                    label: "Members",
+                                    value: studioMembers[s.id]?.length,
+                                  },
+                                  {
+                                    label: "Players",
+                                    value: studioPlayers[s.id]?.length,
+                                  },
+                                  {
+                                    label: "Transactions",
+                                    value: studioTransactions[s.id]?.length,
+                                  },
+                                ].map((item) => (
+                                  <div
+                                    key={item.label}
+                                    style={{
+                                      padding: "0.75rem 0.85rem",
+                                      borderRadius: "12px",
+                                      background: "rgba(255,255,255,0.035)",
+                                      border: "1px solid rgba(255,255,255,0.08)",
+                                    }}
+                                  >
+                                    <div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>
+                                      {item.label}
+                                    </div>
+                                    <div style={{ fontWeight: 800, fontSize: "1rem", marginTop: "0.15rem" }}>
+                                      {item.value ?? "…"}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
 
-                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Members</div>
+                              <DetailSection title="Members" count={studioMembers[s.id]?.length} defaultOpen>
                                 {studioMembers[s.id] === undefined ? (
                                   <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading members...</span>
                                 ) : studioMembers[s.id].length === 0 ? (
                                   <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No members in this studio.</span>
                                 ) : (
-                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
-                                    {studioMembers[s.id].slice(0, 8).map((member) => (
-                                      <li key={member.id} style={{ marginBottom: "0.25rem" }}>
-                                        <strong>{member.email}</strong>
-                                        {member.isOwner ? " · owner" : ` · ${member.role}`}
-                                      </li>
+                                  <div style={{ display: "grid", gap: "0.45rem" }}>
+                                    {studioMembers[s.id].map((member) => (
+                                      <div
+                                        key={member.id}
+                                        style={{
+                                          padding: "0.6rem 0.75rem",
+                                          borderRadius: "10px",
+                                          background: "rgba(255,255,255,0.03)",
+                                          border: "1px solid rgba(255,255,255,0.06)",
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          gap: "0.75rem",
+                                          flexWrap: "wrap",
+                                        }}
+                                      >
+                                        <div>
+                                          <div style={{ fontWeight: 600 }}>{member.email}</div>
+                                          <div style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}>
+                                            {member.isOwner ? "owner" : member.role}
+                                          </div>
+                                        </div>
+                                        <div style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}>
+                                          {member.permissions || "No extra permissions"}
+                                        </div>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
                                 )}
-                              </div>
+                              </DetailSection>
 
-                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Players</div>
-                                {studioPlayers[s.id] === undefined ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading players...</span>
-                                ) : studioPlayers[s.id].length === 0 ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No players in this studio yet.</span>
-                                ) : (
-                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
-                                    {studioPlayers[s.id].slice(0, 8).map((player) => (
-                                      <li key={player.id} style={{ marginBottom: "0.25rem" }}>
-                                        <strong>{player.email ?? player.walletAddress ?? "Unknown player"}</strong>
-                                        {player.gameName ? ` · ${player.gameName}` : ""}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-
-                              <div style={{ padding: "0.9rem", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                                <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Recent transactions</div>
-                                {studioTransactions[s.id] === undefined ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading transactions...</span>
-                                ) : studioTransactions[s.id].length === 0 ? (
-                                  <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>No studio transactions yet.</span>
-                                ) : (
-                                  <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: "0.8rem" }}>
-                                    {studioTransactions[s.id].slice(0, 8).map((tx) => (
-                                      <li key={tx.id} style={{ marginBottom: "0.3rem" }}>
-                                        <strong>{tx.eventType}</strong> · {tx.direction === "out" ? "-" : tx.direction === "in" ? "+" : ""}{tx.amount} {tx.assetKey.toUpperCase()}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
+                              <DetailSection title="Games" count={studioGames[s.id]?.length}>
+                                <StudioGameTree
+                                  games={studioGames[s.id]}
+                                  players={studioPlayers[s.id]}
+                                  transactions={studioTransactions[s.id]}
+                                />
+                              </DetailSection>
                             </div>
                           </td>
                         </tr>
