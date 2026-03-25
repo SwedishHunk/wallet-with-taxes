@@ -141,6 +141,7 @@ export class DataRetentionService {
       passwordHash: "",
       consentGivenAt: null,
       lastLoginAt: null,
+      isSuspended: false,
     });
     this.logger.debug(`[DataRetention] Anonymized user ${user.id}`);
   }

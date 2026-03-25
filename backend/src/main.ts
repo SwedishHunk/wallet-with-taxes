@@ -10,7 +10,9 @@ import { AppExceptionFilter } from "./common/filters/app-exception.filter";
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true exposes the raw request buffer via @RawBody() — required
+  // for HMAC webhook signature verification (e.g. KYC provider callbacks).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const allowedOrigins = (
     process.env.CORS_ORIGINS ||

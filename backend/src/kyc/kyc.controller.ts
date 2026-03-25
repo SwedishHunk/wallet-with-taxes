@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Req, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Headers,
+  RawBody,
+} from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { Request } from "express";
 import { KycService, KycWebhookPayload } from "./kyc.service";
@@ -24,11 +32,20 @@ export class KycController {
   /**
    * POST /kyc/webhook
    * Async callback from the KYC provider with the verification result.
-   * In production, this endpoint MUST verify the provider's webhook signature
-   * before processing. Currently accepts any payload (dev/stub mode).
+   *
+   * The raw request body is passed to the service for HMAC-SHA256 signature
+   * verification. Set KYC_WEBHOOK_SECRET to the shared secret from your
+   * provider to enable verification. Without the secret, verification is
+   * skipped (dev/test mode).
+   *
+   * Expected header: x-kyc-signature: sha256=<hex_digest>
    */
   @Post("webhook")
-  async webhook(@Body() payload: KycWebhookPayload) {
-    return this.kycService.handleWebhook(payload);
+  async webhook(
+    @Headers("x-kyc-signature") signature: string | undefined,
+    @RawBody() rawBody: Buffer,
+    @Body() payload: KycWebhookPayload,
+  ) {
+    return this.kycService.handleWebhook(payload, rawBody, signature);
   }
 }
