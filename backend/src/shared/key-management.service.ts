@@ -40,12 +40,12 @@ export class KeyManagementService {
     if (kmsKeyArn) {
       this.logger.warn(
         "KMS_KEY_ARN is set but real KMS integration is not yet implemented. " +
-        "Falling back to env-var AES-256-GCM. Implement KMS encrypt/decrypt here.",
+          "Falling back to env-var AES-256-GCM. Implement KMS encrypt/decrypt here.",
       );
     } else {
       this.logger.warn(
         "Using env-var AES-256-GCM for private key encryption. " +
-        "For production, migrate to AWS KMS / HashiCorp Vault and set KMS_KEY_ARN.",
+          "For production, migrate to AWS KMS / HashiCorp Vault and set KMS_KEY_ARN.",
       );
     }
   }
@@ -65,6 +65,10 @@ export class KeyManagementService {
    * @throws if the ciphertext is malformed or the key is wrong.
    */
   decrypt(encryptedPrivateKey: string): string {
-    return decryptPrivateKey(encryptedPrivateKey, this.encryptionKey, this.legacyIv);
+    return decryptPrivateKey(
+      encryptedPrivateKey,
+      this.encryptionKey,
+      this.legacyIv,
+    );
   }
 }

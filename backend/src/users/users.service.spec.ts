@@ -101,7 +101,10 @@ describe("UsersService", () => {
       studioMemberService as never,
       jwtService as never,
       dataSource as never,
-      { encrypt: jest.fn((x: string) => x), decrypt: jest.fn((x: string) => x) } as never,
+      {
+        encrypt: jest.fn((x: string) => x),
+        decrypt: jest.fn((x: string) => x),
+      } as never,
     );
 
     process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";

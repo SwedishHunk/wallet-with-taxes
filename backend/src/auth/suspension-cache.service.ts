@@ -19,9 +19,12 @@ export class SuspensionCacheService implements OnModuleDestroy {
   private readonly redis: Redis | null = null;
 
   /** In-process fallback when Redis is unavailable */
-  private readonly localCache = new Map<string, { suspended: boolean; expiresAt: number }>();
+  private readonly localCache = new Map<
+    string,
+    { suspended: boolean; expiresAt: number }
+  >();
   private readonly LOCAL_TTL_MS = 5_000; // 5 seconds
-  private readonly REDIS_TTL_SEC = 5;   // 5 seconds
+  private readonly REDIS_TTL_SEC = 5; // 5 seconds
 
   constructor() {
     const redisUrl = process.env.REDIS_URL;
@@ -32,7 +35,9 @@ export class SuspensionCacheService implements OnModuleDestroy {
         maxRetriesPerRequest: 1,
       });
       this.redis.on("error", (err) => {
-        this.logger.warn(`Redis connection error — falling back to local cache: ${String(err)}`);
+        this.logger.warn(
+          `Redis connection error — falling back to local cache: ${String(err)}`,
+        );
       });
       this.redis.on("connect", () => {
         this.logger.log("Redis connected — suspension cache is distributed");
@@ -40,7 +45,7 @@ export class SuspensionCacheService implements OnModuleDestroy {
     } else {
       this.logger.warn(
         "REDIS_URL not set — using in-process suspension cache (single-instance only). " +
-        "Set REDIS_URL for production multi-instance deployments.",
+          "Set REDIS_URL for production multi-instance deployments.",
       );
     }
   }
@@ -76,7 +81,12 @@ export class SuspensionCacheService implements OnModuleDestroy {
   async set(userId: string, suspended: boolean): Promise<void> {
     if (this.redis?.status === "ready") {
       try {
-        await this.redis.set(`suspension:${userId}`, suspended ? "1" : "0", "EX", this.REDIS_TTL_SEC);
+        await this.redis.set(
+          `suspension:${userId}`,
+          suspended ? "1" : "0",
+          "EX",
+          this.REDIS_TTL_SEC,
+        );
         return;
       } catch {
         // Redis write failed — fall through to local cache

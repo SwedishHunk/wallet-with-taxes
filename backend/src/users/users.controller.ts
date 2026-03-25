@@ -45,7 +45,12 @@ export class UsersController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { email, password, studioName, gdprConsent } = body;
-    const result = await this.usersService.signup(email, password, studioName, gdprConsent);
+    const result = await this.usersService.signup(
+      email,
+      password,
+      studioName,
+      gdprConsent,
+    );
     const { token, ...payload } = result;
     res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;

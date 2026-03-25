@@ -9,21 +9,6 @@ import { ExchangeRateService } from "./exchange-rate.service";
 import { Response } from "express";
 import { SWEDISH_LOSS_DEDUCTION_RATE } from "../shared/constants/business.constants";
 
-interface TaxCsvRow {
-  Date: string;
-  Type: string;
-  TaxTreatment: string;
-  Asset: string;
-  TokenID: number;
-  Amount: number;
-  PriceUSD: number | string;
-  PriceSEK: number | string;
-  ExchangeRateSEKUSD: number | string;
-  ExchangeRateSource: string;
-  FeeUSD: number;
-  ValuationStatus: string;
-}
-
 /** One row in the K4 Section D output (crypto assets, genomsnittsmetoden) */
 interface K4Row {
   Beteckning: string; // asset description
@@ -240,11 +225,19 @@ export class TaxService {
         const avgCostUSD = qty > 0 ? holding.totalCostUSD / qty : 0;
         const avgCostSEK = qty > 0 ? holding.totalCostSEK / qty : 0;
         const glUSD = (e.priceUSD - avgCostUSD) * Number(e.amount);
-        glUSD >= 0 ? (totalGainsUSD += glUSD) : (totalLossesUSD += glUSD);
+        if (glUSD >= 0) {
+          totalGainsUSD += glUSD;
+        } else {
+          totalLossesUSD += glUSD;
+        }
 
         if (e.priceSEK != null) {
           const glSEK = (e.priceSEK - avgCostSEK) * Number(e.amount);
-          glSEK >= 0 ? (totalGainsSEK += glSEK) : (totalLossesSEK += glSEK);
+          if (glSEK >= 0) {
+            totalGainsSEK += glSEK;
+          } else {
+            totalLossesSEK += glSEK;
+          }
           hasSEK = true;
         }
 
@@ -446,7 +439,11 @@ export class TaxService {
     return /^[=+\-@]/.test(str) ? `'${str}` : str;
   }
 
-  async exportEventsAsCSV(userAddress: string, res: Response, year?: number): Promise<void> {
+  async exportEventsAsCSV(
+    userAddress: string,
+    res: Response,
+    year?: number,
+  ): Promise<void> {
     const events = await this.getEventsForUser(userAddress, year);
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -461,20 +458,33 @@ export class TaxService {
     // ── File header ──────────────────────────────────────────────────────────
     lines.push("# INFORMATIONAL ONLY — NOT VERIFIED TAX ADVICE");
     lines.push("# This export is generated for reference purposes only.");
-    lines.push("# It does not constitute a completed K4 declaration or verified tax advice.");
-    lines.push("# Verify all figures with a qualified Swedish tax advisor before filing.");
-    lines.push("# Swedish tax law (IL 44/48 kap): all gains/losses must be reported in SEK.");
+    lines.push(
+      "# It does not constitute a completed K4 declaration or verified tax advice.",
+    );
+    lines.push(
+      "# Verify all figures with a qualified Swedish tax advisor before filing.",
+    );
+    lines.push(
+      "# Swedish tax law (IL 44/48 kap): all gains/losses must be reported in SEK.",
+    );
     if (year) lines.push(`# Tax year: ${year}`);
     lines.push("#");
-    lines.push("# ═══════════════════════════════════════════════════════════════");
-    lines.push("# SECTION 1 — K4 SECTION D (Övriga tillgångar / crypto assets)");
+    lines.push(
+      "# ═══════════════════════════════════════════════════════════════",
+    );
+    lines.push(
+      "# SECTION 1 — K4 SECTION D (Övriga tillgångar / crypto assets)",
+    );
     lines.push("# Method: Genomsnittsmetoden (average cost, IL 48 kap 7 §)");
     lines.push("# One row per disposal event. All monetary values in SEK.");
-    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push(
+      "# ═══════════════════════════════════════════════════════════════",
+    );
     lines.push("");
 
     // ── K4 Section D ─────────────────────────────────────────────────────────
-    const k4Header = "Beteckning,Antal,Forsaljningspris (SEK),Omkostnadsbelopp (SEK),Vinst (SEK),Forlust (SEK),Notering";
+    const k4Header =
+      "Beteckning,Antal,Forsaljningspris (SEK),Omkostnadsbelopp (SEK),Vinst (SEK),Forlust (SEK),Notering";
     lines.push(k4Header);
 
     const k4Rows = this.buildK4Rows(events);
@@ -498,11 +508,17 @@ export class TaxService {
 
     // ── Raw event log (reference appendix) ───────────────────────────────────
     lines.push("");
-    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push(
+      "# ═══════════════════════════════════════════════════════════════",
+    );
     lines.push("# SECTION 2 — Raw event log (reference only, not for filing)");
-    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push(
+      "# ═══════════════════════════════════════════════════════════════",
+    );
     lines.push("");
-    lines.push("Date,Type,TaxTreatment,Asset,TokenID,Amount,PriceUSD,PriceSEK,ExchangeRateSEKUSD,ExchangeRateSource,FeeUSD,ValuationStatus");
+    lines.push(
+      "Date,Type,TaxTreatment,Asset,TokenID,Amount,PriceUSD,PriceSEK,ExchangeRateSEKUSD,ExchangeRateSource,FeeUSD,ValuationStatus",
+    );
 
     for (const e of events) {
       lines.push(
@@ -535,7 +551,12 @@ export class TaxService {
     // Average cost tracking per assetKey, in both SEK and USD
     const basis: Record<
       string,
-      { qtySEK: number; totalCostSEK: number; qtyUSD: number; totalCostUSD: number }
+      {
+        qtySEK: number;
+        totalCostSEK: number;
+        qtyUSD: number;
+        totalCostUSD: number;
+      }
     > = {};
 
     const rows: K4Row[] = [];
@@ -545,7 +566,13 @@ export class TaxService {
       const qty = Number(e.amount);
 
       if (e.type === "acquisition") {
-        if (!basis[key]) basis[key] = { qtySEK: 0, totalCostSEK: 0, qtyUSD: 0, totalCostUSD: 0 };
+        if (!basis[key])
+          basis[key] = {
+            qtySEK: 0,
+            totalCostSEK: 0,
+            qtyUSD: 0,
+            totalCostUSD: 0,
+          };
         if (e.priceSEK != null) {
           basis[key].qtySEK += qty;
           basis[key].totalCostSEK += e.priceSEK * qty;

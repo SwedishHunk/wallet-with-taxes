@@ -40,7 +40,11 @@ describe("TaxController", () => {
     const controller = new TaxController(service as never);
 
     await expect(
-      controller.getSummary("0xabc", undefined, mockReq({ walletAddress: "0xabc" })),
+      controller.getSummary(
+        "0xabc",
+        undefined,
+        mockReq({ walletAddress: "0xabc" }),
+      ),
     ).resolves.toEqual({ ok: true });
     expect(service.getSummary).toHaveBeenCalledWith("0xabc", undefined);
   });
@@ -102,7 +106,11 @@ describe("TaxController", () => {
       mockReq({ walletAddress: "0xabc" }),
       res as never,
     );
-    expect(service.exportEventsAsCSV).toHaveBeenCalledWith("0xabc", res, undefined);
+    expect(service.exportEventsAsCSV).toHaveBeenCalledWith(
+      "0xabc",
+      res,
+      undefined,
+    );
   });
 
   it("throws ForbiddenException on export when wallet does not match", async () => {
@@ -137,7 +145,11 @@ describe("ApiTaxController", () => {
       exportEventsAsCSV: jest.fn(),
     };
     const controller = new ApiTaxController(service as never);
-    const result = await controller.getSummary("0xABC", undefined, mockReq({ walletAddress: "0xabc" }));
+    const result = await controller.getSummary(
+      "0xABC",
+      undefined,
+      mockReq({ walletAddress: "0xabc" }),
+    );
     expect(service.getSummary).toHaveBeenCalledWith("0xabc", undefined);
     expect(result).toEqual({ gains: 0 });
   });
@@ -159,7 +171,16 @@ describe("ApiTaxController", () => {
     };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new ApiTaxController(service as never);
-    await controller.exportCSV("0xABC", undefined, mockReq({ walletAddress: "0xabc" }), res as never);
-    expect(service.exportEventsAsCSV).toHaveBeenCalledWith("0xabc", res, undefined);
+    await controller.exportCSV(
+      "0xABC",
+      undefined,
+      mockReq({ walletAddress: "0xabc" }),
+      res as never,
+    );
+    expect(service.exportEventsAsCSV).toHaveBeenCalledWith(
+      "0xabc",
+      res,
+      undefined,
+    );
   });
 });
