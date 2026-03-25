@@ -26,8 +26,9 @@ interface AuthRequest {
   user: { id: string; email: string };
 }
 
-// 30 requests per minute per IP on all admin endpoints
-@Throttle({ auth: { limit: 30, ttl: 60000 } })
+// Default: 60 requests/min for reads; write endpoints are individually
+// restricted to 10 req/min via the "admin-write" throttle tier.
+@Throttle({ default: { limit: 60, ttl: 60000 } })
 @Controller("admin")
 @UseGuards(JwtAuthGuard)
 export class AdminController {
@@ -72,6 +73,7 @@ export class AdminController {
   }
 
   @Patch("studios/:id/status")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async setStudioStatus(
     @Param("id") id: string,
@@ -87,6 +89,7 @@ export class AdminController {
   }
 
   @Delete("studios/:id")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async deleteStudio(@Param("id") id: string, @Request() req: AuthRequest) {
     return this.adminService.deleteStudio(id, req.user.id, req.user.email);
@@ -123,6 +126,7 @@ export class AdminController {
   }
 
   @Patch("users/:id/admin")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async setUserAdmin(
     @Param("id") id: string,
@@ -138,6 +142,7 @@ export class AdminController {
   }
 
   @Patch("users/:id/suspended")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async setUserSuspended(
     @Param("id") id: string,
@@ -153,6 +158,7 @@ export class AdminController {
   }
 
   @Delete("users/:id")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async deleteUser(@Param("id") id: string, @Request() req: AuthRequest) {
     return this.adminService.deleteUser(id, req.user.id, req.user.email);
@@ -165,6 +171,7 @@ export class AdminController {
   }
 
   @Patch("platform/fee")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async setPlatformFee(
     @Body() body: SetPlatformFeeDto,
@@ -202,6 +209,7 @@ export class AdminController {
   }
 
   @Patch("games/:id/status")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async setGameStatus(
     @Param("id") id: string,
@@ -217,6 +225,7 @@ export class AdminController {
   }
 
   @Delete("games/:id")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
   @UseGuards(TriolithGuard)
   async deleteGame(@Param("id") id: string, @Request() req: AuthRequest) {
     return this.adminService.deleteGame(id, req.user.id, req.user.email);

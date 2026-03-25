@@ -29,6 +29,8 @@ export default function Settings() {
   const [usdSek, setUsdSek] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportMsg, setExportMsg] = useState("");
 
   const loadConfig = () => {
     void api.get<ShopConfig>("/api/shop/config").then((r) => {
@@ -52,6 +54,29 @@ export default function Settings() {
       window.removeEventListener("devtools:settings:refresh", handleRefresh);
     };
   }, []);
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    setExportMsg("");
+    try {
+      const r = await api.get("/users/me/export");
+      const blob = new Blob([JSON.stringify(r.data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my-data-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportMsg("Downloaded");
+      setTimeout(() => setExportMsg(""), 4000);
+    } catch {
+      setExportMsg("Export failed");
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const saveValuation = async () => {
     setLoading(true);
@@ -149,6 +174,46 @@ export default function Settings() {
         ) : (
           <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading…</p>
         )}
+      </Card>
+
+      {/* ── My Data (GDPR Article 20) ── */}
+      <Card style={{ marginBottom: "1rem" }}>
+        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.4rem", fontWeight: 600 }}>
+          My Data
+        </p>
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.1rem", lineHeight: 1.6 }}>
+          Download a copy of all personal data held for your account (GDPR Article 20 — Right to data portability).
+          Includes your profile, studio memberships, and tax event history.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <button
+            onClick={handleExportData}
+            disabled={exportLoading}
+            style={{
+              padding: "0.45rem 1.4rem",
+              borderRadius: 8,
+              border: "1px solid rgba(99,102,241,0.35)",
+              background: "rgba(99,102,241,0.1)",
+              color: "#818cf8",
+              fontWeight: 700,
+              fontSize: "0.83rem",
+              cursor: exportLoading ? "not-allowed" : "pointer",
+              opacity: exportLoading ? 0.6 : 1,
+              letterSpacing: "0.04em",
+            }}
+          >
+            {exportLoading ? "Preparing…" : "Download my data"}
+          </button>
+          {exportMsg && (
+            <span style={{
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color: exportMsg === "Downloaded" ? "#22c55e" : "#ef4444",
+            }}>
+              {exportMsg === "Downloaded" ? "✓ Downloaded" : "✗ Export failed"}
+            </span>
+          )}
+        </div>
       </Card>
 
       {/* ── Fiat Valuation Snapshot ── */}

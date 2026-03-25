@@ -55,7 +55,9 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
 
-    const encryptedPrivateKey = this.keyManagement.encrypt(wallet.privateKey);
+    const encryptedPrivateKey = await this.keyManagement.encrypt(
+      wallet.privateKey,
+    );
 
     const onChainWallet = await this.tryCreateOnChainWallet(wallet.address);
 
@@ -251,6 +253,9 @@ export class UsersService {
         403,
       );
     }
+
+    // Update last login timestamp for GDPR retention tracking (fire-and-forget)
+    void this.userRepository.update(user.id, { lastLoginAt: new Date() });
 
     if (studioId) {
       // Explicit studio login (e.g. MemberLogin switching member identity):

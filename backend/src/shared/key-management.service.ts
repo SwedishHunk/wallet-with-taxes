@@ -4,28 +4,26 @@ import { encryptPrivateKey, decryptPrivateKey } from "./crypto.util";
 /**
  * KeyManagementService — abstraction layer over private key encryption.
  *
- * CURRENT IMPLEMENTATION: env-var backed AES-256-GCM (same as before).
- * PRODUCTION PATH: swap the implementation here for AWS KMS, HashiCorp Vault,
- * or Google Cloud KMS without touching any call-site in users.service.ts or
- * studios.service.ts.
+ * BACKEND SELECTION (evaluated at startup):
+ *   KMS_KEY_ARN set  → AWS KMS (requires @aws-sdk/client-kms installed)
+ *   KMS_KEY_ARN unset → env-var backed AES-256-GCM (dev/PoC default)
  *
- * How to migrate to real KMS:
- *   1. Add a KMS client here (e.g. @aws-sdk/client-kms).
- *   2. In encrypt(): call kms.encrypt() and return the base64 ciphertext.
- *   3. In decrypt(): call kms.decrypt() and return the plaintext.
- *   4. Set KMS_KEY_ARN (or equivalent) in env and check for it here.
- *   5. Existing v1: ciphertexts are still decrypted with the env-var path
- *      (backward compat) until all keys are re-encrypted with the KMS key.
+ * MIGRATION PATH (v1 → KMS):
+ *   Existing "v1:" AES ciphertexts are still decryptable via the AES path
+ *   so keys can be re-encrypted lazily without a big-bang migration.
  *
  * IMPORTANT: The plaintext private key must NEVER be logged or stored
- * anywhere. It should only exist in memory for the duration of a signing
- * operation and then be garbage-collected.
+ * anywhere outside this service. It should only exist in memory for the
+ * duration of a signing operation and then be garbage-collected.
  */
 @Injectable()
 export class KeyManagementService {
   private readonly logger = new Logger(KeyManagementService.name);
   private readonly encryptionKey: string;
   private readonly legacyIv: string | undefined;
+  private readonly kmsKeyArn: string | undefined;
+
+  private kmsClient: any = null;
 
   constructor() {
     const key = process.env.ENCRYPTION_KEY;
@@ -34,18 +32,17 @@ export class KeyManagementService {
     }
     this.encryptionKey = key;
     this.legacyIv = process.env.ENCRYPTION_IV;
+    this.kmsKeyArn = process.env.KMS_KEY_ARN;
 
-    // Log which backend is active (never log the key itself)
-    const kmsKeyArn = process.env.KMS_KEY_ARN;
-    if (kmsKeyArn) {
-      this.logger.warn(
-        "KMS_KEY_ARN is set but real KMS integration is not yet implemented. " +
-          "Falling back to env-var AES-256-GCM. Implement KMS encrypt/decrypt here.",
+    if (this.kmsKeyArn) {
+      this.logger.log(
+        `KMS backend active (KeyId: ${this.kmsKeyArn.slice(-12)}). ` +
+          "Requires @aws-sdk/client-kms installed at runtime.",
       );
     } else {
       this.logger.warn(
         "Using env-var AES-256-GCM for private key encryption. " +
-          "For production, migrate to AWS KMS / HashiCorp Vault and set KMS_KEY_ARN.",
+          "For production, set KMS_KEY_ARN to enable AWS KMS backend.",
       );
     }
   }
@@ -53,22 +50,93 @@ export class KeyManagementService {
   /**
    * Encrypts a private key (plaintext) and returns the ciphertext string.
    * The ciphertext is safe to store in the database.
+   *
+   * When KMS_KEY_ARN is set the ciphertext is prefixed with "kms:" so that
+   * decryptAsync can route to the correct backend.
    */
-  encrypt(plaintextPrivateKey: string): string {
+  async encrypt(plaintextPrivateKey: string): Promise<string> {
+    if (this.kmsKeyArn) {
+      return this.kmsEncrypt(plaintextPrivateKey);
+    }
     return encryptPrivateKey(plaintextPrivateKey, this.encryptionKey);
   }
 
   /**
    * Decrypts a stored ciphertext and returns the plaintext private key.
-   * Handles both the current v1: GCM format and the legacy CBC format.
    *
-   * @throws if the ciphertext is malformed or the key is wrong.
+   * Routing:
+   *   "kms:<base64>" → AWS KMS DecryptCommand
+   *   "v1:<base64>"  → AES-256-GCM (current AES format)
+   *   "<hex>"        → legacy AES-256-CBC (backward compat)
    */
-  decrypt(encryptedPrivateKey: string): string {
+  async decrypt(encryptedPrivateKey: string): Promise<string> {
+    if (encryptedPrivateKey.startsWith("kms:")) {
+      return this.kmsDecrypt(encryptedPrivateKey);
+    }
     return decryptPrivateKey(
       encryptedPrivateKey,
       this.encryptionKey,
       this.legacyIv,
     );
+  }
+
+  // ── AWS KMS helpers ───────────────────────────────────────────────────────
+
+  private async kmsEncrypt(plaintext: string): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const client = await this.getKmsClient();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+    const { EncryptCommand } = require("@aws-sdk/client-kms");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const result = await client.send(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      new EncryptCommand({
+        KeyId: this.kmsKeyArn,
+        Plaintext: Buffer.from(plaintext, "utf8"),
+      }),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const cipherBlob = result.CiphertextBlob as Uint8Array;
+    return "kms:" + Buffer.from(cipherBlob).toString("base64");
+  }
+
+  private async kmsDecrypt(encryptedPrivateKey: string): Promise<string> {
+    const cipherB64 = encryptedPrivateKey.slice(4); // strip "kms:" prefix
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const client = await this.getKmsClient();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+    const { DecryptCommand } = require("@aws-sdk/client-kms");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const result = await client.send(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      new DecryptCommand({
+        KeyId: this.kmsKeyArn,
+        CiphertextBlob: Buffer.from(cipherB64, "base64"),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    return Buffer.from(result.Plaintext as Uint8Array).toString("utf8");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  private async getKmsClient(): Promise<any> {
+    if (this.kmsClient) return this.kmsClient;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+      const { KMSClient } = require("@aws-sdk/client-kms");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+      this.kmsClient = new KMSClient({
+        region: process.env.AWS_REGION ?? "eu-north-1",
+      });
+    } catch (err) {
+      throw new Error(
+        "KMS_KEY_ARN is set but @aws-sdk/client-kms is not installed. " +
+          "Run: npm install @aws-sdk/client-kms\n" +
+          String(err instanceof Error ? err.message : err),
+      );
+    }
+
+    return this.kmsClient;
   }
 }

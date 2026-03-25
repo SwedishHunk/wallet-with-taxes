@@ -130,7 +130,9 @@ export class StudiosService {
       const passwordHash = await bcrypt.hash(password, salt);
       const wallet = ethers.Wallet.createRandom();
 
-      const encryptedPrivateKey = this.keyManagement.encrypt(wallet.privateKey);
+      const encryptedPrivateKey = await this.keyManagement.encrypt(
+        wallet.privateKey,
+      );
 
       user = this.userRepository.create({
         email: dto.email,

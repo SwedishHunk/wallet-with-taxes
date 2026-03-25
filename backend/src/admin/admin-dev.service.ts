@@ -310,12 +310,15 @@ export class AdminDevService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
+    const encryptedPrivateKey = await this.keyManagement.encrypt(
+      wallet.privateKey,
+    );
 
     return this.userRepo.create({
       email,
       passwordHash,
       custodyMode: "custodial",
-      encryptedPrivateKey: this.keyManagement.encrypt(wallet.privateKey),
+      encryptedPrivateKey,
       walletAddress: wallet.address,
       kycStatus: "pending",
     });

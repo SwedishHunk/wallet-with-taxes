@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { ScheduleModule } from "@nestjs/schedule";
 import { UsersModule } from "./users/users.module";
 import { WalletsModule } from "./wallets/wallets.module";
 import { MarketplaceModule } from "./marketplace/marketplace.module";
@@ -14,6 +15,9 @@ import { HealthModule } from "./health/health.module";
 import { PlatformModule } from "./platform/platform.module";
 import { TokenShopModule } from "./tokenshop/tokenshop.module";
 import { EconomicsModule } from "./economics/economics.module";
+import { KycModule } from "./kyc/kyc.module";
+import { DataRetentionModule } from "./data-retention/data-retention.module";
+import { ChainIndexerModule } from "./chain-indexer/chain-indexer.module";
 
 const isTestEnv = process.env.NODE_ENV === "test";
 const isDevEnv =
@@ -28,13 +32,33 @@ const shouldSynchronizeSchema = isTestEnv || isDevEnv;
       isGlobal: true,
       envFilePath: isTestEnv ? ".env.test" : ".env",
     }),
+    /**
+     * Throttle tiers:
+     *   auth         — 10 req/min  (login, signup, link-wallet — brute-force sensitive)
+     *   default      — 60 req/min  (general API endpoints)
+     *   admin-write  — 10 req/min  (admin state-mutating endpoints)
+     *
+     * Apply at the endpoint level with @Throttle({ <tier>: { limit, ttl } }).
+     * No APP_GUARD is registered, so throttling is opt-in per endpoint.
+     */
     ThrottlerModule.forRoot([
       {
         name: "auth",
-        ttl: 60000, // 1 minute window
-        limit: 10, // max 10 requests per minute per IP
+        ttl: 60000,
+        limit: 10,
+      },
+      {
+        name: "default",
+        ttl: 60000,
+        limit: 60,
+      },
+      {
+        name: "admin-write",
+        ttl: 60000,
+        limit: 10,
       },
     ]),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: "postgres",
       host: isTestEnv
@@ -68,6 +92,9 @@ const shouldSynchronizeSchema = isTestEnv || isDevEnv;
     PlatformModule,
     TokenShopModule,
     EconomicsModule,
+    KycModule,
+    DataRetentionModule,
+    ChainIndexerModule,
   ],
 })
 export class AppModule {}
