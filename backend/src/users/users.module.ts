@@ -5,12 +5,13 @@ import { UsersController } from "./users.controller";
 import { User } from "./user.entity";
 import { Studio } from "../platform/entities/studio.entity";
 import { StudioMember } from "../platform/entities/studio-member.entity";
+import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { AuthModule } from "../auth/auth.module";
 import { PlatformModule } from "../platform/platform.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Studio, StudioMember]),
+    TypeOrmModule.forFeature([User, Studio, StudioMember, TaxEvent]),
     AuthModule,
     PlatformModule,
   ],

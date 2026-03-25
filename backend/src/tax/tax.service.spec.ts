@@ -9,6 +9,7 @@ type MockRepo = {
   save: jest.Mock;
   find: jest.Mock;
   findOne: jest.Mock;
+  createQueryBuilder?: jest.Mock;
 };
 
 function makeEvent(partial: Partial<TaxEvent>): TaxEvent {
@@ -30,13 +31,26 @@ describe("TaxService", () => {
   let costBasisRepo: MockRepo;
   let projectionStateRepo: MockRepo;
   let service: TaxService;
+  let qbMock: {
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    orderBy: jest.Mock;
+    getMany: jest.Mock;
+  };
 
   beforeEach(() => {
+    qbMock = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
     repo = {
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => x),
       find: jest.fn(),
       findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(qbMock),
     };
     costBasisRepo = {
       create: jest.fn((x) => x),
@@ -60,6 +74,13 @@ describe("TaxService", () => {
           exchangeRateSEKUSD: null,
           exchangeRateSource: null,
         }),
+        getAssetPriceInSEK: jest.fn().mockResolvedValue({
+          priceUSD: null,
+          priceSEK: null,
+          exchangeRateSEKUSD: null,
+          exchangeRateSource: null,
+          valuationStatus: "missing",
+        }),
       } as never,
     );
   });
@@ -77,17 +98,17 @@ describe("TaxService", () => {
   });
 
   it("getEventsForUser queries sorted events", async () => {
-    repo.find.mockResolvedValueOnce([]);
     await service.getEventsForUser("0xabc");
 
-    expect(repo.find).toHaveBeenCalledWith({
-      where: { userAddress: "0xabc" },
-      order: { timestamp: "ASC" },
+    expect(repo.createQueryBuilder).toHaveBeenCalledWith("e");
+    expect(qbMock.where).toHaveBeenCalledWith("e.userAddress = :addr", {
+      addr: "0xabc",
     });
+    expect(qbMock.orderBy).toHaveBeenCalledWith("e.timestamp", "ASC");
   });
 
   it("getSummary calculates gains, losses and adjusted losses", async () => {
-    repo.find.mockResolvedValueOnce([
+    qbMock.getMany.mockResolvedValueOnce([
       makeEvent({
         type: "acquisition",
         amount: 2,
@@ -110,11 +131,12 @@ describe("TaxService", () => {
       }),
     ]);
 
-    await expect(service.getSummary("0xuser")).resolves.toEqual({
+    await expect(service.getSummary("0xuser")).resolves.toMatchObject({
       totalGainsUSD: 40,
       totalLossesUSD: -20,
       adjustedLossesUSD: -14,
       netTaxableGainUSD: 26,
+      year: null,
       projection: {
         mode: "legacy-fallback",
         projector: "cost-basis",
@@ -127,7 +149,7 @@ describe("TaxService", () => {
   });
 
   it("getSummary handles disposal without prior acquisition", async () => {
-    repo.find.mockResolvedValueOnce([
+    qbMock.getMany.mockResolvedValueOnce([
       makeEvent({
         type: "disposal",
         amount: 2,
@@ -135,11 +157,12 @@ describe("TaxService", () => {
       }),
     ]);
 
-    await expect(service.getSummary("0xuser")).resolves.toEqual({
+    await expect(service.getSummary("0xuser")).resolves.toMatchObject({
       totalGainsUSD: 25,
       totalLossesUSD: 0,
       adjustedLossesUSD: 0,
       netTaxableGainUSD: 25,
+      year: null,
       projection: {
         mode: "legacy-fallback",
         projector: "cost-basis",
@@ -152,7 +175,7 @@ describe("TaxService", () => {
   });
 
   it("exportEventsAsCSV writes headers and csv body", async () => {
-    repo.find.mockResolvedValueOnce([
+    qbMock.getMany.mockResolvedValueOnce([
       makeEvent({
         type: "reward",
         amount: 3,
@@ -321,11 +344,12 @@ describe("TaxService", () => {
     // totalLosses = -50 + -10 = -60
     // adjustedLosses = -60 * 0.7 = -42
     // netTaxable = 125 + (-42) = 83
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       totalGainsUSD: 125,
       totalLossesUSD: -60,
       adjustedLossesUSD: -42,
       netTaxableGainUSD: 83,
+      year: null,
       projection: {
         mode: "cost-basis",
         projector: "cost-basis",

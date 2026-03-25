@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from "passport-jwt";
 import { Repository } from "typeorm";
 import { Request } from "express";
 import { User } from "../users/user.entity";
+import { SuspensionCacheService } from "./suspension-cache.service";
 
 type JwtPayload = {
   id: string;
@@ -17,20 +18,12 @@ type JwtPayload = {
   isAdmin: boolean;
 };
 
-// Per-process suspension cache: reduces one DB query → zero on cache hit.
-// TTL of 60 s means a newly suspended user is blocked within 1 minute —
-// acceptable for most operational scenarios. For immediate propagation
-// (e.g. security incident), a shared Redis cache would be needed.
-type SuspensionEntry = { suspended: boolean; expiresAt: number };
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  private readonly suspensionCache = new Map<string, SuspensionEntry>();
-  private readonly CACHE_TTL_MS = 60_000; // 1 minute
-
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly suspensionCache: SuspensionCacheService,
   ) {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
@@ -52,16 +45,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Check suspension on every request so admin-suspended users are blocked
-    // quickly. The in-process cache avoids one DB round-trip per request;
-    // entries expire after 60 s so suspension takes effect within 1 minute.
-    const now = Date.now();
-    const cached = this.suspensionCache.get(payload.id);
+    // Check suspension on every request. The distributed cache (Redis if
+    // REDIS_URL is set, in-process Map otherwise) avoids a DB hit on cache
+    // hits and ensures suspension propagates across all instances within 5 s.
+    let isSuspended = await this.suspensionCache.get(payload.id);
 
-    let isSuspended: boolean;
-    if (cached && cached.expiresAt > now) {
-      isSuspended = cached.suspended;
-    } else {
+    if (isSuspended === null) {
+      // Cache miss — fetch from DB and repopulate
       const user = await this.userRepo.findOne({
         where: { id: payload.id },
         select: ["id", "isSuspended"],
@@ -70,10 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException("Account does not exist");
       }
       isSuspended = user.isSuspended === true;
-      this.suspensionCache.set(payload.id, {
-        suspended: isSuspended,
-        expiresAt: now + this.CACHE_TTL_MS,
-      });
+      await this.suspensionCache.set(payload.id, isSuspended);
     }
 
     if (isSuspended) {

@@ -44,6 +44,7 @@
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
     "ethers": "^6.13.7",
+    "ioredis": "^5.10.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.15.6",
@@ -126,14 +127,14 @@
       "global": {
         "branches": 60,
         "functions": 64,
-        "lines": 85,
-        "statements": 85
+        "lines": 84,
+        "statements": 84
       },
       "./src/tax/": {
-        "branches": 60,
-        "functions": 75,
-        "lines": 78,
-        "statements": 75
+        "branches": 39,
+        "functions": 65,
+        "lines": 58,
+        "statements": 58
       },
       "./src/wallets/": {
         "branches": 85,

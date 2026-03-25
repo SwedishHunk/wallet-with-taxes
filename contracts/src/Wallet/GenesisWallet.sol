@@ -24,6 +24,15 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 
 contract GenesisWallet is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+    /// @notice Minimum delay between proposing and executing an upgrade (2 days)
+    uint256 public constant UPGRADE_DELAY = 2 days;
+
+    /// @notice Pending upgrade implementation address (zero if none proposed)
+    address public pendingImplementation;
+
+    /// @notice Timestamp after which the pending upgrade may be executed
+    uint256 public upgradeReadyAt;
+
     /// @notice Emitted when an ERC-1155 token is withdrawn to the wallet owner
     /// @param token Address of the ERC-1155 contract
     /// @param id ID of the token being claimed
@@ -39,6 +48,15 @@ contract GenesisWallet is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     /// @param from Sender address
     /// @param amount Amount of ETH received
     event ReceivedETH(address indexed from, uint256 amount);
+
+    /// @notice Emitted when an upgrade is proposed
+    /// @param newImplementation The proposed new implementation address
+    /// @param readyAt Timestamp after which the upgrade may be executed
+    event UpgradeProposed(address indexed newImplementation, uint256 readyAt);
+
+    /// @notice Emitted when a pending upgrade is cancelled
+    /// @param cancelledImplementation The implementation address that was cancelled
+    event UpgradeCancelled(address indexed cancelledImplementation);
 
     /// @notice Constructor (disabled in proxy; use `initialize` instead)
     constructor() initializer {}
@@ -78,10 +96,38 @@ contract GenesisWallet is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit WithdrewTRI(msg.sender, amount);
     }
 
-    /// @notice Authorizes contract upgrade (UUPS requirement)
-    /// @param newImplementation The address of the new implementation contract
-    /// @dev Only callable by the owner. Required by UUPS pattern.
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @notice Step 1 of 2 for upgrades: propose a new implementation with a 2-day timelock.
+    /// @param newImplementation The address of the new implementation to propose
+    /// @dev Must be called at least UPGRADE_DELAY seconds before upgradeToAndCall.
+    function proposeUpgrade(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "GenesisWallet: zero address");
+        pendingImplementation = newImplementation;
+        upgradeReadyAt = block.timestamp + UPGRADE_DELAY;
+        emit UpgradeProposed(newImplementation, upgradeReadyAt);
+    }
+
+    /// @notice Cancel a pending upgrade proposal.
+    function cancelUpgrade() external onlyOwner {
+        emit UpgradeCancelled(pendingImplementation);
+        pendingImplementation = address(0);
+        upgradeReadyAt = 0;
+    }
+
+    /// @notice Authorizes contract upgrade (UUPS requirement).
+    /// @dev Enforces a 2-day timelock. Call proposeUpgrade() first, wait UPGRADE_DELAY, then upgradeToAndCall().
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(
+            newImplementation == pendingImplementation,
+            "GenesisWallet: must propose upgrade first"
+        );
+        require(
+            block.timestamp >= upgradeReadyAt,
+            "GenesisWallet: upgrade timelock not elapsed"
+        );
+        // Clear pending state
+        pendingImplementation = address(0);
+        upgradeReadyAt = 0;
+    }
 
     /// @notice ERC-1155 single-token receive hook
     /// @dev Enables wallet to hold ERC-1155 tokens

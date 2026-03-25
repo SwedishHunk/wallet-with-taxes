@@ -97,9 +97,14 @@ describe("UsersService", () => {
       userRepo as never,
       studioRepo as never,
       studioMemberRepo as never,
+      { find: jest.fn().mockResolvedValue([]) } as never,
       studioMemberService as never,
       jwtService as never,
       dataSource as never,
+      {
+        encrypt: jest.fn((x: string) => x),
+        decrypt: jest.fn((x: string) => x),
+      } as never,
     );
 
     process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";
@@ -122,26 +127,18 @@ describe("UsersService", () => {
   });
 
   it("signup validates email", async () => {
-    await expect(service.signup("bad-email", "pw")).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.signup("bad-email", "pw", undefined, true),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("signup rejects existing user", async () => {
     userRepo.findOne.mockResolvedValueOnce({ id: "u-existing" });
-    await expect(service.signup("user@test.com", "pw")).rejects.toMatchObject({
+    await expect(
+      service.signup("user@test.com", "pw", undefined, true),
+    ).rejects.toMatchObject({
       statusCode: 409,
       message: ERROR_MESSAGES.EMAIL_ALREADY_EXISTS,
-    });
-  });
-
-  it("signup requires encryption env", async () => {
-    delete process.env.ENCRYPTION_KEY;
-    delete process.env.ENCRYPTION_IV;
-    userRepo.findOne.mockResolvedValueOnce(null);
-
-    await expect(service.signup("user@test.com", "pw")).rejects.toMatchObject({
-      statusCode: 500,
     });
   });
 
@@ -158,7 +155,12 @@ describe("UsersService", () => {
       gameAccessIds: [],
     });
 
-    const result = await service.signup("user@test.com", "pw", "My Studio");
+    const result = await service.signup(
+      "user@test.com",
+      "pw",
+      "My Studio",
+      true,
+    );
 
     expect(queryRunner.manager.create).toHaveBeenCalledWith(
       expect.anything(),
@@ -532,6 +534,6 @@ describe("UsersService", () => {
       gameAccessIds: [],
     });
 
-    await service.signup("chain@test.com", "pw");
+    await service.signup("chain@test.com", "pw", undefined, true);
   });
 });

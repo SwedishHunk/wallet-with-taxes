@@ -61,6 +61,10 @@ describe("StudiosService", () => {
       userRepo as never,
       memberRepo as never,
       studioMemberService as never,
+      {
+        encrypt: jest.fn((x: string) => x),
+        decrypt: jest.fn((x: string) => x),
+      } as never,
     );
 
     process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";

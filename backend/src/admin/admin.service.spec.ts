@@ -40,8 +40,8 @@ function makeService(queryRaw?: unknown) {
     findOne: jest.fn(),
     update: jest.fn().mockResolvedValue({}),
   };
-  const shopEventRepo = { find: jest.fn(), findAndCount: jest.fn() };
   const gamePlayerRepo = { find: jest.fn() };
+  const shopEventRepo = { find: jest.fn(), findAndCount: jest.fn() };
   const economicEventRepo = { findAndCount: jest.fn() };
   const platformConfigRepo = {
     findOne: jest.fn().mockResolvedValue(null),
@@ -61,6 +61,11 @@ function makeService(queryRaw?: unknown) {
     query: jest.fn().mockResolvedValue({}),
   };
   const dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
+  const suspensionCache = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    invalidate: jest.fn().mockResolvedValue(undefined),
+  };
 
   const service = new AdminService(
     taxRepo as never,
@@ -73,6 +78,7 @@ function makeService(queryRaw?: unknown) {
     platformConfigRepo as never,
     auditLogRepo as never,
     dataSource as never,
+    suspensionCache as never,
   );
 
   return {
@@ -203,7 +209,6 @@ describe("AdminService", () => {
     await expect(
       service.deleteStudio("s1", ADMIN.id, ADMIN.email),
     ).resolves.toEqual({ id: "s1", deleted: true });
-    // purgeStudio uses raw SQL via queryRunner — no studioRepo.delete call
   });
 
   it("deleteStudio throws NotFoundException when studio missing", async () => {
@@ -296,13 +301,12 @@ describe("AdminService", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("deleteUser removes user and writes audit", async () => {
+  it("deleteUser anonymizes user and writes audit", async () => {
     const { service, userRepo } = makeService();
     userRepo.findOne.mockResolvedValue({ id: "u1" });
     await expect(
       service.deleteUser("u1", ADMIN.id, ADMIN.email),
-    ).resolves.toEqual({ id: "u1", deleted: true });
-    expect(userRepo.delete).toHaveBeenCalledWith("u1");
+    ).resolves.toEqual({ id: "u1", anonymized: true });
   });
 
   it("deleteUser throws NotFoundException when user missing", async () => {

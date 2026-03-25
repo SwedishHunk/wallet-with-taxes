@@ -28,6 +28,7 @@ import { StudioMemberService } from "./studio-member.service";
 import { StudiosService } from "./studios.service";
 import { User } from "../users/user.entity";
 import { EconomicsModule } from "../economics/economics.module";
+import { KeyManagementService } from "../shared/key-management.service";
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { EconomicsModule } from "../economics/economics.module";
     NFTInventoryService,
     StudioMemberService,
     StudiosService,
+    KeyManagementService,
   ],
   exports: [
     TypeOrmModule,
@@ -71,6 +73,7 @@ import { EconomicsModule } from "../economics/economics.module";
     NFTInventoryService,
     StudioMemberService,
     StudiosService,
+    KeyManagementService,
   ],
 })
 export class PlatformModule {}

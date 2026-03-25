@@ -18,7 +18,7 @@ import { User } from "../users/user.entity";
 import { UsersService } from "../users/users.service";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
-import { encryptPrivateKey } from "../shared/crypto.util";
+import { KeyManagementService } from "../shared/key-management.service";
 import { JwtService } from "@nestjs/jwt";
 import { JwtUser } from "../auth/jwt-user.interface";
 import { NFTInventoryService } from "../platform/nft-inventory.service";
@@ -105,6 +105,7 @@ export class AdminDevService {
     private readonly nftInstanceRepo: Repository<NFTInstance>,
     @InjectRepository(StudioMember)
     private readonly memberRepo: Repository<StudioMember>,
+    private readonly keyManagement: KeyManagementService,
   ) {}
 
   private verifyJwtToken(token?: string): JwtUser | null {
@@ -310,16 +311,11 @@ export class AdminDevService {
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
 
-    const encryptionKey = process.env.ENCRYPTION_KEY;
-    if (!encryptionKey) {
-      throw new AppException("ENCRYPTION_KEY env var is missing", 500);
-    }
-
     return this.userRepo.create({
       email,
       passwordHash,
       custodyMode: "custodial",
-      encryptedPrivateKey: encryptPrivateKey(wallet.privateKey, encryptionKey),
+      encryptedPrivateKey: this.keyManagement.encrypt(wallet.privateKey),
       walletAddress: wallet.address,
       kycStatus: "pending",
     });

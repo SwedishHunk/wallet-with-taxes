@@ -31,7 +31,12 @@ describe("UsersController", () => {
     });
     const res = mockRes();
     const result = await controller.signup(
-      { email: "a@b.com", password: "pw", studioName: "S" } as never,
+      {
+        email: "a@b.com",
+        password: "pw",
+        studioName: "S",
+        gdprConsent: true,
+      } as never,
       res,
     );
     expect(result).toEqual({ studio: { studioId: "s1" } });
@@ -42,7 +47,7 @@ describe("UsersController", () => {
       "x",
       expect.objectContaining({ httpOnly: true }),
     );
-    expect(service.signup).toHaveBeenCalledWith("a@b.com", "pw", "S");
+    expect(service.signup).toHaveBeenCalledWith("a@b.com", "pw", "S", true);
   });
 
   it("delegates login and strips token from response", async () => {

@@ -9,6 +9,7 @@ export default function Signup() {
   console.log("🔵 SIGNUP COMPONENT RENDERING");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<null | {
     type: "success" | "error";
@@ -21,9 +22,13 @@ export default function Signup() {
       setMessage({ type: "error", text: "Please enter email and password" });
       return;
     }
+    if (!gdprConsent) {
+      setMessage({ type: "error", text: "You must accept the data processing terms to continue." });
+      return;
+    }
     setLoading(true);
     try {
-      await signup(email, password);
+      await signup(email, password, gdprConsent);
       // Signup successful - redirect to login
       navigate(ROUTES.root);
     } catch (err: unknown) {
@@ -71,10 +76,19 @@ export default function Signup() {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={handleKeyDown}
           />
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#aaa", cursor: "pointer", lineHeight: 1.5 }}>
+            <input
+              type="checkbox"
+              checked={gdprConsent}
+              onChange={(e) => setGdprConsent(e.target.checked)}
+              style={{ marginTop: 2, flexShrink: 0 }}
+            />
+            I agree that Triolith may process my personal data (email address, wallet address, and transaction history) to provide the platform and tax reporting service. You can request deletion or export of your data at any time.
+          </label>
           <button
             onClick={handleSignup}
             className="login-button"
-            disabled={loading}>
+            disabled={loading || !gdprConsent}>
             {loading ? "Creating..." : "Sign Up"}
           </button>
         </div>

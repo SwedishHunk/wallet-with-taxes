@@ -44,8 +44,13 @@ export class UsersController {
     @Body() body: SignupDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { email, password, studioName } = body;
-    const result = await this.usersService.signup(email, password, studioName);
+    const { email, password, studioName, gdprConsent } = body;
+    const result = await this.usersService.signup(
+      email,
+      password,
+      studioName,
+      gdprConsent,
+    );
     const { token, ...payload } = result;
     res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;
@@ -126,5 +131,17 @@ export class UsersController {
   ) {
     const jwtUser = req.user as { id: string };
     return this.usersService.getMemberSession(jwtUser.id, studioId);
+  }
+
+  /**
+   * GDPR Article 20 — Right to data portability.
+   * Returns a structured JSON package of all personal data held for the
+   * authenticated user. Download with: GET /users/me/export
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get("me/export")
+  async exportMyData(@Req() req: Request) {
+    const jwtUser = req.user as { id: string };
+    return this.usersService.exportMyData(jwtUser.id);
   }
 }

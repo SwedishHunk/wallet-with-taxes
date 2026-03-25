@@ -13,8 +13,9 @@ import { StudioMember } from "../platform/entities/studio-member.entity";
 import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
-import { encryptPrivateKey } from "../shared/crypto.util";
+import { KeyManagementService } from "../shared/key-management.service";
 import { assertValidEmail } from "../shared/validators/email.validator";
+import { TaxEvent } from "../tax/entities/tax-event.entity";
 
 @Injectable()
 export class UsersService {
@@ -31,9 +32,12 @@ export class UsersService {
     private readonly studioRepository: Repository<Studio>,
     @InjectRepository(StudioMember)
     private readonly studioMemberRepository: Repository<StudioMember>,
+    @InjectRepository(TaxEvent)
+    private readonly taxEventRepository: Repository<TaxEvent>,
     private readonly studioMemberService: StudioMemberService,
     private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
+    private readonly keyManagement: KeyManagementService,
   ) {
     this.deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
     delete process.env.DEPLOYER_PRIVATE_KEY;
@@ -51,19 +55,7 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
 
-    const encryptionKey = process.env.ENCRYPTION_KEY;
-    if (!encryptionKey) {
-      throw new AppException(
-        ERROR_MESSAGES.MISSING_ENV_VAR("ENCRYPTION_KEY"),
-        500,
-      );
-    }
-
-    // AES-256-GCM: random IV per wallet — eliminates static-IV ciphertext reuse
-    const encryptedPrivateKey = encryptPrivateKey(
-      wallet.privateKey,
-      encryptionKey,
-    );
+    const encryptedPrivateKey = this.keyManagement.encrypt(wallet.privateKey);
 
     const onChainWallet = await this.tryCreateOnChainWallet(wallet.address);
 
@@ -147,7 +139,19 @@ export class UsersService {
     }
   }
 
-  async signup(email: string, password: string, studioName?: string) {
+  async signup(
+    email: string,
+    password: string,
+    studioName?: string,
+    gdprConsent?: boolean,
+  ) {
+    if (!gdprConsent) {
+      throw new AppException(
+        "You must accept the data processing terms to create an account (GDPR Article 7).",
+        400,
+      );
+    }
+
     assertValidEmail(email);
 
     const existingUser = await this.userRepository.findOne({
@@ -173,6 +177,7 @@ export class UsersService {
         walletAddress: wallet.address,
         onChainWallet,
         kycStatus: "pending",
+        consentGivenAt: new Date(),
       });
       await queryRunner.manager.save(user);
 
@@ -492,6 +497,66 @@ export class UsersService {
         membership.permissionsMask,
       ),
       gameAccessIds: membership.gameAccessIds ?? [],
+    };
+  }
+
+  /**
+   * GDPR Article 20 — Right to data portability.
+   * Returns all personal data held for the requesting user as a structured
+   * JSON package. Sensitive fields (passwordHash, encryptedPrivateKey) are
+   * intentionally excluded — they are not "personal data" in the portability
+   * sense and exposing them would be a security risk.
+   */
+  async exportMyData(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new AppException("User not found", 404);
+
+    const memberships = await this.studioMemberRepository.find({
+      where: { user: { id: userId } },
+      relations: ["studio"],
+    });
+
+    const taxEvents = await this.taxEventRepository.find({
+      where: { userAddress: user.walletAddress?.toLowerCase() },
+      order: { timestamp: "ASC" },
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      gdprNote:
+        "This export contains all personal data held for your account under GDPR Article 20 (Right to data portability). Sensitive security fields are excluded.",
+      profile: {
+        id: user.id,
+        email: user.email,
+        walletAddress: user.walletAddress,
+        custodyMode: user.custodyMode,
+        kycStatus: user.kycStatus,
+        isAdmin: user.isAdmin,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      studioMemberships: memberships.map((m) => ({
+        studioId: m.studio.id,
+        studioName: m.studio.name,
+        role: m.role,
+        isOwner: m.isOwner,
+      })),
+      taxEvents: taxEvents.map((e) => ({
+        id: e.id,
+        timestamp: e.timestamp,
+        type: e.type,
+        taxTreatment: e.taxTreatment,
+        assetAddress: e.assetAddress,
+        tokenId: e.tokenId,
+        amount: e.amount,
+        priceUSD: e.priceUSD,
+        priceSEK: e.priceSEK,
+        exchangeRateSEKUSD: e.exchangeRateSEKUSD,
+        exchangeRateSource: e.exchangeRateSource,
+        feeUSD: e.feeUSD,
+        valuationStatus: e.valuationStatus,
+        txHash: e.txHash,
+      })),
     };
   }
 }

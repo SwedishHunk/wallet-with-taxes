@@ -37,14 +37,21 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column({ nullable: true })
-  onChainWallet: string;
+  @Column({ type: "varchar", nullable: true })
+  onChainWallet: string | null;
 
   @Column({ default: false })
   isAdmin: boolean;
 
   @Column({ default: false })
   isSuspended: boolean;
+
+  /**
+   * GDPR Article 7 — timestamp of explicit consent at registration.
+   * Null for users created before consent capture was introduced.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  consentGivenAt: Date | null;
 
   @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
   studioMemberships: StudioMember[];

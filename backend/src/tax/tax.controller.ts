@@ -14,6 +14,12 @@ import { JwtUser } from "../auth/jwt-user.interface";
 import { TaxService } from "./tax.service";
 import { Response } from "express";
 
+function parseYear(raw?: string): number | undefined {
+  if (!raw) return undefined;
+  const n = parseInt(raw, 10);
+  return isFinite(n) && n >= 2020 && n <= 2099 ? n : undefined;
+}
+
 // 10 requests per minute per IP — tax exports can be large
 @Throttle({ auth: { limit: 10, ttl: 60000 } })
 @Controller("tax")
@@ -22,15 +28,20 @@ export class TaxController {
   constructor(private readonly taxService: TaxService) {}
 
   @Get("summary")
-  async getSummary(@Query("user") user: string, @Req() req: Request) {
+  async getSummary(
+    @Query("user") user: string,
+    @Query("year") yearRaw: string | undefined,
+    @Req() req: Request,
+  ) {
     if (!user) return { error: "Missing user address in query." };
     this.assertOwnerOrAdmin(req, user);
-    return this.taxService.getSummary(user.toLowerCase());
+    return this.taxService.getSummary(user.toLowerCase(), parseYear(yearRaw));
   }
 
   @Get("export")
   async exportCSV(
     @Query("user") user: string,
+    @Query("year") yearRaw: string | undefined,
     @Req() req: Request,
     @Res() res: Response,
   ) {
@@ -39,7 +50,11 @@ export class TaxController {
       return;
     }
     this.assertOwnerOrAdmin(req, user);
-    await this.taxService.exportEventsAsCSV(user.toLowerCase(), res);
+    await this.taxService.exportEventsAsCSV(
+      user.toLowerCase(),
+      res,
+      parseYear(yearRaw),
+    );
   }
 
   /** Wallet owners can only query their own address; admins can query any. */
@@ -66,15 +81,20 @@ export class ApiTaxController {
   constructor(private readonly taxService: TaxService) {}
 
   @Get("summary")
-  async getSummary(@Query("user") user: string, @Req() req: Request) {
+  async getSummary(
+    @Query("user") user: string,
+    @Query("year") yearRaw: string | undefined,
+    @Req() req: Request,
+  ) {
     if (!user) return { error: "Missing user address in query." };
     this.assertOwnerOrAdmin(req, user);
-    return this.taxService.getSummary(user.toLowerCase());
+    return this.taxService.getSummary(user.toLowerCase(), parseYear(yearRaw));
   }
 
   @Get("export")
   async exportCSV(
     @Query("user") user: string,
+    @Query("year") yearRaw: string | undefined,
     @Req() req: Request,
     @Res() res: Response,
   ) {
@@ -83,7 +103,11 @@ export class ApiTaxController {
       return;
     }
     this.assertOwnerOrAdmin(req, user);
-    await this.taxService.exportEventsAsCSV(user.toLowerCase(), res);
+    await this.taxService.exportEventsAsCSV(
+      user.toLowerCase(),
+      res,
+      parseYear(yearRaw),
+    );
   }
 
   /** Wallet owners can only query their own address; admins can query any. */
