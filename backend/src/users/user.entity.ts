@@ -46,6 +46,13 @@ export class User {
   @Column({ default: false })
   isSuspended: boolean;
 
+  /**
+   * GDPR Article 7 — timestamp of explicit consent at registration.
+   * Null for users created before consent capture was introduced.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  consentGivenAt: Date | null;
+
   @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
   studioMemberships: StudioMember[];
 }

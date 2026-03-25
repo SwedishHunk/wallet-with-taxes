@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  IsBoolean,
   IsEmail,
   IsEthereumAddress,
   IsNotEmpty,
@@ -23,6 +24,14 @@ export class SignupDto {
   @IsString()
   @IsNotEmpty()
   studioName?: string;
+
+  /**
+   * GDPR Article 7 — explicit consent to data processing.
+   * Must be true for signup to succeed.
+   */
+  @ApiProperty({ description: "GDPR consent — must be true to register" })
+  @IsBoolean()
+  gdprConsent: boolean;
 }
 
 export class LoginDto {

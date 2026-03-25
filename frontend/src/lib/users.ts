@@ -1,8 +1,8 @@
 import { api } from "./api";
 import type { User } from "../types/user";
 
-export const signup = (email: string, password: string, studioName?: string) =>
-  api.post("/users/signup", { email, password, studioName });
+export const signup = (email: string, password: string, gdprConsent: boolean, studioName?: string) =>
+  api.post("/users/signup", { email, password, studioName, gdprConsent });
 
 export const login = (email: string, password: string, studioId?: string) =>
   api.post("/users/login", { email, password, studioId });
