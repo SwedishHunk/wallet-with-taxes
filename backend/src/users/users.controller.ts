@@ -139,6 +139,7 @@ export class UsersController {
    * authenticated user. Download with: GET /users/me/export
    */
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Get("me/export")
   async exportMyData(@Req() req: Request) {
     const jwtUser = req.user as { id: string };

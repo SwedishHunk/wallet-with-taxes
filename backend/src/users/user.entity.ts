@@ -53,6 +53,14 @@ export class User {
   @Column({ type: "timestamptz", nullable: true })
   consentGivenAt: Date | null;
 
+  /**
+   * Timestamp of the user's most recent successful login.
+   * Used by the GDPR data-retention job to detect inactive accounts.
+   * Null for users who have never logged in since this field was added.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  lastLoginAt: Date | null;
+
   @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
   studioMemberships: StudioMember[];
 }

@@ -16,6 +16,7 @@ type Repo = {
   count: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
+  update?: jest.Mock;
 };
 
 type MockQueryRunner = {
@@ -55,6 +56,7 @@ describe("UsersService", () => {
       count: jest.fn(),
       create: jest.fn((x) => x),
       save: jest.fn(async (x) => ({ id: x.id ?? "u1", ...x })),
+      update: jest.fn().mockResolvedValue({}),
     };
     studioRepo = {
       findOne: jest.fn(),
