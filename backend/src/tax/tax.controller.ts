@@ -56,27 +56,44 @@ export class TaxController {
 
 /**
  * Player-facing tax endpoints under /api/tax/...
- * Players authenticate via MetaMask only (no JWT), so these routes are
- * unauthenticated. Tax data is derived from public on-chain events and
- * is keyed by the wallet address supplied in the query string.
+ * Protected by JwtAuthGuard — players must be authenticated.
+ * Wallet owners can only query their own address; admins can query any.
  */
 @Throttle({ auth: { limit: 10, ttl: 60000 } })
 @Controller("api/tax")
+@UseGuards(JwtAuthGuard)
 export class ApiTaxController {
   constructor(private readonly taxService: TaxService) {}
 
   @Get("summary")
-  async getSummary(@Query("user") user: string) {
+  async getSummary(@Query("user") user: string, @Req() req: Request) {
     if (!user) return { error: "Missing user address in query." };
+    this.assertOwnerOrAdmin(req, user);
     return this.taxService.getSummary(user.toLowerCase());
   }
 
   @Get("export")
-  async exportCSV(@Query("user") user: string, @Res() res: Response) {
+  async exportCSV(
+    @Query("user") user: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     if (!user) {
       res.status(400).send("Missing user address");
       return;
     }
+    this.assertOwnerOrAdmin(req, user);
     await this.taxService.exportEventsAsCSV(user.toLowerCase(), res);
+  }
+
+  /** Wallet owners can only query their own address; admins can query any. */
+  private assertOwnerOrAdmin(req: Request, queriedAddress: string) {
+    const jwtUser = req.user as JwtUser;
+    const isAdmin = jwtUser.isAdmin === true;
+    const ownsWallet =
+      jwtUser.walletAddress?.toLowerCase() === queriedAddress.toLowerCase();
+    if (!isAdmin && !ownsWallet) {
+      throw new ForbiddenException("You can only access your own tax records");
+    }
   }
 }

@@ -17,9 +17,7 @@ export default function UserInfo({ user }: Props) {
       <p>
         <strong>Custody Mode:</strong> {user.custodyMode}
       </p>
-      <p>
-        <strong>KYC Status:</strong> {user.kycStatus}
-      </p>
+
       {user.studioId && (
         <p>
           <strong>Studio ID:</strong> {user.studioId}

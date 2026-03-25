@@ -1074,7 +1074,7 @@ export default function TriolithAdminPage() {
         </Card>
       </div>
 
-      <Card style={{ marginBottom: "1.5rem" }}>
+      {import.meta.env.DEV && <Card style={{ marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
           <div style={{ minWidth: "260px", flex: "1 1 320px" }}>
             <h3 style={{ marginBottom: "0.5rem", fontWeight: 600 }}>
@@ -1188,7 +1188,7 @@ export default function TriolithAdminPage() {
             )}
           </div>
         </div>
-      </Card>
+      </Card>}
 
       {/* ── Economics per Studio ── */}
       <div ref={ecoRef}>

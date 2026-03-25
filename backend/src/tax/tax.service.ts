@@ -5,17 +5,23 @@ import { Repository } from "typeorm";
 import { TaxEvent } from "./entities/tax-event.entity";
 import { TaxCostBasis } from "./entities/tax-cost-basis.entity";
 import { TaxProjectionState } from "./entities/tax-projection-state.entity";
+import { ExchangeRateService } from "./exchange-rate.service";
 import { Response } from "express";
 import { SWEDISH_LOSS_DEDUCTION_RATE } from "../shared/constants/business.constants";
 
 interface TaxCsvRow {
   Date: string;
   Type: string;
+  TaxTreatment: string;
   Asset: string;
   TokenID: number;
   Amount: number;
   PriceUSD: number | string;
+  PriceSEK: number | string;
+  ExchangeRateSEKUSD: number | string;
+  ExchangeRateSource: string;
   FeeUSD: number;
+  ValuationStatus: string;
 }
 
 @Injectable()
@@ -30,11 +36,41 @@ export class TaxService {
     private readonly costBasisRepo: Repository<TaxCostBasis>,
     @InjectRepository(TaxProjectionState)
     private readonly projectionStateRepo: Repository<TaxProjectionState>,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   async logEvent(data: Partial<TaxEvent>) {
+    const eventDate =
+      data.timestamp instanceof Date ? data.timestamp : new Date();
+
+    // Derive taxTreatment from type if not explicitly set
+    const taxTreatment: TaxEvent["taxTreatment"] =
+      data.taxTreatment ?? (data.type === "reward" ? "income" : "capital_gain");
+
+    // Fetch SEK rate and convert price if we have a USD price
+    let sekFields: Pick<
+      TaxEvent,
+      "priceSEK" | "exchangeRateSEKUSD" | "exchangeRateSource"
+    > = { priceSEK: null, exchangeRateSEKUSD: null, exchangeRateSource: null };
+
+    if (data.priceUSD != null && data.priceUSD > 0) {
+      try {
+        const converted = await this.exchangeRateService.convertUSDtoSEK(
+          data.priceUSD,
+          eventDate,
+        );
+        sekFields = converted;
+      } catch (err) {
+        this.logger.warn(
+          `Could not fetch SEK rate for event at ${eventDate.toISOString()}: ${String(err)}`,
+        );
+      }
+    }
+
     const normalizedData = {
       ...data,
+      ...sekFields,
+      taxTreatment,
       userAddress: data.userAddress?.toLowerCase(),
       assetAddress: data.assetAddress?.toLowerCase(),
     };
@@ -281,35 +317,62 @@ export class TaxService {
 
   async exportEventsAsCSV(userAddress: string, res: Response): Promise<void> {
     const events = await this.getEventsForUser(userAddress);
+
+    const disclaimer = [
+      "# INFORMATIONAL ONLY — NOT VERIFIED TAX ADVICE",
+      "# This export is generated for reference purposes only.",
+      "# It does not constitute verified tax advice or a completed K4 declaration.",
+      "# PriceSEK values require authoritative exchange rates — check ValuationStatus.",
+      "# Verify all figures with a qualified Swedish tax advisor before filing.",
+      "# Swedish tax law (Inkomstskattelagen): all gains/losses must be reported in SEK.",
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=tax-report-${userAddress.slice(0, 10)}.csv`,
+    );
+
     if (events.length === 0) {
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader(
-        "Content-Disposition",
-        "attachment; filename=tax-report.csv",
+      res.send(
+        `${disclaimer}\nDate,Type,TaxTreatment,Asset,TokenID,Amount,PriceUSD,PriceSEK,ExchangeRateSEKUSD,ExchangeRateSource,FeeUSD,ValuationStatus`,
       );
-      res.send("Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD");
       return;
     }
 
     const formatted: TaxCsvRow[] = events.map((e) => ({
       Date: e.timestamp.toISOString(),
       Type: e.type,
+      TaxTreatment: e.taxTreatment ?? "unknown",
       Asset: e.assetAddress,
       TokenID: e.tokenId,
       Amount: Number(e.amount),
       PriceUSD: e.priceUSD ?? "",
+      PriceSEK: e.priceSEK ?? "",
+      ExchangeRateSEKUSD: e.exchangeRateSEKUSD ?? "",
+      ExchangeRateSource: e.exchangeRateSource ?? "",
       FeeUSD: Number(e.feeUSD),
+      ValuationStatus: e.valuationStatus,
     }));
 
     const header = Object.keys(formatted[0]).join(",");
-    const rows = formatted.map(
-      (row) =>
-        `${this.escapeCsvValue(row.Date)},${this.escapeCsvValue(row.Type)},${this.escapeCsvValue(row.Asset)},${this.escapeCsvValue(row.TokenID)},${this.escapeCsvValue(row.Amount)},${this.escapeCsvValue(row.PriceUSD)},${this.escapeCsvValue(row.FeeUSD)}`,
+    const rows = formatted.map((row) =>
+      [
+        this.escapeCsvValue(row.Date),
+        this.escapeCsvValue(row.Type),
+        this.escapeCsvValue(row.TaxTreatment),
+        this.escapeCsvValue(row.Asset),
+        this.escapeCsvValue(row.TokenID),
+        this.escapeCsvValue(row.Amount),
+        this.escapeCsvValue(row.PriceUSD),
+        this.escapeCsvValue(row.PriceSEK),
+        this.escapeCsvValue(row.ExchangeRateSEKUSD),
+        this.escapeCsvValue(row.ExchangeRateSource),
+        this.escapeCsvValue(row.FeeUSD),
+        this.escapeCsvValue(row.ValuationStatus),
+      ].join(","),
     );
-    const csv = [header, ...rows].join("\n");
 
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", "attachment; filename=tax-report.csv");
-    res.send(csv);
+    res.send([disclaimer, header, ...rows].join("\n"));
   }
 }
