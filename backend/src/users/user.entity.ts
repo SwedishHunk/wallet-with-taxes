@@ -38,7 +38,7 @@ export class User {
   updatedAt: Date;
 
   @Column({ nullable: true })
-  onChainWallet: string;
+  onChainWallet: string | null;
 
   @Column({ default: false })
   isAdmin: boolean;
