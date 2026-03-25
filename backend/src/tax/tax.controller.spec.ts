@@ -122,7 +122,7 @@ describe("ApiTaxController", () => {
   it("getSummary returns error object when user is missing", async () => {
     const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
     const controller = new ApiTaxController(service as never);
-    const result = await controller.getSummary("");
+    const result = await controller.getSummary("", {} as never);
     expect(result).toEqual({ error: "Missing user address in query." });
     expect(service.getSummary).not.toHaveBeenCalled();
   });
@@ -133,7 +133,10 @@ describe("ApiTaxController", () => {
       exportEventsAsCSV: jest.fn(),
     };
     const controller = new ApiTaxController(service as never);
-    const result = await controller.getSummary("0xABC");
+    const result = await controller.getSummary(
+      "0xABC",
+      mockReq({ walletAddress: "0xabc" }),
+    );
     expect(service.getSummary).toHaveBeenCalledWith("0xabc");
     expect(result).toEqual({ gains: 0 });
   });
@@ -142,7 +145,7 @@ describe("ApiTaxController", () => {
     const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new ApiTaxController(service as never);
-    await controller.exportCSV("", res as never);
+    await controller.exportCSV("", {} as never, res as never);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith("Missing user address");
     expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
@@ -155,7 +158,11 @@ describe("ApiTaxController", () => {
     };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new ApiTaxController(service as never);
-    await controller.exportCSV("0xABC", res as never);
+    await controller.exportCSV(
+      "0xABC",
+      mockReq({ walletAddress: "0xabc" }),
+      res as never,
+    );
     expect(service.exportEventsAsCSV).toHaveBeenCalledWith("0xabc", res);
   });
 });

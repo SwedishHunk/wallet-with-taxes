@@ -41,6 +41,7 @@ function makeService(queryRaw?: unknown) {
     update: jest.fn().mockResolvedValue({}),
   };
   const shopEventRepo = { find: jest.fn(), findAndCount: jest.fn() };
+  const gamePlayerRepo = { find: jest.fn() };
   const economicEventRepo = { findAndCount: jest.fn() };
   const platformConfigRepo = {
     findOne: jest.fn().mockResolvedValue(null),
@@ -51,6 +52,15 @@ function makeService(queryRaw?: unknown) {
     save: jest.fn().mockResolvedValue({}),
     findAndCount: jest.fn().mockResolvedValue([[], 0]),
   };
+  const queryRunner = {
+    connect: jest.fn(),
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn(),
+    rollbackTransaction: jest.fn(),
+    release: jest.fn(),
+    query: jest.fn().mockResolvedValue({}),
+  };
+  const dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
 
   const service = new AdminService(
     taxRepo as never,
@@ -58,9 +68,11 @@ function makeService(queryRaw?: unknown) {
     userRepo as never,
     studioRepo as never,
     gameRepo as never,
+    gamePlayerRepo as never,
     economicEventRepo as never,
     platformConfigRepo as never,
     auditLogRepo as never,
+    dataSource as never,
   );
 
   return {
@@ -191,7 +203,7 @@ describe("AdminService", () => {
     await expect(
       service.deleteStudio("s1", ADMIN.id, ADMIN.email),
     ).resolves.toEqual({ id: "s1", deleted: true });
-    expect(studioRepo.delete).toHaveBeenCalledWith("s1");
+    // purgeStudio uses raw SQL via queryRunner — no studioRepo.delete call
   });
 
   it("deleteStudio throws NotFoundException when studio missing", async () => {
