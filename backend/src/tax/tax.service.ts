@@ -24,6 +24,17 @@ interface TaxCsvRow {
   ValuationStatus: string;
 }
 
+/** One row in the K4 Section D output (crypto assets, genomsnittsmetoden) */
+interface K4Row {
+  Beteckning: string; // asset description
+  Antal: string; // quantity (decimal)
+  Forsaljningspris: string; // proceeds in SEK (whole SEK)
+  Omkostnadsbelopp: string; // acquisition cost in SEK (whole SEK)
+  Vinst: string; // gain (positive) or blank
+  Forlust: string; // loss (positive number) or blank
+  Notering: string; // warning if SEK values are missing
+}
+
 @Injectable()
 export class TaxService {
   private readonly logger = new Logger(TaxService.name);
@@ -438,15 +449,6 @@ export class TaxService {
   async exportEventsAsCSV(userAddress: string, res: Response, year?: number): Promise<void> {
     const events = await this.getEventsForUser(userAddress, year);
 
-    const disclaimer = [
-      "# INFORMATIONAL ONLY — NOT VERIFIED TAX ADVICE",
-      "# This export is generated for reference purposes only.",
-      "# It does not constitute verified tax advice or a completed K4 declaration.",
-      "# PriceSEK values require authoritative exchange rates — check ValuationStatus.",
-      "# Verify all figures with a qualified Swedish tax advisor before filing.",
-      "# Swedish tax law (Inkomstskattelagen): all gains/losses must be reported in SEK.",
-    ].join("\n");
-
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     const yearSuffix = year ? `-${year}` : "";
     res.setHeader(
@@ -454,46 +456,170 @@ export class TaxService {
       `attachment; filename=tax-report-${userAddress.slice(0, 10)}${yearSuffix}.csv`,
     );
 
-    if (events.length === 0) {
-      res.send(
-        `${disclaimer}\nDate,Type,TaxTreatment,Asset,TokenID,Amount,PriceUSD,PriceSEK,ExchangeRateSEKUSD,ExchangeRateSource,FeeUSD,ValuationStatus`,
-      );
-      return;
+    const lines: string[] = [];
+
+    // ── File header ──────────────────────────────────────────────────────────
+    lines.push("# INFORMATIONAL ONLY — NOT VERIFIED TAX ADVICE");
+    lines.push("# This export is generated for reference purposes only.");
+    lines.push("# It does not constitute a completed K4 declaration or verified tax advice.");
+    lines.push("# Verify all figures with a qualified Swedish tax advisor before filing.");
+    lines.push("# Swedish tax law (IL 44/48 kap): all gains/losses must be reported in SEK.");
+    if (year) lines.push(`# Tax year: ${year}`);
+    lines.push("#");
+    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push("# SECTION 1 — K4 SECTION D (Övriga tillgångar / crypto assets)");
+    lines.push("# Method: Genomsnittsmetoden (average cost, IL 48 kap 7 §)");
+    lines.push("# One row per disposal event. All monetary values in SEK.");
+    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push("");
+
+    // ── K4 Section D ─────────────────────────────────────────────────────────
+    const k4Header = "Beteckning,Antal,Forsaljningspris (SEK),Omkostnadsbelopp (SEK),Vinst (SEK),Forlust (SEK),Notering";
+    lines.push(k4Header);
+
+    const k4Rows = this.buildK4Rows(events);
+    if (k4Rows.length === 0) {
+      lines.push("# (inga avyttringar / no disposals found)");
+    } else {
+      for (const row of k4Rows) {
+        lines.push(
+          [
+            this.escapeCsvValue(row.Beteckning),
+            this.escapeCsvValue(row.Antal),
+            this.escapeCsvValue(row.Forsaljningspris),
+            this.escapeCsvValue(row.Omkostnadsbelopp),
+            this.escapeCsvValue(row.Vinst),
+            this.escapeCsvValue(row.Forlust),
+            this.escapeCsvValue(row.Notering),
+          ].join(","),
+        );
+      }
     }
 
-    const formatted: TaxCsvRow[] = events.map((e) => ({
-      Date: e.timestamp.toISOString(),
-      Type: e.type,
-      TaxTreatment: e.taxTreatment ?? "unknown",
-      Asset: e.assetAddress,
-      TokenID: e.tokenId,
-      Amount: Number(e.amount),
-      PriceUSD: e.priceUSD ?? "",
-      PriceSEK: e.priceSEK ?? "",
-      ExchangeRateSEKUSD: e.exchangeRateSEKUSD ?? "",
-      ExchangeRateSource: e.exchangeRateSource ?? "",
-      FeeUSD: Number(e.feeUSD),
-      ValuationStatus: e.valuationStatus,
-    }));
+    // ── Raw event log (reference appendix) ───────────────────────────────────
+    lines.push("");
+    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push("# SECTION 2 — Raw event log (reference only, not for filing)");
+    lines.push("# ═══════════════════════════════════════════════════════════════");
+    lines.push("");
+    lines.push("Date,Type,TaxTreatment,Asset,TokenID,Amount,PriceUSD,PriceSEK,ExchangeRateSEKUSD,ExchangeRateSource,FeeUSD,ValuationStatus");
 
-    const header = Object.keys(formatted[0]).join(",");
-    const rows = formatted.map((row) =>
-      [
-        this.escapeCsvValue(row.Date),
-        this.escapeCsvValue(row.Type),
-        this.escapeCsvValue(row.TaxTreatment),
-        this.escapeCsvValue(row.Asset),
-        this.escapeCsvValue(row.TokenID),
-        this.escapeCsvValue(row.Amount),
-        this.escapeCsvValue(row.PriceUSD),
-        this.escapeCsvValue(row.PriceSEK),
-        this.escapeCsvValue(row.ExchangeRateSEKUSD),
-        this.escapeCsvValue(row.ExchangeRateSource),
-        this.escapeCsvValue(row.FeeUSD),
-        this.escapeCsvValue(row.ValuationStatus),
-      ].join(","),
-    );
+    for (const e of events) {
+      lines.push(
+        [
+          this.escapeCsvValue(e.timestamp.toISOString()),
+          this.escapeCsvValue(e.type),
+          this.escapeCsvValue(e.taxTreatment ?? "unknown"),
+          this.escapeCsvValue(e.assetAddress),
+          this.escapeCsvValue(e.tokenId),
+          this.escapeCsvValue(Number(e.amount)),
+          this.escapeCsvValue(e.priceUSD ?? ""),
+          this.escapeCsvValue(e.priceSEK ?? ""),
+          this.escapeCsvValue(e.exchangeRateSEKUSD ?? ""),
+          this.escapeCsvValue(e.exchangeRateSource ?? ""),
+          this.escapeCsvValue(Number(e.feeUSD)),
+          this.escapeCsvValue(e.valuationStatus),
+        ].join(","),
+      );
+    }
 
-    res.send([disclaimer, header, ...rows].join("\n"));
+    res.send(lines.join("\n"));
+  }
+
+  /**
+   * Builds K4 Section D rows from raw events using genomsnittsmetoden.
+   * Each disposal event produces one K4 row.
+   * All monetary values are in SEK; if SEK is unavailable the row is flagged.
+   */
+  private buildK4Rows(events: TaxEvent[]): K4Row[] {
+    // Average cost tracking per assetKey, in both SEK and USD
+    const basis: Record<
+      string,
+      { qtySEK: number; totalCostSEK: number; qtyUSD: number; totalCostUSD: number }
+    > = {};
+
+    const rows: K4Row[] = [];
+
+    for (const e of events) {
+      const key = `${e.assetAddress}:${e.tokenId}`;
+      const qty = Number(e.amount);
+
+      if (e.type === "acquisition") {
+        if (!basis[key]) basis[key] = { qtySEK: 0, totalCostSEK: 0, qtyUSD: 0, totalCostUSD: 0 };
+        if (e.priceSEK != null) {
+          basis[key].qtySEK += qty;
+          basis[key].totalCostSEK += e.priceSEK * qty;
+        }
+        if (e.priceUSD != null) {
+          basis[key].qtyUSD += qty;
+          basis[key].totalCostUSD += e.priceUSD * qty;
+        }
+        continue;
+      }
+
+      if (e.type !== "disposal") continue;
+
+      const b = basis[key];
+      const hasSEK = e.priceSEK != null && b?.qtySEK > 0;
+      const hasUSD = e.priceUSD != null && b?.qtyUSD > 0;
+
+      let forsaljningspris = "";
+      let omkostnadsbelopp = "";
+      let vinst = "";
+      let forlust = "";
+      let notering = "";
+
+      if (hasSEK) {
+        const avgCostSEK = b.totalCostSEK / b.qtySEK;
+        const proceedsSEK = e.priceSEK! * qty;
+        const costSEK = avgCostSEK * qty;
+        const glSEK = proceedsSEK - costSEK;
+
+        forsaljningspris = Math.round(proceedsSEK).toString();
+        omkostnadsbelopp = Math.round(costSEK).toString();
+        vinst = glSEK >= 0 ? Math.round(glSEK).toString() : "0";
+        forlust = glSEK < 0 ? Math.round(Math.abs(glSEK)).toString() : "0";
+
+        // Update basis
+        b.totalCostSEK -= avgCostSEK * qty;
+        b.qtySEK -= qty;
+      } else if (hasUSD) {
+        // SEK unavailable — use USD as fallback with a warning
+        const avgCostUSD = b.totalCostUSD / b.qtyUSD;
+        const proceedsUSD = e.priceUSD! * qty;
+        const costUSD = avgCostUSD * qty;
+        const glUSD = proceedsUSD - costUSD;
+
+        forsaljningspris = proceedsUSD.toFixed(2) + " USD";
+        omkostnadsbelopp = costUSD.toFixed(2) + " USD";
+        vinst = glUSD >= 0 ? glUSD.toFixed(2) + " USD" : "0";
+        forlust = glUSD < 0 ? Math.abs(glUSD).toFixed(2) + " USD" : "0";
+        notering = "SAKNAS SEK-KURS — kan ej användas för K4-inlämning";
+
+        b.totalCostUSD -= avgCostUSD * qty;
+        b.qtyUSD -= qty;
+      } else {
+        forsaljningspris = "SAKNAS";
+        omkostnadsbelopp = "SAKNAS";
+        notering = "SAKNAS pris — händelsen kan ej tas upp i K4";
+      }
+
+      const assetLabel =
+        e.assetAddress.length > 10
+          ? `${e.assetAddress.slice(0, 8)}... #${e.tokenId}`
+          : `${e.assetAddress} #${e.tokenId}`;
+
+      rows.push({
+        Beteckning: assetLabel,
+        Antal: qty.toString(),
+        Forsaljningspris: forsaljningspris,
+        Omkostnadsbelopp: omkostnadsbelopp,
+        Vinst: vinst,
+        Forlust: forlust,
+        Notering: notering,
+      });
+    }
+
+    return rows;
   }
 }
