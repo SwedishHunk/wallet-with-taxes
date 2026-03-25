@@ -53,11 +53,10 @@ export default function TaxReport() {
   // ---- Check if the tax backend is reachable ----
   const checkBackendStatus = useCallback(async () => {
     try {
-      await apiGet("/tax/summary?user=0x0000000000000000000000000000000000000000");
+      await fetch("/health");
       setBackendOnline(true);
     } catch {
-      // 403 means reachable (zero address not owned), anything else is a problem
-      setBackendOnline(true);
+      setBackendOnline(false);
     }
   }, []);
 
@@ -108,7 +107,8 @@ export default function TaxReport() {
   async function handleExportCSV() {
     if (!address) return;
     const token = sessionStorage.getItem("token");
-    const res = await fetch(`/api/tax/export?user=${address}`, {
+    const res = await fetch(`/tax/export?user=${address}`, {
+      credentials: "include",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) return;
@@ -277,6 +277,19 @@ export default function TaxReport() {
           </p>
         </div>
       )}
+
+      {/* Legal disclaimer — always visible above any tax data */}
+      <div className="bg-yellow-500/5 border border-yellow-500/30 rounded-lg p-4 mb-4">
+        <p className="text-xs text-yellow-300 font-semibold mb-1">
+          Informational only — not verified tax advice
+        </p>
+        <p className="text-xs text-gray-400 leading-relaxed">
+          This data is generated for reference purposes only. It does not constitute
+          a completed K4 declaration or verified Swedish tax advice. Prices marked
+          as "missing" cannot be used for filing. Verify all figures with a qualified
+          Swedish tax advisor (skatterådgivare) before submitting to Skatteverket.
+        </p>
+      </div>
 
       {/* Info Banner */}
       <div className="bg-neon-cyan/5 border border-neon-cyan/20 rounded-lg p-4 mb-8">

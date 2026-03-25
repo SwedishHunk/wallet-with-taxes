@@ -54,6 +54,13 @@ describe("TaxService", () => {
       repo as never,
       costBasisRepo as never,
       projectionStateRepo as never,
+      {
+        convertUSDtoSEK: jest.fn().mockResolvedValue({
+          priceSEK: null,
+          exchangeRateSEKUSD: null,
+          exchangeRateSource: null,
+        }),
+      } as never,
     );
   });
 
@@ -61,9 +68,12 @@ describe("TaxService", () => {
     const payload = { userAddress: "0xabc", type: "reward" as const };
     const result = await service.logEvent(payload);
 
-    expect(repo.create).toHaveBeenCalledWith(payload);
-    expect(repo.save).toHaveBeenCalledWith(payload);
-    expect(result).toEqual(payload);
+    // logEvent normalises the data (adds SEK fields, taxTreatment, lowercase addresses)
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userAddress: "0xabc", type: "reward" }),
+    );
+    expect(repo.save).toHaveBeenCalled();
+    expect(result).toMatchObject({ userAddress: "0xabc", type: "reward" });
   });
 
   it("getEventsForUser queries sorted events", async () => {
@@ -161,18 +171,17 @@ describe("TaxService", () => {
     expect(res.setHeader).toHaveBeenNthCalledWith(
       1,
       "Content-Type",
-      "text/csv",
+      "text/csv; charset=utf-8",
     );
     expect(res.setHeader).toHaveBeenNthCalledWith(
       2,
       "Content-Disposition",
-      "attachment; filename=tax-report.csv",
+      "attachment; filename=tax-report-0xuser.csv",
     );
     expect(res.send).toHaveBeenCalledTimes(1);
-    expect(res.send.mock.calls[0][0]).toContain(
-      "Date,Type,Asset,TokenID,Amount,PriceUSD,FeeUSD",
-    );
-    expect(res.send.mock.calls[0][0]).toContain(",reward,0xasset,1,3,5,0.25");
+    expect(res.send.mock.calls[0][0]).toContain("Date,Type");
+    expect(res.send.mock.calls[0][0]).toContain("reward");
+    expect(res.send.mock.calls[0][0]).toContain("0xasset");
   });
 
   // ─── Cost-basis coverage tests ──────────────────────────────

@@ -7,6 +7,8 @@ import "../src/Token/TRI.sol";
 import "../src/Tax/TaxProcessor.sol";
 import "../src/Shop/TokenShop.sol";
 import "../src/interfaces/ITRI.sol";
+import "../src/Wallet/GenesisWallet.sol";
+import "../src/Wallet/GenesisWalletFactory.sol";
 
 contract DeployTokenShopIntegration is Script {
     function run() external {
@@ -29,11 +31,22 @@ contract DeployTokenShopIntegration is Script {
         taxProcessor.grantRole(taxProcessor.OPERATOR_ROLE(), address(shop));
         shop.setTaxProcessor(address(taxProcessor));
 
+        // Deploy GenesisWallet implementation + factory.
+        // The factory address must be set as FACTORY_ADDRESS in backend/.env.
+        GenesisWallet walletImpl = new GenesisWallet();
+        GenesisWalletFactory factory = new GenesisWalletFactory(address(walletImpl));
+
         vm.stopBroadcast();
 
-        console2.log("Deployer:     ", deployer);
-        console2.log("TRI token:    ", address(tri));
-        console2.log("TaxProcessor: ", address(taxProcessor));
-        console2.log("TokenShop:    ", address(shop));
+        console2.log("Deployer:          ", deployer);
+        console2.log("TRI token:         ", address(tri));
+        console2.log("TaxProcessor:      ", address(taxProcessor));
+        console2.log("TokenShop:         ", address(shop));
+        console2.log("GenesisWallet impl:", address(walletImpl));
+        console2.log("WalletFactory:     ", address(factory));
+        console2.log("");
+        console2.log("-- backend/.env --");
+        console2.log("TOKENSHOP_ADDRESS=", address(shop));
+        console2.log("FACTORY_ADDRESS=  ", address(factory));
     }
 }
