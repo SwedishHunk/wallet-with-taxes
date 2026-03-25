@@ -37,7 +37,7 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   onChainWallet: string | null;
 
   @Column({ default: false })
