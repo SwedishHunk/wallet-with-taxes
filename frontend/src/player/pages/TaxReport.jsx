@@ -15,30 +15,16 @@ import {
   WifiOff,
 } from "lucide-react";
 
-/**
- * TAX REPORT PAGE
- *
- * This page talks to the wallet-with-taxes backend (default: port 3001)
- * to show Swedish tax data. Everything else in the frontend talks to
- * our own backend (port 3000).
- *
- * How it works:
- * 1. User connects wallet (MetaMask)
- * 2. We call GET /tax/summary?user=0x... on the tax backend
- * 3. We display gains, losses, and the Swedish-adjusted tax amount
- * 4. User can download a CSV tax report from GET /tax/export?user=0x...
- *
- * ERROR HANDLING:
- * - If the tax backend is not running → shows "Tax service unavailable" message
- * - If the fetch fails for other reasons → shows the specific error
- * - Connection status indicator (green/red dot) at the top
- *
- * CONFIGURATION:
- * - Set VITE_TAX_API_URL in frontend/.env to change the tax backend URL
- * - Default: http://localhost:3001
- */
-
 const TAX_API = ""; // tax routes live on the main backend via /api/tax/...
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => CURRENT_YEAR - i);
+
+function fmt(value, currency) {
+  if (value == null) return "—";
+  const abs = Math.abs(value).toFixed(2);
+  return currency === "SEK" ? `${abs} kr` : `$${abs}`;
+}
 
 export default function TaxReport() {
   const { t } = useLanguage();
@@ -48,9 +34,9 @@ export default function TaxReport() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [backendOnline, setBackendOnline] = useState(null); // null = unknown, true/false
+  const [backendOnline, setBackendOnline] = useState(null);
+  const [selectedYear, setSelectedYear] = useState("");
 
-  // ---- Check if the tax backend is reachable ----
   const checkBackendStatus = useCallback(async () => {
     try {
       await fetch("/health");
@@ -60,19 +46,18 @@ export default function TaxReport() {
     }
   }, []);
 
-  // Check backend status on mount
   useEffect(() => {
     checkBackendStatus();
   }, [checkBackendStatus]);
 
-  // ---- Fetch tax summary for connected wallet ----
   const fetchSummary = useCallback(async () => {
     if (!address) return;
 
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet(`/tax/summary?user=${address}`);
+      const yearParam = selectedYear ? `&year=${selectedYear}` : "";
+      const data = await apiGet(`/tax/summary?user=${address}${yearParam}`);
       setSummary(data);
       setBackendOnline(true);
     } catch (err) {
@@ -81,16 +66,14 @@ export default function TaxReport() {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, selectedYear]);
 
-  // Fetch on connect
   useEffect(() => {
     if (isConnected && address) {
       fetchSummary();
     }
   }, [isConnected, address, fetchSummary]);
 
-  // Auto-refresh every 10 seconds
   useEffect(() => {
     if (!isConnected) return;
     const interval = setInterval(fetchSummary, 10000);
@@ -107,7 +90,8 @@ export default function TaxReport() {
   async function handleExportCSV() {
     if (!address) return;
     const token = sessionStorage.getItem("token");
-    const res = await fetch(`/tax/export?user=${address}`, {
+    const yearParam = selectedYear ? `&year=${selectedYear}` : "";
+    const res = await fetch(`/tax/export?user=${address}${yearParam}`, {
       credentials: "include",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
@@ -116,12 +100,15 @@ export default function TaxReport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tax-report-${address.slice(0, 8)}.csv`;
+    a.download = `tax-report-${address.slice(0, 8)}${selectedYear ? `-${selectedYear}` : ""}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  // ---- NOT CONNECTED STATE ----
+  const hasSEK =
+    summary &&
+    (summary.totalGainsSEK != null || summary.totalLossesSEK != null);
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
@@ -138,11 +125,9 @@ export default function TaxReport() {
     );
   }
 
-  // ---- CONNECTION FAILED STATE ----
   if (error === "CONNECTION_FAILED" && !summary) {
     return (
       <div>
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">
@@ -199,8 +184,7 @@ export default function TaxReport() {
 
   const hasActivity =
     summary &&
-    (summary.totalGainsUSD !== 0 ||
-      summary.totalLossesUSD !== 0);
+    (summary.totalGainsUSD !== 0 || summary.totalLossesUSD !== 0);
 
   return (
     <div>
@@ -215,7 +199,6 @@ export default function TaxReport() {
               {t("player.tax.subtitle")}
             </p>
           </div>
-          {/* Connection status indicator */}
           {backendOnline !== null && (
             <div
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${
@@ -238,7 +221,20 @@ export default function TaxReport() {
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Year selector */}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="bg-dark-700 border border-dark-500 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-neon-cyan"
+          >
+            <option value="">All years</option>
+            {YEAR_OPTIONS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -261,12 +257,12 @@ export default function TaxReport() {
         </div>
       </div>
 
-      {/* Error Banner (for non-connection errors) */}
+      {/* Error Banner */}
       {error && error !== "CONNECTION_FAILED" && (
         <ErrorBanner message={error} onRetry={handleRefresh} />
       )}
 
-      {/* Connection lost warning (when we had data but lost connection) */}
+      {/* Connection lost warning */}
       {!backendOnline && summary && (
         <div className="bg-neon-pink/5 border border-neon-pink/20 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-300">
@@ -278,7 +274,7 @@ export default function TaxReport() {
         </div>
       )}
 
-      {/* Legal disclaimer — always visible above any tax data */}
+      {/* Legal disclaimer */}
       <div className="bg-yellow-500/5 border border-yellow-500/30 rounded-lg p-4 mb-4">
         <p className="text-xs text-yellow-300 font-semibold mb-1">
           Informational only — not verified tax advice
@@ -313,9 +309,9 @@ export default function TaxReport() {
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats Grid — USD */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <StatCard
             label={t("player.tax.totalGains")}
             value={`$${summary.totalGainsUSD.toFixed(2)}`}
@@ -347,12 +343,58 @@ export default function TaxReport() {
         </div>
       )}
 
+      {/* SEK Stats Grid — only shown when SEK data is available */}
+      {summary && hasSEK && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatCard
+            label="Gains (SEK)"
+            value={fmt(summary.totalGainsSEK, "SEK")}
+            sub="Swedish kronor"
+            color="green"
+            icon={TrendingUp}
+          />
+          <StatCard
+            label="Losses (SEK)"
+            value={fmt(summary.totalLossesSEK, "SEK")}
+            sub="Swedish kronor"
+            color="pink"
+            icon={TrendingDown}
+          />
+          <StatCard
+            label="Adj. Losses (SEK)"
+            value={fmt(summary.adjustedLossesSEK, "SEK")}
+            sub="70% deductible"
+            color="purple"
+            icon={Scale}
+          />
+          <StatCard
+            label="Net Taxable (SEK)"
+            value={fmt(summary.netTaxableGainSEK, "SEK")}
+            sub="Report to Skatteverket"
+            color="cyan"
+            icon={Receipt}
+          />
+        </div>
+      )}
+
+      {/* SEK unavailable notice */}
+      {summary && !hasSEK && (
+        <div className="bg-dark-700/40 border border-dark-500 rounded-lg p-3 mb-8 text-xs text-gray-500 italic">
+          SEK values are unavailable — price oracle data is missing for one or more events. USD values are shown above.
+        </div>
+      )}
+
       {/* Tax Explanation Card */}
       {summary && (
         <div className="card mb-8">
           <p className="label mb-4 flex items-center gap-2">
             <Scale size={14} />
             {t("player.tax.calcTitle")}
+            {summary.year && (
+              <span className="ml-2 text-xs text-neon-cyan font-normal">
+                {summary.year}
+              </span>
+            )}
           </p>
 
           <div className="space-y-4">
@@ -366,9 +408,16 @@ export default function TaxReport() {
                   {t("player.tax.totalCapGains")}
                 </span>
               </div>
-              <span className="font-mono text-sm text-neon-green">
-                +${summary.totalGainsUSD.toFixed(2)}
-              </span>
+              <div className="text-right">
+                <span className="font-mono text-sm text-neon-green block">
+                  +${summary.totalGainsUSD.toFixed(2)}
+                </span>
+                {hasSEK && summary.totalGainsSEK != null && (
+                  <span className="font-mono text-xs text-neon-green/60 block">
+                    +{summary.totalGainsSEK.toFixed(2)} kr
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Losses */}
@@ -381,9 +430,16 @@ export default function TaxReport() {
                   {t("player.tax.totalCapLosses")}
                 </span>
               </div>
-              <span className="font-mono text-sm text-neon-pink">
-                -${Math.abs(summary.totalLossesUSD).toFixed(2)}
-              </span>
+              <div className="text-right">
+                <span className="font-mono text-sm text-neon-pink block">
+                  -${Math.abs(summary.totalLossesUSD).toFixed(2)}
+                </span>
+                {hasSEK && summary.totalLossesSEK != null && (
+                  <span className="font-mono text-xs text-neon-pink/60 block">
+                    -{Math.abs(summary.totalLossesSEK).toFixed(2)} kr
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* 70% rule */}
@@ -401,9 +457,16 @@ export default function TaxReport() {
                   </p>
                 </div>
               </div>
-              <span className="font-mono text-sm text-neon-purple">
-                -${Math.abs(summary.adjustedLossesUSD).toFixed(2)}
-              </span>
+              <div className="text-right">
+                <span className="font-mono text-sm text-neon-purple block">
+                  -${Math.abs(summary.adjustedLossesUSD).toFixed(2)}
+                </span>
+                {hasSEK && summary.adjustedLossesSEK != null && (
+                  <span className="font-mono text-xs text-neon-purple/60 block">
+                    -{Math.abs(summary.adjustedLossesSEK).toFixed(2)} kr
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Divider */}
@@ -424,21 +487,42 @@ export default function TaxReport() {
                   </p>
                 </div>
               </div>
-              <span
-                className={`font-mono text-lg font-bold ${
-                  summary.netTaxableGainUSD >= 0
-                    ? "glow-text-green"
-                    : "glow-text-pink"
-                }`}
-              >
-                ${summary.netTaxableGainUSD.toFixed(2)}
-              </span>
+              <div className="text-right">
+                <span
+                  className={`font-mono text-lg font-bold block ${
+                    summary.netTaxableGainUSD >= 0
+                      ? "glow-text-green"
+                      : "glow-text-pink"
+                  }`}
+                >
+                  ${summary.netTaxableGainUSD.toFixed(2)}
+                </span>
+                {hasSEK && summary.netTaxableGainSEK != null && (
+                  <span
+                    className={`font-mono text-sm block ${
+                      summary.netTaxableGainSEK >= 0
+                        ? "text-neon-green/70"
+                        : "text-neon-pink/70"
+                    }`}
+                  >
+                    {summary.netTaxableGainSEK.toFixed(2)} kr
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* USD disclaimer */}
-            <p className="text-xs text-gray-600 italic mt-2">
-              {t("player.tax.usdNote")}
-            </p>
+            {/* Note */}
+            {!hasSEK && (
+              <p className="text-xs text-gray-600 italic mt-2">
+                {t("player.tax.usdNote")}
+              </p>
+            )}
+            {hasSEK && (
+              <p className="text-xs text-gray-600 italic mt-2">
+                SEK values calculated using Riksbanken/ECB exchange rates at each transaction date.
+                Swedish tax law (IL 44 kap) requires SEK denomination — use the SEK figures for K4 filing.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -462,7 +546,7 @@ export default function TaxReport() {
           Wallet: {address}
         </p>
         <p className="text-xs text-gray-600 mt-1">
-          Tax backend: {TAX_API}
+          Tax backend: {TAX_API || "(main backend)"}
         </p>
       </div>
     </div>

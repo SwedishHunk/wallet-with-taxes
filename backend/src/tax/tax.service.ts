@@ -47,30 +47,57 @@ export class TaxService {
     const taxTreatment: TaxEvent["taxTreatment"] =
       data.taxTreatment ?? (data.type === "reward" ? "income" : "capital_gain");
 
-    // Fetch SEK rate and convert price if we have a USD price
+    // Resolve asset price — use caller-supplied priceUSD if present,
+    // otherwise try CoinGecko for known assets (ETH, USDC, etc.).
+    let resolvedPriceUSD = data.priceUSD ?? null;
+    let resolvedValuationStatus = data.valuationStatus ?? "missing";
     let sekFields: Pick<
       TaxEvent,
       "priceSEK" | "exchangeRateSEKUSD" | "exchangeRateSource"
     > = { priceSEK: null, exchangeRateSEKUSD: null, exchangeRateSource: null };
 
-    if (data.priceUSD != null && data.priceUSD > 0) {
-      try {
+    try {
+      if (resolvedPriceUSD != null && resolvedPriceUSD > 0) {
+        // Caller supplied a price — just convert to SEK
         const converted = await this.exchangeRateService.convertUSDtoSEK(
-          data.priceUSD,
+          resolvedPriceUSD,
           eventDate,
         );
         sekFields = converted;
-      } catch (err) {
-        this.logger.warn(
-          `Could not fetch SEK rate for event at ${eventDate.toISOString()}: ${String(err)}`,
+        if (converted.priceSEK != null) {
+          resolvedValuationStatus = data.valuationStatus ?? "estimated";
+        }
+      } else if (data.assetAddress) {
+        // No price supplied — attempt oracle lookup for known assets
+        const oracle = await this.exchangeRateService.getAssetPriceInSEK(
+          data.assetAddress,
+          eventDate,
         );
+        if (oracle.priceUSD != null) {
+          resolvedPriceUSD = oracle.priceUSD;
+          resolvedValuationStatus = oracle.valuationStatus;
+          sekFields = {
+            priceSEK: oracle.priceSEK,
+            exchangeRateSEKUSD: oracle.exchangeRateSEKUSD,
+            exchangeRateSource: oracle.exchangeRateSource,
+          };
+          this.logger.debug(
+            `Oracle price for ${data.assetAddress}: $${resolvedPriceUSD} / ${oracle.priceSEK ?? "?"} SEK`,
+          );
+        }
       }
+    } catch (err) {
+      this.logger.warn(
+        `Price oracle failed for event at ${eventDate.toISOString()}: ${String(err)}`,
+      );
     }
 
     const normalizedData = {
       ...data,
       ...sekFields,
       taxTreatment,
+      priceUSD: resolvedPriceUSD ?? data.priceUSD,
+      valuationStatus: resolvedValuationStatus,
       userAddress: data.userAddress?.toLowerCase(),
       assetAddress: data.assetAddress?.toLowerCase(),
     };
@@ -93,17 +120,40 @@ export class TaxService {
 
     return saved;
   }
-  async getEventsForUser(userAddress: string): Promise<TaxEvent[]> {
-    return this.repo.find({
-      where: { userAddress: userAddress.toLowerCase() },
-      order: { timestamp: "ASC" },
-    });
+  async getEventsForUser(
+    userAddress: string,
+    year?: number,
+  ): Promise<TaxEvent[]> {
+    const qb = this.repo
+      .createQueryBuilder("e")
+      .where("e.userAddress = :addr", { addr: userAddress.toLowerCase() })
+      .orderBy("e.timestamp", "ASC");
+
+    if (year) {
+      qb.andWhere("EXTRACT(YEAR FROM e.timestamp) = :year", { year });
+    }
+    return qb.getMany();
   }
 
-  async getSummary(userAddress: string) {
+  /**
+   * Returns tax summary for a user, optionally filtered to a calendar year.
+   * When year is supplied the calculation is always done from raw events
+   * (legacy path) since the cost-basis table is lifetime-cumulative.
+   * Response includes both USD and SEK totals.
+   */
+  async getSummary(userAddress: string, year?: number) {
     const normalizedAddress = userAddress.toLowerCase();
 
-    // Try optimized path: read from cost-basis table
+    if (year) {
+      const result = await this.getSummaryFromEvents(normalizedAddress, year);
+      return {
+        ...result,
+        year,
+        projection: await this.getProjectionSummary("legacy-fallback"),
+      };
+    }
+
+    // Try optimized path: read from cost-basis table (lifetime totals)
     try {
       const bases = await this.costBasisRepo.find({
         where: { userAddress: normalizedAddress },
@@ -124,21 +174,91 @@ export class TaxService {
           totalLossesUSD: +totalLossesUSD.toFixed(2),
           adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
           netTaxableGainUSD: +netTaxableGainUSD.toFixed(2),
+          totalGainsSEK: null, // lifetime cost-basis table is USD-only
+          totalLossesSEK: null,
+          netTaxableGainSEK: null,
+          year: null,
           projection: await this.getProjectionSummary("cost-basis"),
         };
       }
-      return {
-        ...(await this.getSummaryLegacy(normalizedAddress)),
-        projection: await this.getProjectionSummary("legacy-fallback"),
-      };
     } catch (error) {
       await this.markProjectionFailed(error);
     }
 
-    // Fallback: legacy in-memory calculation (for pre-existing data)
     return {
-      ...(await this.getSummaryLegacy(normalizedAddress)),
+      ...(await this.getSummaryFromEvents(normalizedAddress)),
+      year: null,
       projection: await this.getProjectionSummary("legacy-fallback"),
+    };
+  }
+
+  /**
+   * Calculate gains/losses by scanning raw TaxEvents.
+   * Supports year filter. Returns both USD and SEK totals where available.
+   */
+  private async getSummaryFromEvents(userAddress: string, year?: number) {
+    const events = await this.getEventsForUser(userAddress, year);
+    const acquisitions: Record<
+      string,
+      { totalCostUSD: number; totalCostSEK: number; quantity: number }
+    > = {};
+    let totalGainsUSD = 0;
+    let totalLossesUSD = 0;
+    let totalGainsSEK = 0;
+    let totalLossesSEK = 0;
+    let hasSEK = false;
+
+    for (const e of events) {
+      const key = `${e.assetAddress}:${e.tokenId}`;
+
+      if (e.type === "acquisition" && e.priceUSD != null) {
+        if (!acquisitions[key]) {
+          acquisitions[key] = { totalCostUSD: 0, totalCostSEK: 0, quantity: 0 };
+        }
+        acquisitions[key].totalCostUSD += e.priceUSD * Number(e.amount);
+        if (e.priceSEK != null) {
+          acquisitions[key].totalCostSEK += e.priceSEK * Number(e.amount);
+          hasSEK = true;
+        }
+        acquisitions[key].quantity += Number(e.amount);
+      }
+
+      if (e.type === "disposal" && e.priceUSD != null) {
+        const holding = acquisitions[key];
+        const qty = holding?.quantity ?? 0;
+        const avgCostUSD = qty > 0 ? holding.totalCostUSD / qty : 0;
+        const avgCostSEK = qty > 0 ? holding.totalCostSEK / qty : 0;
+        const glUSD = (e.priceUSD - avgCostUSD) * Number(e.amount);
+        glUSD >= 0 ? (totalGainsUSD += glUSD) : (totalLossesUSD += glUSD);
+
+        if (e.priceSEK != null) {
+          const glSEK = (e.priceSEK - avgCostSEK) * Number(e.amount);
+          glSEK >= 0 ? (totalGainsSEK += glSEK) : (totalLossesSEK += glSEK);
+          hasSEK = true;
+        }
+
+        if (holding) {
+          holding.totalCostUSD -= avgCostUSD * Number(e.amount);
+          holding.totalCostSEK -= avgCostSEK * Number(e.amount);
+          holding.quantity -= Number(e.amount);
+        }
+      }
+    }
+
+    const adjustedLossesUSD = totalLossesUSD * SWEDISH_LOSS_DEDUCTION_RATE;
+    const adjustedLossesSEK = totalLossesSEK * SWEDISH_LOSS_DEDUCTION_RATE;
+
+    return {
+      totalGainsUSD: +totalGainsUSD.toFixed(2),
+      totalLossesUSD: +totalLossesUSD.toFixed(2),
+      adjustedLossesUSD: +adjustedLossesUSD.toFixed(2),
+      netTaxableGainUSD: +(totalGainsUSD + adjustedLossesUSD).toFixed(2),
+      totalGainsSEK: hasSEK ? +totalGainsSEK.toFixed(2) : null,
+      totalLossesSEK: hasSEK ? +totalLossesSEK.toFixed(2) : null,
+      adjustedLossesSEK: hasSEK ? +adjustedLossesSEK.toFixed(2) : null,
+      netTaxableGainSEK: hasSEK
+        ? +(totalGainsSEK + adjustedLossesSEK).toFixed(2)
+        : null,
     };
   }
 
@@ -315,8 +435,8 @@ export class TaxService {
     return /^[=+\-@]/.test(str) ? `'${str}` : str;
   }
 
-  async exportEventsAsCSV(userAddress: string, res: Response): Promise<void> {
-    const events = await this.getEventsForUser(userAddress);
+  async exportEventsAsCSV(userAddress: string, res: Response, year?: number): Promise<void> {
+    const events = await this.getEventsForUser(userAddress, year);
 
     const disclaimer = [
       "# INFORMATIONAL ONLY — NOT VERIFIED TAX ADVICE",
@@ -328,9 +448,10 @@ export class TaxService {
     ].join("\n");
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    const yearSuffix = year ? `-${year}` : "";
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=tax-report-${userAddress.slice(0, 10)}.csv`,
+      `attachment; filename=tax-report-${userAddress.slice(0, 10)}${yearSuffix}.csv`,
     );
 
     if (events.length === 0) {

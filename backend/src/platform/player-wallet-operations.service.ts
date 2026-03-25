@@ -10,6 +10,7 @@ import { GameWallet } from "./entities/game-wallet.entity";
 import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
+import { User } from "../users/user.entity";
 
 @Injectable()
 export class PlayerWalletOperationsService {
@@ -21,6 +22,8 @@ export class PlayerWalletOperationsService {
     private readonly ledgerRepo: Repository<LedgerEntry>,
     @InjectRepository(NFTInstance)
     private readonly nftInstanceRepo: Repository<NFTInstance>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly playerWalletIdentityService: PlayerWalletIdentityService,
   ) {}
 
@@ -80,6 +83,19 @@ export class PlayerWalletOperationsService {
   ) {
     const amountNum = parseAmount(amount);
     const operationKey = this.normalizeIdempotencyKey(idempotencyKey);
+
+    // KYC gate — custodial users must be verified before withdrawing real value
+    const user = await this.userRepo.findOne({
+      where: { walletAddress: walletAddress.toLowerCase() },
+      select: ["id", "custodyMode", "kycStatus"],
+    });
+    if (user?.custodyMode === "custodial" && user.kycStatus !== "verified") {
+      throw new AppException(
+        "Identity verification (KYC) is required before withdrawing. Please complete verification.",
+        403,
+      );
+    }
+
     const { wallet } =
       await this.playerWalletIdentityService.resolvePlayerGameWallet(
         gameId,
