@@ -8,7 +8,13 @@ describe("AdminController", () => {
     getAllStudios: jest.fn(),
     getAllTransactions: jest.fn(),
   };
-  const controller = new AdminController(service as never);
+  const dataRetentionService = {
+    runManually: jest.fn(),
+  };
+  const controller = new AdminController(
+    service as never,
+    dataRetentionService as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,5 +58,13 @@ describe("AdminController", () => {
     service.getAllTransactions.mockResolvedValueOnce({ events: [], total: 0 });
     await controller.getAllTransactions("10", "20");
     expect(service.getAllTransactions).toHaveBeenCalledWith(10, 20);
+  });
+
+  it("delegates runDataRetention", async () => {
+    dataRetentionService.runManually.mockResolvedValueOnce({ anonymized: 2 });
+    await expect(controller.runDataRetention()).resolves.toEqual({
+      anonymized: 2,
+    });
+    expect(dataRetentionService.runManually).toHaveBeenCalled();
   });
 });

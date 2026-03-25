@@ -1,4 +1,9 @@
-import { NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { createHmac } from "crypto";
+import {
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { KycService } from "./kyc.service";
 
 function makeService(userRow: unknown = null) {
@@ -16,6 +21,7 @@ describe("KycService", () => {
   afterEach(() => {
     Object.assign(process.env, originalEnv);
     delete process.env.KYC_PROVIDER_KEY;
+    delete process.env.KYC_WEBHOOK_SECRET;
   });
 
   // ── dev auto-approve mode ──────────────────────────────────────────────────
@@ -94,5 +100,93 @@ describe("KycService", () => {
     expect(userRepo.update).toHaveBeenCalledWith("u2", {
       kycStatus: "rejected",
     });
+  });
+
+  // ── webhook signature verification ────────────────────────────────────────
+
+  it("skips signature check when KYC_WEBHOOK_SECRET is not set (dev mode)", async () => {
+    delete process.env.KYC_WEBHOOK_SECRET;
+    const { service } = makeService({ id: "u1" });
+
+    // No rawBody or signature — should not throw in dev mode
+    await expect(
+      service.handleWebhook({
+        sessionId: "s1",
+        userId: "u1",
+        status: "verified",
+      }),
+    ).resolves.toMatchObject({ updated: true });
+  });
+
+  it("throws UnauthorizedException when secret is set but signature header is absent", async () => {
+    process.env.KYC_WEBHOOK_SECRET = "test-secret";
+    const { service } = makeService({ id: "u1" });
+
+    await expect(
+      service.handleWebhook(
+        { sessionId: "s1", userId: "u1", status: "verified" },
+        Buffer.from("{}"),
+        undefined,
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("throws UnauthorizedException when secret is set but rawBody is absent", async () => {
+    process.env.KYC_WEBHOOK_SECRET = "test-secret";
+    const { service } = makeService({ id: "u1" });
+
+    await expect(
+      service.handleWebhook(
+        { sessionId: "s1", userId: "u1", status: "verified" },
+        undefined,
+        "sha256=abc",
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("throws UnauthorizedException when HMAC signature does not match", async () => {
+    process.env.KYC_WEBHOOK_SECRET = "test-secret";
+    const { service } = makeService({ id: "u1" });
+    const rawBody = Buffer.from('{"userId":"u1","status":"verified"}');
+
+    await expect(
+      service.handleWebhook(
+        { sessionId: "s1", userId: "u1", status: "verified" },
+        rawBody,
+        "sha256=badhash000000000000000000000000000000000000000000000000000000000",
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("accepts a valid HMAC-SHA256 signature (plain hex format)", async () => {
+    const secret = "valid-secret-key";
+    process.env.KYC_WEBHOOK_SECRET = secret;
+    const { service } = makeService({ id: "u1" });
+    const rawBody = Buffer.from('{"userId":"u1","status":"verified"}');
+    const sig = createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    await expect(
+      service.handleWebhook(
+        { sessionId: "s1", userId: "u1", status: "verified" },
+        rawBody,
+        sig,
+      ),
+    ).resolves.toMatchObject({ updated: true });
+  });
+
+  it("accepts a valid HMAC-SHA256 signature (sha256= prefix format)", async () => {
+    const secret = "valid-secret-key";
+    process.env.KYC_WEBHOOK_SECRET = secret;
+    const { service } = makeService({ id: "u1" });
+    const rawBody = Buffer.from('{"userId":"u1","status":"verified"}');
+    const sig = createHmac("sha256", secret).update(rawBody).digest("hex");
+
+    await expect(
+      service.handleWebhook(
+        { sessionId: "s1", userId: "u1", status: "verified" },
+        rawBody,
+        `sha256=${sig}`,
+      ),
+    ).resolves.toMatchObject({ updated: true });
   });
 });

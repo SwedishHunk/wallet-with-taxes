@@ -34,6 +34,9 @@ function cookieOpts(): CookieOptions {
   };
 }
 
+// Default: 60 req/min for all endpoints. Auth-sensitive endpoints override
+// this with @Throttle({ auth: { limit: 10, ttl: 60000 } }) at method level.
+@Throttle({ default: { limit: 60, ttl: 60000 } })
 @Controller("users")
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

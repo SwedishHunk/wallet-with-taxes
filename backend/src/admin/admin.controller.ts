@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   UseGuards,
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AdminGuard } from "../auth/admin.guard";
 import { TriolithGuard } from "../auth/triolith.guard";
 import { AdminService } from "../admin/admin.service";
+import { DataRetentionService } from "../data-retention/data-retention.service";
 import {
   SetStudioStatusDto,
   SetUserAdminDto,
@@ -32,7 +34,10 @@ interface AuthRequest {
 @Controller("admin")
 @UseGuards(JwtAuthGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly dataRetentionService: DataRetentionService,
+  ) {}
 
   // Studio-owner level: fee stats visible to studio owners
   @Get("fees")
@@ -229,6 +234,19 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async deleteGame(@Param("id") id: string, @Request() req: AuthRequest) {
     return this.adminService.deleteGame(id, req.user.id, req.user.email);
+  }
+
+  /**
+   * POST /admin/maintenance/data-retention
+   * Manually trigger the GDPR data-retention anonymisation job.
+   * Useful for compliance testing and on-demand anonymisation runs
+   * without waiting for the nightly cron.
+   */
+  @Post("maintenance/data-retention")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
+  @UseGuards(TriolithGuard)
+  async runDataRetention() {
+    return this.dataRetentionService.runManually();
   }
 
   @Get("audit-log")

@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -38,8 +40,11 @@ const shouldSynchronizeSchema = isTestEnv || isDevEnv;
      *   default      — 60 req/min  (general API endpoints)
      *   admin-write  — 10 req/min  (admin state-mutating endpoints)
      *
-     * Apply at the endpoint level with @Throttle({ <tier>: { limit, ttl } }).
-     * No APP_GUARD is registered, so throttling is opt-in per endpoint.
+     * ThrottlerGuard is registered as a global APP_GUARD (see providers below).
+     * Controllers set @Throttle({ <tier>: { limit, ttl } }) to pick a specific
+     * tier; a method-level decorator overrides any class-level one. Endpoints
+     * without any decorator inherit all named tiers — so every controller class
+     * should carry a class-level @Throttle({ default: ... }) fallback.
      */
     ThrottlerModule.forRoot([
       {
@@ -95,6 +100,13 @@ const shouldSynchronizeSchema = isTestEnv || isDevEnv;
     KycModule,
     DataRetentionModule,
     ChainIndexerModule,
+  ],
+  providers: [
+    // Apply rate-limiting globally. Each controller declares which tier to use
+    // via @Throttle({ <tier>: { limit, ttl } }). Without a @Throttle decorator
+    // all named tiers are checked — add a class-level @Throttle({ default: ... })
+    // to any controller that should inherit the 60 req/min default.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

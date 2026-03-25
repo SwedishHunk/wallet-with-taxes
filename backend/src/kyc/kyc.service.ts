@@ -3,7 +3,9 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { createHmac, timingSafeEqual } from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../users/user.entity";
@@ -26,6 +28,12 @@ export interface KycWebhookPayload {
  *   and a redirect URL for the user to complete verification in their browser.
  *   handleWebhook() processes the async callback from the provider.
  *
+ * WEBHOOK SIGNATURE VERIFICATION:
+ *   Set KYC_WEBHOOK_SECRET to the shared HMAC secret provided by your KYC
+ *   provider. When set, every incoming webhook is verified with HMAC-SHA256
+ *   before any payload is processed.  When unset (dev/test), verification
+ *   is skipped.
+ *
  * IMPORTANT: Before launching custodial wallets for real users, wire in a
  * real KYC provider here and gate all withdrawal flows on kycStatus="verified".
  */
@@ -46,6 +54,13 @@ export class KycService {
       this.logger.warn(
         "KYC_PROVIDER_KEY is not set — running in dev auto-approve mode. " +
           "Set KYC_PROVIDER_KEY to enable real identity verification.",
+      );
+    }
+
+    if (!process.env.KYC_WEBHOOK_SECRET) {
+      this.logger.warn(
+        "KYC_WEBHOOK_SECRET is not set — webhook signature verification " +
+          "is DISABLED. Set KYC_WEBHOOK_SECRET in production.",
       );
     }
   }
@@ -85,14 +100,20 @@ export class KycService {
 
   /**
    * Handle an async webhook callback from the KYC provider.
-   * Updates the user's kycStatus based on the provider's decision.
    *
-   * In production, this endpoint must verify the webhook signature
-   * (provider-specific HMAC or public-key signature) before processing.
+   * Verifies the HMAC-SHA256 signature when KYC_WEBHOOK_SECRET is set.
+   * The raw request body is required for correct signature computation —
+   * never re-serialise the parsed payload as key order may differ.
+   *
+   * Signature format accepted: plain hex OR "sha256=<hex>" (GitHub/Stripe style).
    */
   async handleWebhook(
     payload: KycWebhookPayload,
+    rawBody?: Buffer,
+    signature?: string,
   ): Promise<{ updated: boolean }> {
+    this.verifyWebhookSignature(rawBody, signature);
+
     const { userId, status } = payload;
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -104,5 +125,40 @@ export class KycService {
     await this.userRepository.update(userId, { kycStatus: status });
     this.logger.log(`KYC status updated: user=${userId} status=${status}`);
     return { updated: true };
+  }
+
+  // ── private helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Verifies the HMAC-SHA256 webhook signature.
+   *
+   * When KYC_WEBHOOK_SECRET is not configured (dev/test), verification is
+   * skipped entirely. In production the secret must be set.
+   *
+   * Uses timingSafeEqual to prevent timing-based signature oracle attacks.
+   */
+  private verifyWebhookSignature(
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+  ): void {
+    const secret = process.env.KYC_WEBHOOK_SECRET;
+    if (!secret) return; // dev mode — skip verification
+
+    if (!signature || !rawBody) {
+      throw new UnauthorizedException(
+        "KYC webhook: x-kyc-signature header is required in production",
+      );
+    }
+
+    const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+    // Accept both plain hex and "sha256=<hex>" (Stripe/GitHub style)
+    const rawSig = signature.replace(/^sha256=/, "");
+    const sigBuf = Buffer.from(rawSig, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+
+    // timingSafeEqual throws if lengths differ — guard with length check first
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+      throw new UnauthorizedException("KYC webhook: invalid signature");
+    }
   }
 }

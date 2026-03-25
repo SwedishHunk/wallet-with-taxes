@@ -27,17 +27,45 @@ describe("KycController", () => {
     });
   });
 
-  it("webhook delegates to kycService.handleWebhook", async () => {
+  it("webhook passes payload, rawBody and signature to kycService.handleWebhook", async () => {
     const { controller, kycService } = makeController();
     const payload = {
       sessionId: "s1",
       userId: "u1",
       status: "verified" as const,
     };
+    const rawBody = Buffer.from(JSON.stringify(payload));
+    const signature = "sha256=abc123";
 
-    const result = await controller.webhook(payload);
+    const result = await controller.webhook(signature, rawBody, payload);
 
-    expect(kycService.handleWebhook).toHaveBeenCalledWith(payload);
+    expect(kycService.handleWebhook).toHaveBeenCalledWith(
+      payload,
+      rawBody,
+      signature,
+    );
+    expect(result).toEqual({ updated: true });
+  });
+
+  it("webhook works without a signature header (dev mode pass-through)", async () => {
+    const { controller, kycService } = makeController();
+    const payload = {
+      sessionId: "s2",
+      userId: "u2",
+      status: "rejected" as const,
+    };
+
+    const result = await controller.webhook(
+      undefined,
+      Buffer.from("{}"),
+      payload,
+    );
+
+    expect(kycService.handleWebhook).toHaveBeenCalledWith(
+      payload,
+      expect.any(Buffer),
+      undefined,
+    );
     expect(result).toEqual({ updated: true });
   });
 });
