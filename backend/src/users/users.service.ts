@@ -91,6 +91,20 @@ export class UsersService {
 
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
+
+      // Sanity-check: verify the factory address actually holds contract code.
+      // If the local node was reset and only the TokenShop script was re-run,
+      // FACTORY_ADDRESS may point to the TRI token (first deploy = same address)
+      // instead of the GenesisWalletFactory, causing a silent revert.
+      const code = await provider.getCode(factoryAddress);
+      if (code === "0x") {
+        console.warn(
+          `[wallet-factory] No contract at FACTORY_ADDRESS=${factoryAddress}. ` +
+            "Deploy the GenesisWalletFactory and update FACTORY_ADDRESS in .env.",
+        );
+        return null;
+      }
+
       const deployer = new ethers.Wallet(deployerKey, provider);
       const factory = new ethers.Contract(
         factoryAddress,
@@ -110,10 +124,25 @@ export class UsersService {
       );
       return null;
     } catch (err) {
-      console.warn(
-        "Skipping on-chain wallet creation (RPC unavailable?):",
-        err,
-      );
+      // Distinguish between "contract call reverted" and "RPC not reachable"
+      const isNetworkError =
+        err instanceof Error &&
+        (err.message.includes("ECONNREFUSED") ||
+          err.message.includes("could not detect network") ||
+          err.message.includes("timeout"));
+
+      if (isNetworkError) {
+        console.warn(
+          `[wallet-factory] RPC at ${rpcUrl} is unreachable. On-chain wallet creation skipped.`,
+        );
+      } else {
+        console.warn(
+          `[wallet-factory] createWallet(${walletAddress}) reverted — ` +
+            "FACTORY_ADDRESS likely points to the wrong contract (e.g. TRI token instead of GenesisWalletFactory). " +
+            "Re-deploy the factory and update FACTORY_ADDRESS in .env.\n" +
+            String(err instanceof Error ? err.message : err),
+        );
+      }
       return null;
     }
   }
