@@ -13,6 +13,7 @@ import { GamePlayer } from "../platform/entities/game-player.entity";
 import { EconomicEvent } from "../economics/entities/economic-event.entity";
 import { PlatformConfig } from "./platform-config.entity";
 import { AdminAuditLog } from "./admin-audit-log.entity";
+import { SuspensionCacheService } from "../auth/suspension-cache.service";
 import { ethers } from "ethers";
 import { DataSource, Repository } from "typeorm";
 import {
@@ -59,6 +60,7 @@ export class AdminService {
     private readonly auditLogRepo: Repository<AdminAuditLog>,
 
     private readonly dataSource: DataSource,
+    private readonly suspensionCache: SuspensionCacheService,
   ) {}
 
   private async writeAudit(
@@ -286,6 +288,9 @@ export class AdminService {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     await this.userRepo.update(id, { isSuspended });
+    // Immediately invalidate the distributed suspension cache so the change
+    // takes effect on the user's next request without waiting for TTL expiry.
+    await this.suspensionCache.invalidate(id);
     await this.writeAudit(adminId, adminEmail, "setUserSuspended", "user", id, {
       isSuspended,
     });

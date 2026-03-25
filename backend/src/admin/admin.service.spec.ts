@@ -41,6 +41,7 @@ function makeService(queryRaw?: unknown) {
     update: jest.fn().mockResolvedValue({}),
   };
   const shopEventRepo = { find: jest.fn(), findAndCount: jest.fn() };
+  const gamePlayerRepo = { find: jest.fn() };
   const economicEventRepo = { findAndCount: jest.fn() };
   const platformConfigRepo = {
     findOne: jest.fn().mockResolvedValue(null),
@@ -51,6 +52,12 @@ function makeService(queryRaw?: unknown) {
     save: jest.fn().mockResolvedValue({}),
     findAndCount: jest.fn().mockResolvedValue([[], 0]),
   };
+  const dataSource = { createQueryRunner: jest.fn() };
+  const suspensionCache = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    invalidate: jest.fn().mockResolvedValue(undefined),
+  };
 
   const service = new AdminService(
     taxRepo as never,
@@ -58,9 +65,12 @@ function makeService(queryRaw?: unknown) {
     userRepo as never,
     studioRepo as never,
     gameRepo as never,
+    gamePlayerRepo as never,
     economicEventRepo as never,
     platformConfigRepo as never,
     auditLogRepo as never,
+    dataSource as never,
+    suspensionCache as never,
   );
 
   return {

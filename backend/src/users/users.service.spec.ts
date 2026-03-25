@@ -97,9 +97,11 @@ describe("UsersService", () => {
       userRepo as never,
       studioRepo as never,
       studioMemberRepo as never,
+      { find: jest.fn().mockResolvedValue([]) } as never,
       studioMemberService as never,
       jwtService as never,
       dataSource as never,
+      { encrypt: jest.fn((x: string) => x), decrypt: jest.fn((x: string) => x) } as never,
     );
 
     process.env.ENCRYPTION_KEY = "12345678901234567890123456789012";

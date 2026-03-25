@@ -12,7 +12,7 @@ import { User } from "../users/user.entity";
 import { StudioMemberService } from "./studio-member.service";
 import * as bcrypt from "bcryptjs";
 import { ethers } from "ethers";
-import { encryptPrivateKey } from "../shared/crypto.util";
+import { KeyManagementService } from "../shared/key-management.service";
 import * as crypto from "crypto";
 import { assertValidEmail } from "../shared/validators/email.validator";
 
@@ -38,6 +38,7 @@ export class StudiosService {
     @InjectRepository(StudioMember)
     private readonly memberRepository: Repository<StudioMember>,
     private readonly studioMemberService: StudioMemberService,
+    private readonly keyManagement: KeyManagementService,
   ) {}
 
   /**
@@ -129,16 +130,7 @@ export class StudiosService {
       const passwordHash = await bcrypt.hash(password, salt);
       const wallet = ethers.Wallet.createRandom();
 
-      const encryptionKey = process.env.ENCRYPTION_KEY;
-      if (!encryptionKey) {
-        throw new Error("ENCRYPTION_KEY env var is missing");
-      }
-
-      // AES-256-GCM: random IV per wallet — eliminates static-IV ciphertext reuse
-      const encryptedPrivateKey = encryptPrivateKey(
-        wallet.privateKey,
-        encryptionKey,
-      );
+      const encryptedPrivateKey = this.keyManagement.encrypt(wallet.privateKey);
 
       user = this.userRepository.create({
         email: dto.email,

@@ -157,6 +157,7 @@ describe("PlatformService", () => {
       walletRepo as never,
       ledgerRepo as never,
       nftInstanceRepo as never,
+      { findOne: jest.fn() } as never,
       playerWalletIdentityService as never,
     );
     nftShopService = new NFTShopService(

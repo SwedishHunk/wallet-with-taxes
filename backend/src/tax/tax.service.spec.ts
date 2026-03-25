@@ -54,6 +54,7 @@ describe("TaxService", () => {
       repo as never,
       costBasisRepo as never,
       projectionStateRepo as never,
+      { getRate: jest.fn().mockResolvedValue(null) } as never,
     );
   });
 

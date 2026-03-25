@@ -13,7 +13,7 @@ import { StudioMember } from "../platform/entities/studio-member.entity";
 import { StudioMemberService } from "../platform/studio-member.service";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
-import { encryptPrivateKey } from "../shared/crypto.util";
+import { KeyManagementService } from "../shared/key-management.service";
 import { assertValidEmail } from "../shared/validators/email.validator";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 
@@ -37,6 +37,7 @@ export class UsersService {
     private readonly studioMemberService: StudioMemberService,
     private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
+    private readonly keyManagement: KeyManagementService,
   ) {
     this.deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
     delete process.env.DEPLOYER_PRIVATE_KEY;
@@ -54,19 +55,7 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(password, salt);
     const wallet = ethers.Wallet.createRandom();
 
-    const encryptionKey = process.env.ENCRYPTION_KEY;
-    if (!encryptionKey) {
-      throw new AppException(
-        ERROR_MESSAGES.MISSING_ENV_VAR("ENCRYPTION_KEY"),
-        500,
-      );
-    }
-
-    // AES-256-GCM: random IV per wallet — eliminates static-IV ciphertext reuse
-    const encryptedPrivateKey = encryptPrivateKey(
-      wallet.privateKey,
-      encryptionKey,
-    );
+    const encryptedPrivateKey = this.keyManagement.encrypt(wallet.privateKey);
 
     const onChainWallet = await this.tryCreateOnChainWallet(wallet.address);
 

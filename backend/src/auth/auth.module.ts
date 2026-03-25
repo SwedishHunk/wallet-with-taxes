@@ -4,6 +4,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtStrategy } from "./jwt.strategy";
+import { SuspensionCacheService } from "./suspension-cache.service";
 import { User } from "../users/user.entity";
 
 @Module({
@@ -26,7 +27,7 @@ import { User } from "../users/user.entity";
       },
     }),
   ],
-  providers: [JwtStrategy],
-  exports: [JwtModule, PassportModule],
+  providers: [JwtStrategy, SuspensionCacheService],
+  exports: [JwtModule, PassportModule, SuspensionCacheService],
 })
 export class AuthModule {}
