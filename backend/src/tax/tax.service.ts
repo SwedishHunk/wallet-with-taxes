@@ -229,11 +229,19 @@ export class TaxService {
         const avgCostUSD = qty > 0 ? holding.totalCostUSD / qty : 0;
         const avgCostSEK = qty > 0 ? holding.totalCostSEK / qty : 0;
         const glUSD = (e.priceUSD - avgCostUSD) * Number(e.amount);
-        glUSD >= 0 ? (totalGainsUSD += glUSD) : (totalLossesUSD += glUSD);
+        if (glUSD >= 0) {
+          totalGainsUSD += glUSD;
+        } else {
+          totalLossesUSD += glUSD;
+        }
 
         if (e.priceSEK != null) {
           const glSEK = (e.priceSEK - avgCostSEK) * Number(e.amount);
-          glSEK >= 0 ? (totalGainsSEK += glSEK) : (totalLossesSEK += glSEK);
+          if (glSEK >= 0) {
+            totalGainsSEK += glSEK;
+          } else {
+            totalLossesSEK += glSEK;
+          }
           hasSEK = true;
         }
 
@@ -435,7 +443,11 @@ export class TaxService {
     return /^[=+\-@]/.test(str) ? `'${str}` : str;
   }
 
-  async exportEventsAsCSV(userAddress: string, res: Response, year?: number): Promise<void> {
+  async exportEventsAsCSV(
+    userAddress: string,
+    res: Response,
+    year?: number,
+  ): Promise<void> {
     const events = await this.getEventsForUser(userAddress, year);
 
     const disclaimer = [
