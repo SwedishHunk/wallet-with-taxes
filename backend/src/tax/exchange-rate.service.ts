@@ -1,23 +1,42 @@
 import { Injectable, Logger } from "@nestjs/common";
 
 /**
- * Fetches SEK/USD exchange rates for Swedish tax calculations.
+ * Fetches fiat and crypto prices for Swedish tax calculations.
  *
  * Swedish tax law (Inkomstskattelagen 44 kap) requires all capital
- * gains and losses to be denominated in SEK, using the exchange rate
- * at the exact date of each taxable event.
+ * gains and losses to be denominated in SEK at the date of each event.
  *
- * Rate source priority:
+ * Fiat rate source priority:
  *  1. Riksbanken daily rates (authoritative for SEK — riksbank.se)
  *  2. European Central Bank (ecb.europa.eu) as fallback
- *  3. CoinGecko for crypto-to-SEK rates (TRI token, ETH, etc.)
+ *
+ * Crypto price source:
+ *  - CoinGecko free API v3 (historical prices by coin ID or contract address)
+ *  - Unknown/unlisted tokens (e.g. TRI on local chain) return null gracefully
+ *
+ * Well-known asset map — add entries here when a token gets a CoinGecko listing.
  */
+
+/** Maps lowercase contract address (or symbol) → CoinGecko coin ID */
+const KNOWN_ASSETS: Record<string, string> = {
+  eth: "ethereum",
+  ethereum: "ethereum",
+  weth: "weth",
+  usdc: "usd-coin",
+  usdt: "tether",
+  dai: "dai",
+  // Add your TRI contract address here once it has a CoinGecko listing:
+  // "0xabc123...": "triolith-tri",
+};
+
 @Injectable()
 export class ExchangeRateService {
   private readonly logger = new Logger(ExchangeRateService.name);
 
-  /** Cache: date string "YYYY-MM-DD" → SEK per 1 USD */
+  /** Cache: "sekusd:YYYY-MM-DD" → { rate, source } */
   private readonly cache = new Map<string, { rate: number; source: string }>();
+  /** Cache: "crypto:{coinId}:YYYY-MM-DD" → price in USD */
+  private readonly cryptoCache = new Map<string, number>();
 
   /**
    * Returns the SEK/USD rate for a given date.
@@ -27,14 +46,72 @@ export class ExchangeRateService {
   async getSEKperUSD(
     date: Date,
   ): Promise<{ rate: number; source: string } | null> {
-    const key = this.toDateKey(date);
+    const key = `sekusd:${this.toDateKey(date)}`;
     if (this.cache.has(key)) return this.cache.get(key)!;
 
+    const dateKey = this.toDateKey(date);
     const result =
-      (await this.fetchFromRiksbanken(key)) ?? (await this.fetchFromECB(key));
+      (await this.fetchFromRiksbanken(dateKey)) ??
+      (await this.fetchFromECB(dateKey));
 
     if (result) this.cache.set(key, result);
     return result ?? null;
+  }
+
+  /**
+   * Returns the USD price of an asset at a given date.
+   * Accepts a CoinGecko coin ID, a well-known symbol, or a contract address.
+   * Returns null if the asset is unknown or unlisted (e.g. TRI on local chain).
+   */
+  async getCryptoPriceUSD(
+    assetIdentifier: string,
+    date: Date,
+  ): Promise<number | null> {
+    const coinId = this.resolveCoinId(assetIdentifier);
+    if (!coinId) return null;
+
+    const dateKey = this.toDateKey(date);
+    const cacheKey = `crypto:${coinId}:${dateKey}`;
+    if (this.cryptoCache.has(cacheKey)) return this.cryptoCache.get(cacheKey)!;
+
+    const price = await this.fetchCoinGeckoHistorical(coinId, dateKey);
+    if (price != null) this.cryptoCache.set(cacheKey, price);
+    return price;
+  }
+
+  /**
+   * Full resolution: asset identifier → USD price → SEK price.
+   * Returns all three fields, or nulls if either lookup fails.
+   */
+  async getAssetPriceInSEK(
+    assetIdentifier: string,
+    date: Date,
+  ): Promise<{
+    priceUSD: number | null;
+    priceSEK: number | null;
+    exchangeRateSEKUSD: number | null;
+    exchangeRateSource: string | null;
+    valuationStatus: "authoritative" | "estimated" | "missing";
+  }> {
+    const priceUSD = await this.getCryptoPriceUSD(assetIdentifier, date);
+    if (priceUSD == null) {
+      return {
+        priceUSD: null,
+        priceSEK: null,
+        exchangeRateSEKUSD: null,
+        exchangeRateSource: null,
+        valuationStatus: "missing",
+      };
+    }
+
+    const sekResult = await this.getSEKperUSD(date);
+    return {
+      priceUSD,
+      priceSEK: sekResult ? +(priceUSD * sekResult.rate).toFixed(4) : null,
+      exchangeRateSEKUSD: sekResult?.rate ?? null,
+      exchangeRateSource: sekResult?.source ?? null,
+      valuationStatus: sekResult ? "authoritative" : "estimated",
+    };
   }
 
   /**
@@ -146,6 +223,60 @@ export class ExchangeRateService {
       const obs = Object.values(series.observations)[0];
       const value = obs[0];
       return isFinite(value) && value > 0 ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ─── Crypto price helpers ────────────────────────────────────────────────────
+
+  /**
+   * Resolves an asset identifier to a CoinGecko coin ID.
+   * Accepts: known symbol (eth, usdc…), lowercase contract address, or coin ID.
+   * Returns null for unknown assets (e.g. TRI on local devnet).
+   */
+  private resolveCoinId(identifier: string): string | null {
+    const lower = identifier.toLowerCase().trim();
+    return KNOWN_ASSETS[lower] ?? null;
+  }
+
+  /**
+   * CoinGecko free API — historical price for a coin on a specific date.
+   * Endpoint: GET /coins/{id}/history?date=dd-mm-yyyy&localization=false
+   * Returns the USD market price at that date, or null if unavailable.
+   */
+  private async fetchCoinGeckoHistorical(
+    coinId: string,
+    dateKey: string, // "YYYY-MM-DD"
+  ): Promise<number | null> {
+    try {
+      // CoinGecko expects dd-mm-yyyy
+      const [year, month, day] = dateKey.split("-");
+      const cgDate = `${day}-${month}-${year}`;
+      const url = `https://api.coingecko.com/api/v3/coins/${coinId}/history?date=${cgDate}&localization=false`;
+
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        headers: { Accept: "application/json" },
+      });
+
+      if (res.status === 429) {
+        this.logger.warn(
+          `CoinGecko rate limit hit for ${coinId} on ${dateKey}`,
+        );
+        return null;
+      }
+      if (!res.ok) return null;
+
+      const json = (await res.json()) as {
+        market_data?: { current_price?: { usd?: number } };
+      };
+
+      const price = json.market_data?.current_price?.usd;
+      if (typeof price !== "number" || !isFinite(price) || price <= 0) {
+        return null;
+      }
+      return price;
     } catch {
       return null;
     }

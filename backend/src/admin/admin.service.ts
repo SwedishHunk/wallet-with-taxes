@@ -327,9 +327,26 @@ export class AdminService {
     }
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
-    await this.userRepo.delete(id);
-    await this.writeAudit(adminId, adminEmail, "deleteUser", "user", id);
-    return { id, deleted: true };
+
+    // GDPR Art. 17 — anonymize personal fields instead of hard-deleting.
+    // The user row is retained so that foreign-key references in
+    // audit_log, ledger_entries, and economic_events remain intact.
+    // Personal identifiers are replaced with non-reversible placeholders.
+    await this.userRepo.update(id, {
+      email: `deleted-${id}@anonymized`,
+      passwordHash: "ANONYMIZED",
+      walletAddress: `0x${"0".repeat(40)}`,
+      encryptedPrivateKey: null,
+      onChainWallet: null,
+      isAdmin: false,
+      isSuspended: true,
+      kycStatus: "pending",
+    });
+
+    await this.writeAudit(adminId, adminEmail, "anonymizeUser", "user", id, {
+      reason: "GDPR Art. 17 erasure request — personal fields anonymized",
+    });
+    return { id, anonymized: true };
   }
 
   async deleteStudio(id: string, adminId: string, adminEmail: string) {
