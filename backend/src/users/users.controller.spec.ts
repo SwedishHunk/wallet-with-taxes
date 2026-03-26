@@ -17,6 +17,8 @@ describe("UsersController", () => {
     findById: jest.fn(),
     getStudiosForUser: jest.fn(),
     getMemberSession: jest.fn(),
+    updateTin: jest.fn(),
+    exportMyData: jest.fn(),
   };
   const controller = new UsersController(service as never);
 
@@ -141,5 +143,21 @@ describe("UsersController", () => {
     await expect(
       controller.getMemberSession(req({ id: "u1" }), "s1"),
     ).resolves.toEqual({ memberId: "m1" });
+  });
+
+  it("delegates updateTin (DAC8/CARF)", async () => {
+    service.updateTin.mockResolvedValueOnce({ updated: true });
+    const result = await controller.updateTin(req({ id: "u1" }), {
+      taxIdentificationNumber: "19900101-1234",
+    } as never);
+    expect(result).toEqual({ updated: true });
+    expect(service.updateTin).toHaveBeenCalledWith("u1", "19900101-1234");
+  });
+
+  it("delegates exportMyData", async () => {
+    service.exportMyData.mockResolvedValueOnce({ exportedAt: "2026-01-01" });
+    const result = await controller.exportMyData(req({ id: "u1" }));
+    expect(result).toEqual({ exportedAt: "2026-01-01" });
+    expect(service.exportMyData).toHaveBeenCalledWith("u1");
   });
 });

@@ -11,6 +11,7 @@ import { LedgerEntry } from "./entities/ledger-entry.entity";
 import { NFTInstance } from "./entities/nft-instance.entity";
 import { PlayerWalletIdentityService } from "./player-wallet-identity.service";
 import { User } from "../users/user.entity";
+import { AmlMonitorService } from "../aml/aml-monitor.service";
 
 @Injectable()
 export class PlayerWalletOperationsService {
@@ -25,6 +26,7 @@ export class PlayerWalletOperationsService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly playerWalletIdentityService: PlayerWalletIdentityService,
+    private readonly amlMonitorService: AmlMonitorService,
   ) {}
 
   private normalizeIdempotencyKey(idempotencyKey?: string | null) {
@@ -96,6 +98,18 @@ export class PlayerWalletOperationsService {
       );
     }
 
+    // AML monitoring — flag withdrawals that exceed the €10,000 USD threshold.
+    // TRI/USD price is not always available; pass null when unknown so the
+    // service logs a warning rather than silently skipping.
+    const triUsdPrice = this.getTRIUSDPrice();
+    const amountUsd = triUsdPrice !== null ? amountNum * triUsdPrice : null;
+    await this.amlMonitorService.checkAndFlag({
+      userAddress: walletAddress,
+      amountUsd,
+      txType: "withdrawal",
+      context: { gameId, amountTRI: amountNum },
+    });
+
     const { wallet } =
       await this.playerWalletIdentityService.resolvePlayerGameWallet(
         gameId,
@@ -156,6 +170,20 @@ export class PlayerWalletOperationsService {
         }
         throw error;
       });
+  }
+
+  /**
+   * Returns the current TRI/USD price from the environment variable
+   * TRI_USD_PRICE, or null when not configured.
+   *
+   * This is a temporary approach — in production this should be replaced with
+   * a live price feed from ExchangeRateService once TRI has a CoinGecko listing.
+   */
+  private getTRIUSDPrice(): number | null {
+    const raw = process.env.TRI_USD_PRICE;
+    if (!raw) return null;
+    const parsed = parseFloat(raw);
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
   }
 
   async playerTransferBetweenPlayers(

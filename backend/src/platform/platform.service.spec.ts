@@ -44,6 +44,7 @@ describe("PlatformService", () => {
   let nftInstanceRepo: Repo;
   let walletDepositIntentRepo: Repo;
   let userRepo: Repo;
+  let playerOpsUserRepo: Repo;
   let walletIdentityRepo: Repo;
   let marketplaceListingRepo: Repo;
   let economicsService: { logEvent: jest.Mock };
@@ -121,6 +122,12 @@ describe("PlatformService", () => {
       create: jest.fn((x) => x),
       save: jest.fn(),
     };
+    playerOpsUserRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn(),
+    };
     walletIdentityRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -157,8 +164,9 @@ describe("PlatformService", () => {
       walletRepo as never,
       ledgerRepo as never,
       nftInstanceRepo as never,
-      { findOne: jest.fn() } as never,
+      playerOpsUserRepo as never,
       playerWalletIdentityService as never,
+      { checkAndFlag: jest.fn().mockResolvedValue(false) } as never,
     );
     nftShopService = new NFTShopService(
       dataSource as never,
@@ -220,7 +228,7 @@ describe("PlatformService", () => {
     ).mockResolvedValue(undefined);
   });
 
-  it("createWalletDepositIntent creates pending intent with deterministic fake address", async () => {
+  it("createWalletDepositIntent creates pending intent with deterministic deposit address", async () => {
     gameRepo.findOne.mockResolvedValueOnce({
       id: "g1",
       studio: { id: "s1" },
@@ -247,6 +255,42 @@ describe("PlatformService", () => {
         status: WalletDepositIntentStatus.PENDING,
       }),
     );
+  });
+
+  it("createWalletDepositIntent derives real BIP-44 address when HD_WALLET_MNEMONIC is set", async () => {
+    // 12-word BIP-39 test mnemonic — safe to use in automated tests
+    process.env.HD_WALLET_MNEMONIC =
+      "test test test test test test test test test test test junk";
+
+    // Create a new service instance so it picks up the env var in its constructor
+    const hdAdminService = new GameWalletAdminService(
+      dataSource as never,
+      gameRepo as never,
+      gamePlayerRepo as never,
+      walletRepo as never,
+      ledgerRepo as never,
+      walletDepositIntentRepo as never,
+      userRepo as never,
+    );
+
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1", studio: { id: "s1" } });
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    walletDepositIntentRepo.create.mockImplementationOnce(
+      (x: Record<string, unknown>) => ({ ...x }),
+    );
+
+    const result = await hdAdminService.createWalletDepositIntent(
+      "g1",
+      "u1",
+      "s1",
+      "10",
+    );
+
+    // Real BIP-44 Ethereum address: 0x + 40 hex chars (EIP-55 checksummed)
+    expect(result.depositAddress).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(result.amount).toBe("10");
+
+    delete process.env.HD_WALLET_MNEMONIC;
   });
 
   it("confirmWalletDepositIntent rejects invalid tx hash", async () => {
@@ -1800,6 +1844,94 @@ describe("PlatformService", () => {
     expect(txLedgerRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ type: "withdraw", amount: "4" }),
     );
+  });
+
+  it("playerWithdrawFromGameWallet blocks custodial user with pending KYC", async () => {
+    playerOpsUserRepo.findOne.mockResolvedValueOnce({
+      custodyMode: "custodial",
+      kycStatus: "pending",
+    });
+    await expect(
+      service.playerWithdrawFromGameWallet("g1", "0xabc", 5),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message:
+        "Identity verification (KYC) is required before withdrawing. Please complete verification.",
+    });
+  });
+
+  it("playerWithdrawFromGameWallet blocks custodial user with rejected KYC", async () => {
+    playerOpsUserRepo.findOne.mockResolvedValueOnce({
+      custodyMode: "custodial",
+      kycStatus: "rejected",
+    });
+    await expect(
+      service.playerWithdrawFromGameWallet("g1", "0xabc", 5),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("playerWithdrawFromGameWallet allows custodial user with verified KYC", async () => {
+    playerOpsUserRepo.findOne.mockResolvedValueOnce({
+      custodyMode: "custodial",
+      kycStatus: "verified",
+    });
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "10",
+      totalWithdrawn: "0",
+    });
+    const txWalletRepo = { save: jest.fn(async (x: unknown) => x) };
+    const txLedgerRepo = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementationOnce(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return txLedgerRepo;
+            throw new Error("unexpected repository");
+          },
+        }),
+    );
+    const result = await service.playerWithdrawFromGameWallet("g1", "0xabc", 4);
+    expect((result as { balance: string }).balance).toBe("6");
+  });
+
+  it("playerWithdrawFromGameWallet bypasses KYC gate for self-custody user", async () => {
+    playerOpsUserRepo.findOne.mockResolvedValueOnce({
+      custodyMode: "self",
+      kycStatus: "pending",
+    });
+    gameRepo.findOne.mockResolvedValueOnce({ id: "g1" });
+    walletIdentityRepo.findOne.mockResolvedValueOnce({ id: "wid1" });
+    gamePlayerRepo.findOne.mockResolvedValueOnce({ id: "gp1" });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: "w1",
+      balance: "10",
+      totalWithdrawn: "0",
+    });
+    const txWalletRepo = { save: jest.fn(async (x: unknown) => x) };
+    const txLedgerRepo = {
+      create: jest.fn((x: unknown) => x),
+      save: jest.fn(async (x: unknown) => x),
+    };
+    dataSource.transaction.mockImplementationOnce(
+      async (cb: (m: unknown) => unknown) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GameWallet) return txWalletRepo;
+            if (entity === LedgerEntry) return txLedgerRepo;
+            throw new Error("unexpected repository");
+          },
+        }),
+    );
+    const result = await service.playerWithdrawFromGameWallet("g1", "0xabc", 4);
+    expect((result as { balance: string }).balance).toBe("6");
   });
 
   it("playerTransferBetweenPlayers rejects self-transfer", async () => {

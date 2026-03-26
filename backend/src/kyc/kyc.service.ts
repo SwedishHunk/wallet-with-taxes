@@ -14,6 +14,12 @@ export interface KycWebhookPayload {
   sessionId: string;
   userId: string;
   status: "verified" | "rejected" | "pending";
+  /**
+   * DAC8 / CARF — national tax identification number (personnummer / TIN)
+   * returned by the KYC provider after identity verification.
+   * Stored on the user record to satisfy EU DAC8 reporting requirements.
+   */
+  taxIdentificationNumber?: string;
 }
 
 /**
@@ -114,7 +120,7 @@ export class KycService {
   ): Promise<{ updated: boolean }> {
     this.verifyWebhookSignature(rawBody, signature);
 
-    const { userId, status } = payload;
+    const { userId, status, taxIdentificationNumber } = payload;
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -122,8 +128,18 @@ export class KycService {
       return { updated: false };
     }
 
-    await this.userRepository.update(userId, { kycStatus: status });
-    this.logger.log(`KYC status updated: user=${userId} status=${status}`);
+    // Build update payload: always update kycStatus; store TIN when provided
+    // by the KYC provider (DAC8/CARF requirement for EU reporting)
+    const updatePayload: Partial<User> = { kycStatus: status };
+    if (taxIdentificationNumber) {
+      updatePayload.taxIdentificationNumber = taxIdentificationNumber;
+    }
+
+    await this.userRepository.update(userId, updatePayload);
+    this.logger.log(
+      `KYC status updated: user=${userId} status=${status}` +
+        (taxIdentificationNumber ? " (TIN stored)" : ""),
+    );
     return { updated: true };
   }
 

@@ -16,6 +16,7 @@ import { AdminGuard } from "../auth/admin.guard";
 import { TriolithGuard } from "../auth/triolith.guard";
 import { AdminService } from "../admin/admin.service";
 import { DataRetentionService } from "../data-retention/data-retention.service";
+import { ReconciliationService } from "../reconciliation/reconciliation.service";
 import {
   SetStudioStatusDto,
   SetUserAdminDto,
@@ -37,6 +38,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly dataRetentionService: DataRetentionService,
+    private readonly reconciliationService: ReconciliationService,
   ) {}
 
   // Studio-owner level: fee stats visible to studio owners
@@ -247,6 +249,18 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async runDataRetention() {
     return this.dataRetentionService.runManually();
+  }
+
+  /**
+   * POST /admin/maintenance/reconciliation
+   * Manually trigger the transaction reconciliation check.
+   * Returns a report of any discrepancies between ledger and tax-event records.
+   */
+  @Post("maintenance/reconciliation")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
+  @UseGuards(TriolithGuard)
+  async runReconciliation() {
+    return this.reconciliationService.runManually();
   }
 
   @Get("audit-log")

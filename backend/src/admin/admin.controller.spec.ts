@@ -11,9 +11,13 @@ describe("AdminController", () => {
   const dataRetentionService = {
     runManually: jest.fn(),
   };
+  const reconciliationService = {
+    runManually: jest.fn(),
+  };
   const controller = new AdminController(
     service as never,
     dataRetentionService as never,
+    reconciliationService as never,
   );
 
   beforeEach(() => {
@@ -66,5 +70,11 @@ describe("AdminController", () => {
       anonymized: 2,
     });
     expect(dataRetentionService.runManually).toHaveBeenCalled();
+  });
+
+  it("delegates runReconciliation", async () => {
+    reconciliationService.runManually.mockResolvedValueOnce({ ok: true });
+    await expect(controller.runReconciliation()).resolves.toEqual({ ok: true });
+    expect(reconciliationService.runManually).toHaveBeenCalled();
   });
 });

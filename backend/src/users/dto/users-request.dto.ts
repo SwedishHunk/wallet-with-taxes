@@ -7,6 +7,8 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
+  MinLength,
 } from "class-validator";
 
 export class SignupDto {
@@ -54,6 +56,25 @@ export class SelectStudioDto {
   @ApiProperty({ description: "Studio ID to activate" })
   @IsUUID()
   studioId: string;
+}
+
+/**
+ * DAC8 / CARF — Update the authenticated user's tax identification number.
+ * Accepts national TIN in any standard format (Swedish personnummer, EU TIN,
+ * etc.).  The value is stored as-is; no country-specific checksum validation
+ * is performed to remain compatible with all EU member-state formats.
+ */
+export class UpdateTinDto {
+  @ApiProperty({
+    description:
+      "National tax identification number (e.g. Swedish personnummer '19900101-1234', DE TIN '12345678901'). Required for DAC8/CARF EU reporting.",
+    example: "19900101-1234",
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(5)
+  @MaxLength(30)
+  taxIdentificationNumber: string;
 }
 
 export class LinkWalletDto {

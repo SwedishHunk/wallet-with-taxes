@@ -20,6 +20,7 @@ import { EconomicsModule } from "./economics/economics.module";
 import { KycModule } from "./kyc/kyc.module";
 import { DataRetentionModule } from "./data-retention/data-retention.module";
 import { ChainIndexerModule } from "./chain-indexer/chain-indexer.module";
+import { ReconciliationModule } from "./reconciliation/reconciliation.module";
 
 const isTestEnv = process.env.NODE_ENV === "test";
 const isDevEnv =
@@ -100,6 +101,7 @@ const shouldSynchronizeSchema = isTestEnv || isDevEnv;
     KycModule,
     DataRetentionModule,
     ChainIndexerModule,
+    ReconciliationModule,
   ],
   providers: [
     // Apply rate-limiting globally. Each controller declares which tier to use

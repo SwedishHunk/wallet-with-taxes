@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Body,
   Get,
   Req,
@@ -18,6 +19,7 @@ import {
   LoginDto,
   SelectStudioDto,
   SignupDto,
+  UpdateTinDto,
 } from "./dto/users-request.dto";
 
 const ACCESS_COOKIE = "access_token";
@@ -134,6 +136,21 @@ export class UsersController {
   ) {
     const jwtUser = req.user as { id: string };
     return this.usersService.getMemberSession(jwtUser.id, studioId);
+  }
+
+  /**
+   * DAC8 / CARF — Store or update the authenticated user's national tax
+   * identification number (personnummer / TIN).  Required for EU DAC8
+   * reporting once platform thresholds are exceeded.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Put("me/tin")
+  async updateTin(@Req() req: Request, @Body() body: UpdateTinDto) {
+    const jwtUser = req.user as { id: string };
+    return this.usersService.updateTin(
+      jwtUser.id,
+      body.taxIdentificationNumber,
+    );
   }
 
   /**
