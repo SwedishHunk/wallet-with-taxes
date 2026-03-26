@@ -5,6 +5,7 @@ import {
   Query,
   Req,
   Res,
+  UnprocessableEntityException,
   UseGuards,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
@@ -44,12 +45,38 @@ export class TaxController {
     @Query("year") yearRaw: string | undefined,
     @Req() req: Request,
     @Res() res: Response,
+    @Query("force") force?: string,
   ) {
     if (!user) {
       res.status(400).send("Missing user address");
       return;
     }
     this.assertOwnerOrAdmin(req, user);
+
+    const jwtUser = req.user as JwtUser;
+    const isAdmin = jwtUser.isAdmin === true;
+
+    // Missing-valuation gate: block export when >5% of events lack price data,
+    // unless the requester is an admin overriding with ?force=true.
+    if (!(isAdmin && force === "true")) {
+      const readiness = await this.taxService.checkExportReadiness(
+        user.toLowerCase(),
+        parseYear(yearRaw),
+      );
+      if (readiness.blocked) {
+        throw new UnprocessableEntityException({
+          message:
+            "Export blocked: too many events are missing price data. " +
+            "Tax report would be materially incomplete for filing purposes.",
+          missingCount: readiness.missingCount,
+          totalCount: readiness.totalCount,
+          missingRatioPct: +(readiness.missingRatio * 100).toFixed(1),
+          thresholdPct: 5,
+          hint: "Admins can bypass this gate by adding ?force=true to the request.",
+        });
+      }
+    }
+
     await this.taxService.exportEventsAsCSV(
       user.toLowerCase(),
       res,
@@ -97,12 +124,38 @@ export class ApiTaxController {
     @Query("year") yearRaw: string | undefined,
     @Req() req: Request,
     @Res() res: Response,
+    @Query("force") force?: string,
   ) {
     if (!user) {
       res.status(400).send("Missing user address");
       return;
     }
     this.assertOwnerOrAdmin(req, user);
+
+    const jwtUser = req.user as JwtUser;
+    const isAdmin = jwtUser.isAdmin === true;
+
+    // Missing-valuation gate: block export when >5% of events lack price data,
+    // unless the requester is an admin overriding with ?force=true.
+    if (!(isAdmin && force === "true")) {
+      const readiness = await this.taxService.checkExportReadiness(
+        user.toLowerCase(),
+        parseYear(yearRaw),
+      );
+      if (readiness.blocked) {
+        throw new UnprocessableEntityException({
+          message:
+            "Export blocked: too many events are missing price data. " +
+            "Tax report would be materially incomplete for filing purposes.",
+          missingCount: readiness.missingCount,
+          totalCount: readiness.totalCount,
+          missingRatioPct: +(readiness.missingRatio * 100).toFixed(1),
+          thresholdPct: 5,
+          hint: "Admins can bypass this gate by adding ?force=true to the request.",
+        });
+      }
+    }
+
     await this.taxService.exportEventsAsCSV(
       user.toLowerCase(),
       res,

@@ -36,6 +36,7 @@ describe("TaxService", () => {
     andWhere: jest.Mock;
     orderBy: jest.Mock;
     getMany: jest.Mock;
+    getCount: jest.Mock;
   };
 
   beforeEach(() => {
@@ -44,6 +45,7 @@ describe("TaxService", () => {
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([]),
+      getCount: jest.fn().mockResolvedValue(0),
     };
     repo = {
       create: jest.fn((x) => x),
@@ -448,6 +450,71 @@ describe("TaxService", () => {
         healthy: false,
         lastError: "projection blew up",
       }),
+    );
+  });
+
+  // ── checkExportReadiness ───────────────────────────────────────────────────
+
+  it("checkExportReadiness returns blocked=false when no events are missing", async () => {
+    // total=10, missing=0 → ratio=0%
+    qbMock.getCount
+      .mockResolvedValueOnce(10) // total
+      .mockResolvedValueOnce(0); // missing
+
+    const result = await service.checkExportReadiness("0xuser");
+
+    expect(result.totalCount).toBe(10);
+    expect(result.missingCount).toBe(0);
+    expect(result.missingRatio).toBe(0);
+    expect(result.blocked).toBe(false);
+  });
+
+  it("checkExportReadiness returns blocked=false when ratio is exactly at threshold", async () => {
+    // total=100, missing=5 → ratio=5% (not > 5%, so not blocked)
+    qbMock.getCount
+      .mockResolvedValueOnce(100) // total
+      .mockResolvedValueOnce(5); // missing
+
+    const result = await service.checkExportReadiness("0xuser");
+
+    expect(result.missingRatio).toBeCloseTo(0.05);
+    expect(result.blocked).toBe(false);
+  });
+
+  it("checkExportReadiness returns blocked=true when ratio exceeds threshold", async () => {
+    // total=100, missing=6 → ratio=6% > 5%
+    qbMock.getCount
+      .mockResolvedValueOnce(100) // total
+      .mockResolvedValueOnce(6); // missing
+
+    const result = await service.checkExportReadiness("0xuser");
+
+    expect(result.missingCount).toBe(6);
+    expect(result.missingRatio).toBeCloseTo(0.06);
+    expect(result.blocked).toBe(true);
+  });
+
+  it("checkExportReadiness returns blocked=false when user has zero events", async () => {
+    qbMock.getCount
+      .mockResolvedValueOnce(0) // total
+      .mockResolvedValueOnce(0); // missing
+
+    const result = await service.checkExportReadiness("0xuser");
+
+    expect(result.totalCount).toBe(0);
+    expect(result.missingRatio).toBe(0);
+    expect(result.blocked).toBe(false);
+  });
+
+  // ── getSummary _disclaimer ─────────────────────────────────────────────────
+
+  it("getSummary includes _disclaimer field", async () => {
+    const result = await service.getSummary("0xuser");
+    expect(typeof (result as Record<string, unknown>)._disclaimer).toBe(
+      "string",
+    );
+    expect((result as Record<string, unknown>)._disclaimer).toContain(
+      "Informational only",
     );
   });
 });

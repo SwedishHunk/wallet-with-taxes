@@ -125,7 +125,28 @@ describe("AdminService", () => {
     expect(query.andWhere).toHaveBeenCalledTimes(2);
   });
 
-  // ── revenue split ──────────────────────────────────────────
+  // ── SAFU summary ───────────────────────────────────────────
+  it("getSafuSummary returns policy constants and lifetime estimate", async () => {
+    const { service } = makeService({ totalFeesUSD: "1000" });
+    const result = await service.getSafuSummary();
+    expect(result.policy.safuCutFromTriolithPct).toBe(5);
+    expect(result.policy.triolithRevSharePct).toBe(30);
+    expect(result.policy.impliedSafuOfTotalFeesPct).toBeCloseTo(1.5);
+    // totalFees=1000, triolithGross=300, safuEstimate=15
+    expect(result.lifetimeEstimate.totalPlatformFeesUSD).toBe(1000);
+    expect(result.lifetimeEstimate.triolithGrossShareUSD).toBe(300);
+    expect(result.lifetimeEstimate.estimatedSafuAccumulatedUSD).toBe(15);
+    expect(typeof result._note).toBe("string");
+  });
+
+  it("getSafuSummary handles zero fees gracefully", async () => {
+    const { service } = makeService(null);
+    const result = await service.getSafuSummary();
+    expect(result.lifetimeEstimate.totalPlatformFeesUSD).toBe(0);
+    expect(result.lifetimeEstimate.estimatedSafuAccumulatedUSD).toBe(0);
+  });
+
+  // ── revenue split ───────────────────────────────────────────
   it("getRevenueSplit computes all shares", async () => {
     const { service } = makeService({ totalFeesUSD: "100" });
     await expect(service.getRevenueSplit()).resolves.toEqual({

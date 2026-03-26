@@ -17,6 +17,7 @@ import { TriolithGuard } from "../auth/triolith.guard";
 import { AdminService } from "../admin/admin.service";
 import { DataRetentionService } from "../data-retention/data-retention.service";
 import { ReconciliationService } from "../reconciliation/reconciliation.service";
+import { AmlMonitorService } from "../aml/aml-monitor.service";
 import {
   SetStudioStatusDto,
   SetUserAdminDto,
@@ -24,6 +25,7 @@ import {
   SetPlatformFeeDto,
   SetGameStatusDto,
 } from "./dto/admin-request.dto";
+import { ReviewAmlFlagDto } from "../aml/dto/review-aml-flag.dto";
 
 interface AuthRequest {
   user: { id: string; email: string };
@@ -39,6 +41,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly dataRetentionService: DataRetentionService,
     private readonly reconciliationService: ReconciliationService,
+    private readonly amlMonitorService: AmlMonitorService,
   ) {}
 
   // Studio-owner level: fee stats visible to studio owners
@@ -263,6 +266,30 @@ export class AdminController {
     return this.reconciliationService.runManually();
   }
 
+  // ── AML compliance endpoints ───────────────────────────────────────────────
+
+  /**
+   * GET /admin/aml/flags
+   * Returns all unreviewed AML flags for MLRO / compliance officer review.
+   * Ordered by most recent first.
+   */
+  @Get("aml/flags")
+  @UseGuards(TriolithGuard)
+  async getAmlFlags() {
+    return this.amlMonitorService.getUnreviewedFlags();
+  }
+
+  /**
+   * PATCH /admin/aml/flags/:id/review
+   * Mark an AML flag as reviewed with optional notes.
+   */
+  @Patch("aml/flags/:id/review")
+  @Throttle({ "admin-write": { limit: 10, ttl: 60000 } })
+  @UseGuards(TriolithGuard)
+  async reviewAmlFlag(@Param("id") id: string, @Body() body: ReviewAmlFlagDto) {
+    return this.amlMonitorService.reviewFlag(id, body.reviewNotes);
+  }
+
   @Get("audit-log")
   @UseGuards(TriolithGuard)
   async getAuditLog(
@@ -279,5 +306,16 @@ export class AdminController {
   @UseGuards(TriolithGuard)
   async getEconomicsSummaryPerStudio() {
     return this.adminService.getEconomicsSummaryPerStudio();
+  }
+
+  /**
+   * GET /admin/safu/summary
+   * Returns an auditable SAFU reserve summary: policy constants + lifetime
+   * fee-based accumulation estimate.  Use for compliance review and reporting.
+   */
+  @Get("safu/summary")
+  @UseGuards(TriolithGuard)
+  async getSafuSummary() {
+    return this.adminService.getSafuSummary();
   }
 }

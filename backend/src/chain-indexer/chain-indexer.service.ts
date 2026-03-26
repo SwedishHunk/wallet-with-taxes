@@ -231,6 +231,24 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       timestamp,
     });
 
+    // Buyer: disposal of TRI used to pay for the NFT.
+    // When the buyer pays in TRI, spending TRI is itself a taxable disposal
+    // event — the buyer must report any gain/loss vs their TRI cost basis.
+    // We log the TRI disposal here so the buyer's tax report is complete.
+    const triAddr = process.env.TRI_TOKEN_ADDRESS;
+    if (triAddr) {
+      await this.taxService.logEvent({
+        type: "disposal",
+        userAddress: buyer.toLowerCase(),
+        assetAddress: triAddr.toLowerCase(),
+        amount: priceEth, // quantity of TRI tokens spent (using ETH unit as proxy)
+        priceUSD: priceEth, // total USD value of TRI spent
+        feeUSD: feeEth,
+        txHash: event.transactionHash,
+        timestamp,
+      });
+    }
+
     this.logger.debug(
       `Indexed Marketplace.Sold: seller=${seller} buyer=${buyer} asset=${assetAddress} tokenId=${tokenId}`,
     );

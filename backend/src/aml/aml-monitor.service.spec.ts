@@ -1,3 +1,4 @@
+import { NotFoundException } from "@nestjs/common";
 import { AmlMonitorService } from "./aml-monitor.service";
 
 function makeService() {
@@ -7,6 +8,7 @@ function makeService() {
       Promise.resolve({ id: "flag-1", ...x }),
     ),
     find: jest.fn(),
+    findOne: jest.fn(),
   };
   const service = new AmlMonitorService(amlFlagRepo as never);
   return { service, amlFlagRepo };
@@ -92,5 +94,55 @@ describe("AmlMonitorService", () => {
       where: { reviewed: false },
       order: { flaggedAt: "DESC" },
     });
+  });
+
+  // ── reviewFlag ─────────────────────────────────────────────────────────────
+
+  it("reviewFlag marks flag as reviewed and saves", async () => {
+    const { service, amlFlagRepo } = makeService();
+    const existingFlag = {
+      id: "f1",
+      reviewed: false,
+      reviewNotes: null,
+    } as Record<string, unknown>;
+    amlFlagRepo.findOne.mockResolvedValueOnce(existingFlag);
+    amlFlagRepo.save.mockImplementationOnce((x: Record<string, unknown>) =>
+      Promise.resolve(x as unknown as { id: string }),
+    );
+
+    const result = await service.reviewFlag("f1", "Reviewed — no issue.");
+
+    expect(amlFlagRepo.findOne).toHaveBeenCalledWith({ where: { id: "f1" } });
+    expect(existingFlag.reviewed).toBe(true);
+    expect(existingFlag.reviewNotes).toBe("Reviewed — no issue.");
+    expect(amlFlagRepo.save).toHaveBeenCalledWith(existingFlag);
+    expect((result as unknown as Record<string, unknown>).reviewed).toBe(true);
+  });
+
+  it("reviewFlag sets reviewNotes to null when not provided", async () => {
+    const { service, amlFlagRepo } = makeService();
+    const existingFlag = {
+      id: "f2",
+      reviewed: false,
+      reviewNotes: null,
+    } as Record<string, unknown>;
+    amlFlagRepo.findOne.mockResolvedValueOnce(existingFlag);
+    amlFlagRepo.save.mockImplementationOnce((x: Record<string, unknown>) =>
+      Promise.resolve(x as unknown as { id: string }),
+    );
+
+    await service.reviewFlag("f2");
+
+    expect(existingFlag.reviewNotes).toBeNull();
+  });
+
+  it("reviewFlag throws NotFoundException when flag does not exist", async () => {
+    const { service, amlFlagRepo } = makeService();
+    amlFlagRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(service.reviewFlag("nonexistent")).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(amlFlagRepo.save).not.toHaveBeenCalled();
   });
 });

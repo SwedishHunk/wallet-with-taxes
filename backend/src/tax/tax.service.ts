@@ -25,6 +25,13 @@ export class TaxService {
   private readonly logger = new Logger(TaxService.name);
   private static readonly PROJECTOR = "cost-basis";
 
+  /**
+   * If more than this fraction of a user's events lack price data, the CSV
+   * export is blocked to prevent users from filing a materially incomplete
+   * tax report.  Admins can override by passing force=true.
+   */
+  static readonly MISSING_VALUATION_THRESHOLD = 0.05; // 5%
+
   constructor(
     @InjectRepository(TaxEvent)
     private readonly repo: Repository<TaxEvent>,
@@ -132,6 +139,46 @@ export class TaxService {
   }
 
   /**
+   * Pre-flight check for CSV export.
+   * Returns whether the export is safe to serve based on the fraction of events
+   * that are missing price data.  Blocked when missingRatio > MISSING_VALUATION_THRESHOLD.
+   */
+  async checkExportReadiness(
+    userAddress: string,
+    year?: number,
+  ): Promise<{
+    totalCount: number;
+    missingCount: number;
+    missingRatio: number;
+    blocked: boolean;
+  }> {
+    const addr = userAddress.toLowerCase();
+
+    const totalQb = this.repo
+      .createQueryBuilder("e")
+      .where("e.userAddress = :addr", { addr });
+    const missingQb = this.repo
+      .createQueryBuilder("e")
+      .where("e.userAddress = :addr", { addr })
+      .andWhere("e.valuationStatus = :status", { status: "missing" });
+
+    if (year) {
+      totalQb.andWhere("EXTRACT(YEAR FROM e.timestamp) = :year", { year });
+      missingQb.andWhere("EXTRACT(YEAR FROM e.timestamp) = :year", { year });
+    }
+
+    const [totalCount, missingCount] = await Promise.all([
+      totalQb.getCount(),
+      missingQb.getCount(),
+    ]);
+
+    const missingRatio = totalCount > 0 ? missingCount / totalCount : 0;
+    const blocked = missingRatio > TaxService.MISSING_VALUATION_THRESHOLD;
+
+    return { totalCount, missingCount, missingRatio, blocked };
+  }
+
+  /**
    * Returns tax summary for a user, optionally filtered to a calendar year.
    * When year is supplied the calculation is always done from raw events
    * (legacy path) since the cost-basis table is lifetime-cumulative.
@@ -139,6 +186,9 @@ export class TaxService {
    */
   async getSummary(userAddress: string, year?: number) {
     const normalizedAddress = userAddress.toLowerCase();
+    const disclaimer =
+      "Informational only. Not verified tax or financial advice. " +
+      "Verify all figures with a qualified Swedish tax advisor before filing.";
 
     if (year) {
       const result = await this.getSummaryFromEvents(normalizedAddress, year);
@@ -146,6 +196,7 @@ export class TaxService {
         ...result,
         year,
         projection: await this.getProjectionSummary("legacy-fallback"),
+        _disclaimer: disclaimer,
       };
     }
 
@@ -175,6 +226,7 @@ export class TaxService {
           netTaxableGainSEK: null,
           year: null,
           projection: await this.getProjectionSummary("cost-basis"),
+          _disclaimer: disclaimer,
         };
       }
     } catch (error) {
@@ -185,6 +237,7 @@ export class TaxService {
       ...(await this.getSummaryFromEvents(normalizedAddress)),
       year: null,
       projection: await this.getProjectionSummary("legacy-fallback"),
+      _disclaimer: disclaimer,
     };
   }
 

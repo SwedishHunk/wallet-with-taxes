@@ -209,7 +209,8 @@ describe("ChainIndexerService", () => {
 
   // ── handleMarketplaceSold ─────────────────────────────────────────────────
 
-  it("handleMarketplaceSold logs disposal (seller) and acquisition (buyer) TaxEvents", async () => {
+  it("handleMarketplaceSold logs seller disposal + buyer acquisition (no TRI addr set)", async () => {
+    delete process.env.TRI_TOKEN_ADDRESS;
     const { taxService, svc } = makeService();
     svc.provider = {
       getBlock: jest.fn().mockResolvedValue({ timestamp: 1_700_000_000 }),
@@ -225,6 +226,7 @@ describe("ChainIndexerService", () => {
       { blockNumber: 100, transactionHash: "0xtxhash" },
     );
 
+    // 2 events: seller disposal + buyer NFT acquisition (TRI disposal skipped — no TRI addr)
     expect(taxService.logEvent).toHaveBeenCalledTimes(2);
     expect(taxService.logEvent).toHaveBeenNthCalledWith(
       1,
@@ -240,6 +242,35 @@ describe("ChainIndexerService", () => {
         type: "acquisition",
         userAddress: "0xbuyer",
         feeUSD: 0,
+      }),
+    );
+  });
+
+  it("handleMarketplaceSold logs 3 events including buyer TRI disposal when TRI_TOKEN_ADDRESS is set", async () => {
+    process.env.TRI_TOKEN_ADDRESS = "0xtritoken";
+    const { taxService, svc } = makeService();
+    svc.provider = {
+      getBlock: jest.fn().mockResolvedValue({ timestamp: 1_700_000_000 }),
+    };
+
+    await svc.handleMarketplaceSold(
+      "0xSeller",
+      "0xBuyer",
+      "0xAsset",
+      BigInt(7),
+      ethers.parseEther("2.0"),
+      ethers.parseEther("0.1"),
+      { blockNumber: 101, transactionHash: "0xtxhash2" },
+    );
+
+    // 3 events: seller disposal + buyer NFT acquisition + buyer TRI disposal
+    expect(taxService.logEvent).toHaveBeenCalledTimes(3);
+    expect(taxService.logEvent).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        type: "disposal",
+        userAddress: "0xbuyer",
+        assetAddress: "0xtritoken",
       }),
     );
   });

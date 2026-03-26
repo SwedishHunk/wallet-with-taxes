@@ -150,6 +150,49 @@ export class AdminService {
     };
   }
 
+  /**
+   * Returns an auditable summary of the SAFU reserve allocation.
+   *
+   * The SAFU ("Secure Asset Fund for Users") accumulates as a percentage of
+   * Triolith's protocol revenue.  This endpoint surfaces:
+   *   - The policy constants (percentages)
+   *   - An estimate of lifetime SAFU accumulation based on DB fee records
+   *
+   * Note: actual SAFU balance requires an on-chain query to the FeeDistributor
+   * contract.  The DB-based estimate here may lag or differ from on-chain state.
+   */
+  async getSafuSummary() {
+    const raw = await this.taxRepo
+      .createQueryBuilder("tax")
+      .select(['COALESCE(SUM(tax.feeUSD), 0)::text AS "totalFeesUSD"'])
+      .where("tax.feeUSD IS NOT NULL")
+      .getRawOne<{ totalFeesUSD: string }>();
+
+    const totalFeesUSD = Number(raw?.totalFeesUSD ?? "0");
+    const triolithGross = totalFeesUSD * REVENUE_SPLIT_TRIOLITH;
+    const estimatedSafuUSD = triolithGross * SAFU_CUT_FROM_TRIOLITH;
+
+    return {
+      policy: {
+        safuCutFromTriolithPct: SAFU_CUT_FROM_TRIOLITH * 100,
+        triolithRevSharePct: REVENUE_SPLIT_TRIOLITH * 100,
+        impliedSafuOfTotalFeesPct: +(
+          SAFU_CUT_FROM_TRIOLITH *
+          REVENUE_SPLIT_TRIOLITH *
+          100
+        ).toFixed(2),
+      },
+      lifetimeEstimate: {
+        totalPlatformFeesUSD: +totalFeesUSD.toFixed(2),
+        triolithGrossShareUSD: +triolithGross.toFixed(2),
+        estimatedSafuAccumulatedUSD: +estimatedSafuUSD.toFixed(2),
+      },
+      _note:
+        "Estimated from on-chain fee events recorded in DB. " +
+        "Verify actual SAFU balance via FeeDistributor contract query before reporting.",
+    };
+  }
+
   async getUserList() {
     const users = await this.userRepo.find({
       select: [
