@@ -7,6 +7,7 @@ describe("AdminController", () => {
     getUserList: jest.fn(),
     getAllStudios: jest.fn(),
     getAllTransactions: jest.fn(),
+    getSafuSummary: jest.fn(),
   };
   const dataRetentionService = {
     runManually: jest.fn(),
@@ -14,10 +15,15 @@ describe("AdminController", () => {
   const reconciliationService = {
     runManually: jest.fn(),
   };
+  const amlMonitorService = {
+    getUnreviewedFlags: jest.fn(),
+    reviewFlag: jest.fn(),
+  };
   const controller = new AdminController(
     service as never,
     dataRetentionService as never,
     reconciliationService as never,
+    amlMonitorService as never,
   );
 
   beforeEach(() => {
@@ -76,5 +82,28 @@ describe("AdminController", () => {
     reconciliationService.runManually.mockResolvedValueOnce({ ok: true });
     await expect(controller.runReconciliation()).resolves.toEqual({ ok: true });
     expect(reconciliationService.runManually).toHaveBeenCalled();
+  });
+
+  it("delegates getAmlFlags to AmlMonitorService.getUnreviewedFlags", async () => {
+    const flags = [{ id: "f1", reviewed: false }];
+    amlMonitorService.getUnreviewedFlags.mockResolvedValueOnce(flags);
+    await expect(controller.getAmlFlags()).resolves.toEqual(flags);
+    expect(amlMonitorService.getUnreviewedFlags).toHaveBeenCalled();
+  });
+
+  it("delegates reviewAmlFlag to AmlMonitorService.reviewFlag", async () => {
+    const updated = { id: "f1", reviewed: true, reviewNotes: "ok" };
+    amlMonitorService.reviewFlag.mockResolvedValueOnce(updated);
+    await expect(
+      controller.reviewAmlFlag("f1", { reviewNotes: "ok" }),
+    ).resolves.toEqual(updated);
+    expect(amlMonitorService.reviewFlag).toHaveBeenCalledWith("f1", "ok");
+  });
+
+  it("delegates getSafuSummary to AdminService", async () => {
+    const summary = { policy: { safuCutFromTriolithPct: 5 } };
+    service.getSafuSummary.mockResolvedValueOnce(summary);
+    await expect(controller.getSafuSummary()).resolves.toEqual(summary);
+    expect(service.getSafuSummary).toHaveBeenCalled();
   });
 });

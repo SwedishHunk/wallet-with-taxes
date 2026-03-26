@@ -19,6 +19,7 @@ import { AuthModule } from "../auth/auth.module";
 import { EconomicsModule } from "../economics/economics.module";
 import { DataRetentionModule } from "../data-retention/data-retention.module";
 import { ReconciliationModule } from "../reconciliation/reconciliation.module";
+import { AmlModule } from "../aml/aml.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ReconciliationModule } from "../reconciliation/reconciliation.module";
     EconomicsModule,
     DataRetentionModule,
     ReconciliationModule,
+    AmlModule,
   ],
   controllers: [AdminController, AdminDevController],
   providers: [AdminService, AdminDevService],

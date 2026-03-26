@@ -1,4 +1,7 @@
-import { ForbiddenException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  UnprocessableEntityException,
+} from "@nestjs/common";
 import { ApiTaxController, TaxController } from "./tax.controller";
 
 // Helper: build a mock Express Request with optional JwtUser on req.user
@@ -23,6 +26,7 @@ describe("TaxController", () => {
     const service = {
       getSummary: jest.fn(),
       exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
     };
     const controller = new TaxController(service as never);
 
@@ -36,6 +40,7 @@ describe("TaxController", () => {
     const service = {
       getSummary: jest.fn().mockResolvedValue({ ok: true }),
       exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
     };
     const controller = new TaxController(service as never);
 
@@ -53,6 +58,7 @@ describe("TaxController", () => {
     const service = {
       getSummary: jest.fn().mockResolvedValue({ ok: true }),
       exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
     };
     const controller = new TaxController(service as never);
 
@@ -67,7 +73,11 @@ describe("TaxController", () => {
   });
 
   it("throws ForbiddenException when wallet does not match and not admin", async () => {
-    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
+    };
     const controller = new TaxController(service as never);
 
     await expect(
@@ -81,7 +91,11 @@ describe("TaxController", () => {
   });
 
   it("returns 400 when user query is missing in export", async () => {
-    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
+    };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new TaxController(service as never);
 
@@ -96,6 +110,12 @@ describe("TaxController", () => {
     const service = {
       getSummary: jest.fn(),
       exportEventsAsCSV: jest.fn().mockResolvedValue(undefined),
+      checkExportReadiness: jest.fn().mockResolvedValue({
+        blocked: false,
+        totalCount: 5,
+        missingCount: 0,
+        missingRatio: 0,
+      }),
     };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new TaxController(service as never);
@@ -114,7 +134,11 @@ describe("TaxController", () => {
   });
 
   it("throws ForbiddenException on export when wallet does not match", async () => {
-    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
+    };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new TaxController(service as never);
 
@@ -128,11 +152,62 @@ describe("TaxController", () => {
     ).rejects.toThrow(ForbiddenException);
     expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
   });
+
+  it("throws UnprocessableEntityException when >5% events have missing valuations", async () => {
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn().mockResolvedValue({
+        blocked: true,
+        totalCount: 100,
+        missingCount: 10,
+        missingRatio: 0.1,
+      }),
+    };
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+    const controller = new TaxController(service as never);
+
+    await expect(
+      controller.exportCSV(
+        "0xabc",
+        undefined,
+        mockReq({ walletAddress: "0xabc" }),
+        res as never,
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+    expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
+  });
+
+  it("admin with force=true bypasses the missing-valuation gate", async () => {
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn().mockResolvedValue(undefined),
+      checkExportReadiness: jest.fn(),
+    };
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+    const controller = new TaxController(service as never);
+
+    await controller.exportCSV(
+      "0xabc",
+      undefined,
+      mockReq({ walletAddress: "0xabc", isAdmin: true }),
+      res as never,
+      "true",
+    );
+
+    // Gate was skipped — checkExportReadiness never called
+    expect(service.checkExportReadiness).not.toHaveBeenCalled();
+    expect(service.exportEventsAsCSV).toHaveBeenCalled();
+  });
 });
 
 describe("ApiTaxController", () => {
   it("getSummary returns error object when user is missing", async () => {
-    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
+    };
     const controller = new ApiTaxController(service as never);
     const result = await controller.getSummary("", undefined, {} as never);
     expect(result).toEqual({ error: "Missing user address in query." });
@@ -143,6 +218,7 @@ describe("ApiTaxController", () => {
     const service = {
       getSummary: jest.fn().mockResolvedValue({ gains: 0 }),
       exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
     };
     const controller = new ApiTaxController(service as never);
     const result = await controller.getSummary(
@@ -155,7 +231,11 @@ describe("ApiTaxController", () => {
   });
 
   it("exportCSV returns 400 when user is missing", async () => {
-    const service = { getSummary: jest.fn(), exportEventsAsCSV: jest.fn() };
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn(),
+    };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new ApiTaxController(service as never);
     await controller.exportCSV("", undefined, {} as never, res as never);
@@ -168,6 +248,12 @@ describe("ApiTaxController", () => {
     const service = {
       getSummary: jest.fn(),
       exportEventsAsCSV: jest.fn().mockResolvedValue(undefined),
+      checkExportReadiness: jest.fn().mockResolvedValue({
+        blocked: false,
+        totalCount: 3,
+        missingCount: 0,
+        missingRatio: 0,
+      }),
     };
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
     const controller = new ApiTaxController(service as never);
@@ -182,5 +268,30 @@ describe("ApiTaxController", () => {
       res,
       undefined,
     );
+  });
+
+  it("exportCSV throws UnprocessableEntityException when gate is triggered", async () => {
+    const service = {
+      getSummary: jest.fn(),
+      exportEventsAsCSV: jest.fn(),
+      checkExportReadiness: jest.fn().mockResolvedValue({
+        blocked: true,
+        totalCount: 50,
+        missingCount: 40,
+        missingRatio: 0.8,
+      }),
+    };
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+    const controller = new ApiTaxController(service as never);
+
+    await expect(
+      controller.exportCSV(
+        "0xabc",
+        undefined,
+        mockReq({ walletAddress: "0xabc" }),
+        res as never,
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+    expect(service.exportEventsAsCSV).not.toHaveBeenCalled();
   });
 });

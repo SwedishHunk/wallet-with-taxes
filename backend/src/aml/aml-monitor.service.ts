@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { AmlFlag } from "./aml-flag.entity";
@@ -87,5 +87,19 @@ export class AmlMonitorService {
       where: { reviewed: false },
       order: { flaggedAt: "DESC" },
     });
+  }
+
+  /**
+   * Mark an AML flag as reviewed by a compliance officer / MLRO.
+   * Throws NotFoundException if the flag does not exist.
+   */
+  async reviewFlag(flagId: string, reviewNotes?: string): Promise<AmlFlag> {
+    const flag = await this.amlFlagRepo.findOne({ where: { id: flagId } });
+    if (!flag) {
+      throw new NotFoundException(`AML flag ${flagId} not found`);
+    }
+    flag.reviewed = true;
+    flag.reviewNotes = reviewNotes ?? null;
+    return this.amlFlagRepo.save(flag);
   }
 }
