@@ -76,7 +76,8 @@ export default function TaxReport() {
 
   useEffect(() => {
     if (!isConnected) return;
-    const interval = setInterval(fetchSummary, 10000);
+    // 60 s interval keeps well below the 10 req/min rate limit
+    const interval = setInterval(fetchSummary, 60000);
     return () => clearInterval(interval);
   }, [isConnected, fetchSummary]);
 

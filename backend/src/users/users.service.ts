@@ -524,6 +524,85 @@ export class UsersService {
    * intentionally excluded — they are not "personal data" in the portability
    * sense and exposing them would be a security risk.
    */
+  /**
+   * Player portal wallet authentication.
+   * Verifies a MetaMask-signed challenge message and issues a JWT for the
+   * wallet owner.  Creates a lightweight player user record if none exists.
+   *
+   * Message format expected from frontend:
+   *   "Triolith Portal Login\nWallet: {walletAddress}\nTimestamp: {unixMs}"
+   *
+   * The timestamp must be within 5 minutes of the current server time to
+   * prevent replay attacks.
+   */
+  async loginByWallet(
+    walletAddress: string,
+    message: string,
+    signature: string,
+  ): Promise<{ token: string; userId: string; walletAddress: string }> {
+    const normalized = walletAddress.trim().toLowerCase();
+
+    if (!ethers.isAddress(normalized)) {
+      throw new AppException("Invalid wallet address", 400);
+    }
+
+    // Validate timestamp embedded in the challenge message
+    const tsMatch = /Timestamp:\s*(\d+)/.exec(message);
+    if (!tsMatch) {
+      throw new AppException("Invalid login message format", 400);
+    }
+    const challengeTs = parseInt(tsMatch[1], 10);
+    if (Math.abs(Date.now() - challengeTs) > 5 * 60 * 1000) {
+      throw new AppException("Login challenge expired (5 min window)", 401);
+    }
+
+    // Verify the MetaMask signature
+    let recovered: string;
+    try {
+      recovered = ethers.verifyMessage(message, signature);
+    } catch {
+      throw new AppException("Invalid signature", 400);
+    }
+    if (recovered.toLowerCase() !== normalized) {
+      throw new AppException("Signature does not match wallet address", 401);
+    }
+
+    // Find or create a player user record keyed by wallet address
+    let user = await this.userRepository.findOne({
+      where: { walletAddress: normalized },
+    });
+
+    if (!user) {
+      const syntheticEmail = `${normalized}@wallet.triolith`;
+      user = this.userRepository.create({
+        email: syntheticEmail,
+        passwordHash: "",
+        custodyMode: "self",
+        walletAddress: normalized,
+        kycStatus: "pending",
+      });
+      user = await this.userRepository.save(user);
+      this.logger.log(
+        `Created player wallet user for ${normalized} (id=${user.id})`,
+      );
+    }
+
+    if (user.isSuspended) {
+      throw new AppException("Account is suspended", 403);
+    }
+
+    void this.userRepository.update(user.id, { lastLoginAt: new Date() });
+
+    const token = this.jwtService.sign({
+      id: user.id,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      isAdmin: user.isAdmin,
+    });
+
+    return { token, userId: user.id, walletAddress: user.walletAddress };
+  }
+
   async exportMyData(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new AppException("User not found", 404);

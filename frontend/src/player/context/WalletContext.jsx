@@ -10,6 +10,27 @@ const ADMIN_ADDRESS = (
   "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 ).toLowerCase();
 
+/** Exchange a MetaMask-signed challenge for a backend JWT and store it. */
+async function authenticateWallet(walletAddress, walletSigner) {
+  try {
+    const timestamp = Date.now();
+    const message = `Triolith Portal Login\nWallet: ${walletAddress}\nTimestamp: ${timestamp}`;
+    const signature = await walletSigner.signMessage(message);
+    const resp = await fetch("/users/wallet-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress, message, signature }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.token) sessionStorage.setItem("token", data.token);
+    }
+  } catch (err) {
+    // Non-fatal — wallet is still connected, but authenticated API calls will fail
+    console.warn("Wallet authentication failed:", err);
+  }
+}
+
 export function WalletProvider({ children }) {
   const [address, setAddress] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -37,6 +58,9 @@ export function WalletProvider({ children }) {
       setSigner(walletSigner);
       setAddress(accounts[0].toLowerCase());
       setChainId(Number(network.chainId));
+
+      // Authenticate with the backend to get a JWT for API calls
+      await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
     } catch (err) {
       console.error("Wallet connection failed:", err);
     } finally {
@@ -45,6 +69,7 @@ export function WalletProvider({ children }) {
   }, []);
 
   const disconnect = useCallback(() => {
+    sessionStorage.removeItem("token");
     setAddress(null);
     setProvider(null);
     setSigner(null);
@@ -81,6 +106,7 @@ export function WalletProvider({ children }) {
   // connected account without popping up the approval dialog.
   // If the user previously connected, MetaMask remembers and returns
   // the account. If not, it returns an empty array and we do nothing.
+  // On auto-reconnect we also re-authenticate if there is no stored token.
   useEffect(() => {
     if (!window.ethereum) return;
 
@@ -97,6 +123,11 @@ export function WalletProvider({ children }) {
           setSigner(walletSigner);
           setAddress(accounts[0].toLowerCase());
           setChainId(Number(network.chainId));
+
+          // Re-authenticate if token is missing or stale
+          if (!sessionStorage.getItem("token")) {
+            await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
+          }
         }
       } catch (err) {
         console.error("Auto-reconnect failed:", err);

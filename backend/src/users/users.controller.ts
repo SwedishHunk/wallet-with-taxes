@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Put,
@@ -94,6 +95,34 @@ export class UsersController {
     const { token, ...payload } = result;
     res.cookie(ACCESS_COOKIE, token, cookieOpts());
     return payload;
+  }
+
+  /**
+   * Player portal wallet authentication.
+   * Accepts a MetaMask-signed challenge and issues a JWT for the wallet owner.
+   * No cookie is set — the player portal stores the token in sessionStorage
+   * and sends it as a Bearer header (no HttpOnly cookie needed for this flow).
+   */
+  @Post("wallet-session")
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  async walletSession(
+    @Body()
+    body?: {
+      walletAddress?: string;
+      message?: string;
+      signature?: string;
+    },
+  ) {
+    if (!body?.walletAddress || !body?.message || !body?.signature) {
+      throw new BadRequestException(
+        "walletAddress, message and signature are required",
+      );
+    }
+    return this.usersService.loginByWallet(
+      body.walletAddress,
+      body.message,
+      body.signature,
+    );
   }
 
   /** Clear the HttpOnly auth cookie and end the session. */
