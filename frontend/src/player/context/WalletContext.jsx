@@ -10,6 +10,53 @@ const ADMIN_ADDRESS = (
   "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 ).toLowerCase();
 
+/**
+ * Read the walletAddress claim from the JWT stored in sessionStorage without
+ * verifying the signature (client-side only, for routing decisions).
+ * Returns null when the token is absent, malformed, or has no walletAddress.
+ */
+function getStoredTokenWallet() {
+  const token = sessionStorage.getItem("token");
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return payload.walletAddress ? payload.walletAddress.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Exchange a MetaMask-signed challenge for a backend JWT and store it. */
+async function authenticateWallet(walletAddress, walletSigner) {
+  try {
+    const timestamp = Date.now();
+    const message = `Triolith Portal Login\nWallet: ${walletAddress}\nTimestamp: ${timestamp}`;
+    const signature = await walletSigner.signMessage(message);
+    const resp = await fetch("/users/wallet-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress, message, signature }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.token) sessionStorage.setItem("token", data.token);
+    } else {
+      const body = await resp.json().catch(() => ({ message: resp.statusText }));
+      console.warn(
+        `Wallet authentication failed: HTTP ${resp.status}`,
+        body,
+      );
+    }
+  } catch (err) {
+    // Non-fatal — wallet is still connected, but authenticated API calls will fail
+    console.warn("Wallet authentication failed:", err);
+  }
+}
+
 export function WalletProvider({ children }) {
   const [address, setAddress] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -33,6 +80,10 @@ export function WalletProvider({ children }) {
       const network = await browserProvider.getNetwork();
       const walletSigner = await browserProvider.getSigner();
 
+      // Authenticate BEFORE updating address so that when React re-renders
+      // components they already have a valid JWT in sessionStorage.
+      await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
+
       setProvider(browserProvider);
       setSigner(walletSigner);
       setAddress(accounts[0].toLowerCase());
@@ -45,6 +96,7 @@ export function WalletProvider({ children }) {
   }, []);
 
   const disconnect = useCallback(() => {
+    sessionStorage.removeItem("token");
     setAddress(null);
     setProvider(null);
     setSigner(null);
@@ -81,6 +133,7 @@ export function WalletProvider({ children }) {
   // connected account without popping up the approval dialog.
   // If the user previously connected, MetaMask remembers and returns
   // the account. If not, it returns an empty array and we do nothing.
+  // On auto-reconnect we also re-authenticate if there is no stored token.
   useEffect(() => {
     if (!window.ethereum) return;
 
@@ -93,9 +146,19 @@ export function WalletProvider({ children }) {
           const network = await browserProvider.getNetwork();
           const walletSigner = await browserProvider.getSigner();
 
+          const walletAddr = accounts[0].toLowerCase();
+
+          // Re-authenticate if the stored token is absent OR belongs to a
+          // different wallet (e.g. stale studio-panel JWT has no walletAddress).
+          if (getStoredTokenWallet() !== walletAddr) {
+            await authenticateWallet(walletAddr, walletSigner);
+          }
+
+          // Set address AFTER JWT is ready so components that react to
+          // isConnected=true already have the correct token in sessionStorage.
           setProvider(browserProvider);
           setSigner(walletSigner);
-          setAddress(accounts[0].toLowerCase());
+          setAddress(walletAddr);
           setChainId(Number(network.chainId));
         }
       } catch (err) {

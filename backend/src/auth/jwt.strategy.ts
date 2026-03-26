@@ -31,13 +31,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     super({
-      // Primary: HttpOnly cookie (XSS-safe). Fallback: Bearer header
-      // (player portal and any non-browser clients that can't use cookies).
+      // Bearer takes precedence over the HttpOnly cookie so that the player
+      // portal (which stores wallet-session JWTs in sessionStorage and sends
+      // them as Bearer headers) is not overridden by a studio-portal cookie
+      // that may be present in the same browser session.
       jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
         (req: Request) =>
           (req?.cookies as Record<string, string> | undefined)?.access_token ??
           null,
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,

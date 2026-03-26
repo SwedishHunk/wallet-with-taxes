@@ -554,4 +554,98 @@ describe("UsersService", () => {
 
     await service.signup("chain@test.com", "pw", undefined, true);
   });
+
+  // ── loginByWallet ───────────────────────────────────────────────────────────
+
+  describe("loginByWallet", () => {
+    const testWallet = new ethers.Wallet("0x" + "ab".repeat(32));
+    const normalizedAddress = testWallet.address.toLowerCase();
+
+    function makeMessage(offsetMs = 0) {
+      const ts = Date.now() + offsetMs;
+      return `Triolith Portal Login\nWallet: ${normalizedAddress}\nTimestamp: ${ts}`;
+    }
+
+    it("rejects an invalid wallet address", async () => {
+      await expect(
+        service.loginByWallet("not-an-address", "msg", "sig"),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it("rejects a message without a Timestamp field", async () => {
+      await expect(
+        service.loginByWallet(normalizedAddress, "No timestamp here", "sig"),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it("rejects an expired challenge (timestamp > 5 min ago)", async () => {
+      const oldMsg = makeMessage(-6 * 60 * 1000); // 6 min ago
+      const sig = await testWallet.signMessage(oldMsg);
+      await expect(
+        service.loginByWallet(normalizedAddress, oldMsg, sig),
+      ).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    it("rejects a mismatched signature", async () => {
+      const otherWallet = new ethers.Wallet("0x" + "cd".repeat(32));
+      const msg = makeMessage();
+      const sig = await otherWallet.signMessage(msg); // signed by a different key
+      await expect(
+        service.loginByWallet(normalizedAddress, msg, sig),
+      ).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    it("returns a token for an existing user", async () => {
+      const msg = makeMessage();
+      const sig = await testWallet.signMessage(msg);
+      userRepo.findOne.mockResolvedValueOnce({
+        id: "u-wallet",
+        email: `${normalizedAddress}@wallet.triolith`,
+        walletAddress: normalizedAddress,
+        isAdmin: false,
+        isSuspended: false,
+      });
+      const result = await service.loginByWallet(normalizedAddress, msg, sig);
+      expect(result.token).toBe("jwt-token");
+      expect(result.walletAddress).toBe(normalizedAddress);
+      expect(userRepo.save).not.toHaveBeenCalled(); // no new user created
+    });
+
+    it("creates a new user when wallet is not yet registered", async () => {
+      const msg = makeMessage();
+      const sig = await testWallet.signMessage(msg);
+      userRepo.findOne.mockResolvedValueOnce(null); // no existing user
+      userRepo.save.mockResolvedValueOnce({
+        id: "u-new",
+        email: `${normalizedAddress}@wallet.triolith`,
+        walletAddress: normalizedAddress,
+        isAdmin: false,
+        isSuspended: false,
+      });
+      const result = await service.loginByWallet(normalizedAddress, msg, sig);
+      expect(result.token).toBe("jwt-token");
+      expect(userRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: `${normalizedAddress}@wallet.triolith`,
+          custodyMode: "self",
+          walletAddress: normalizedAddress,
+        }),
+      );
+      expect(userRepo.save).toHaveBeenCalled();
+    });
+
+    it("throws 403 when the wallet user is suspended", async () => {
+      const msg = makeMessage();
+      const sig = await testWallet.signMessage(msg);
+      userRepo.findOne.mockResolvedValueOnce({
+        id: "u-suspended",
+        walletAddress: normalizedAddress,
+        isAdmin: false,
+        isSuspended: true,
+      });
+      await expect(
+        service.loginByWallet(normalizedAddress, msg, sig),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+  });
 });

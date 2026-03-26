@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { UsersController } from "./users.controller";
 
 function req(user: { id: string }) {
@@ -19,6 +20,7 @@ describe("UsersController", () => {
     getMemberSession: jest.fn(),
     updateTin: jest.fn(),
     exportMyData: jest.fn(),
+    loginByWallet: jest.fn(),
   };
   const controller = new UsersController(service as never);
 
@@ -159,5 +161,35 @@ describe("UsersController", () => {
     const result = await controller.exportMyData(req({ id: "u1" }));
     expect(result).toEqual({ exportedAt: "2026-01-01" });
     expect(service.exportMyData).toHaveBeenCalledWith("u1");
+  });
+
+  // ── walletSession ───────────────────────────────────────────────────────────
+
+  it("walletSession throws BadRequestException when body is missing fields", async () => {
+    await expect(controller.walletSession({})).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(
+      controller.walletSession({ walletAddress: "0xabc" }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it("walletSession delegates to loginByWallet and returns token", async () => {
+    service.loginByWallet.mockResolvedValueOnce({
+      token: "jwt-tok",
+      userId: "u1",
+      walletAddress: "0xabc",
+    });
+    const result = await controller.walletSession({
+      walletAddress: "0xabc",
+      message: "msg",
+      signature: "sig",
+    });
+    expect(result).toEqual({
+      token: "jwt-tok",
+      userId: "u1",
+      walletAddress: "0xabc",
+    });
+    expect(service.loginByWallet).toHaveBeenCalledWith("0xabc", "msg", "sig");
   });
 });
