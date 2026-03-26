@@ -10,6 +10,26 @@ const ADMIN_ADDRESS = (
   "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 ).toLowerCase();
 
+/**
+ * Read the walletAddress claim from the JWT stored in sessionStorage without
+ * verifying the signature (client-side only, for routing decisions).
+ * Returns null when the token is absent, malformed, or has no walletAddress.
+ */
+function getStoredTokenWallet() {
+  const token = sessionStorage.getItem("token");
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return payload.walletAddress ? payload.walletAddress.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Exchange a MetaMask-signed challenge for a backend JWT and store it. */
 async function authenticateWallet(walletAddress, walletSigner) {
   try {
@@ -54,13 +74,14 @@ export function WalletProvider({ children }) {
       const network = await browserProvider.getNetwork();
       const walletSigner = await browserProvider.getSigner();
 
+      // Authenticate BEFORE updating address so that when React re-renders
+      // components they already have a valid JWT in sessionStorage.
+      await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
+
       setProvider(browserProvider);
       setSigner(walletSigner);
       setAddress(accounts[0].toLowerCase());
       setChainId(Number(network.chainId));
-
-      // Authenticate with the backend to get a JWT for API calls
-      await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
     } catch (err) {
       console.error("Wallet connection failed:", err);
     } finally {
@@ -119,15 +140,20 @@ export function WalletProvider({ children }) {
           const network = await browserProvider.getNetwork();
           const walletSigner = await browserProvider.getSigner();
 
+          const walletAddr = accounts[0].toLowerCase();
+
+          // Re-authenticate if the stored token is absent OR belongs to a
+          // different wallet (e.g. stale studio-panel JWT has no walletAddress).
+          if (getStoredTokenWallet() !== walletAddr) {
+            await authenticateWallet(walletAddr, walletSigner);
+          }
+
+          // Set address AFTER JWT is ready so components that react to
+          // isConnected=true already have the correct token in sessionStorage.
           setProvider(browserProvider);
           setSigner(walletSigner);
-          setAddress(accounts[0].toLowerCase());
+          setAddress(walletAddr);
           setChainId(Number(network.chainId));
-
-          // Re-authenticate if token is missing or stale
-          if (!sessionStorage.getItem("token")) {
-            await authenticateWallet(accounts[0].toLowerCase(), walletSigner);
-          }
         }
       } catch (err) {
         console.error("Auto-reconnect failed:", err);
