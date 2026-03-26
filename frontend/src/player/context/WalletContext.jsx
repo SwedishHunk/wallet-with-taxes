@@ -44,6 +44,12 @@ async function authenticateWallet(walletAddress, walletSigner) {
     if (resp.ok) {
       const data = await resp.json();
       if (data.token) sessionStorage.setItem("token", data.token);
+    } else {
+      const body = await resp.json().catch(() => ({ message: resp.statusText }));
+      console.warn(
+        `Wallet authentication failed: HTTP ${resp.status}`,
+        body,
+      );
     }
   } catch (err) {
     // Non-fatal — wallet is still connected, but authenticated API calls will fail
