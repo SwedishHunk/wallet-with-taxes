@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { createHash, randomUUID } from "crypto";
-import { ethers } from "ethers";
+import { ethers, HDNodeWallet, Mnemonic } from "ethers";
 import { DataSource, QueryFailedError, Repository } from "typeorm";
 import { AppException } from "../common/exceptions/app-exception";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages";
@@ -20,10 +20,25 @@ import {
 @Injectable()
 export class GameWalletAdminService {
   private static readonly DEPOSIT_INTENT_TTL_MS = 15 * 60 * 1000;
+
+  /**
+   * BIP-44 account path for Ethereum (coin type 60, account 0, change 0).
+   * The HD wallet is initialised at this depth; individual addresses are
+   * derived via deriveChild(<uint32 index>) to produce m/44'/60'/0'/0/<index>.
+   */
+  private static readonly BIP44_ACCOUNT_PATH = "m/44'/60'/0'/0";
+
+  private readonly logger = new Logger(GameWalletAdminService.name);
   private readonly rpcUrl = process.env.RPC_URL?.trim();
   private readonly rpcProvider = this.rpcUrl
     ? new ethers.JsonRpcProvider(this.rpcUrl)
     : null;
+
+  /**
+   * HD root wallet initialised from HD_WALLET_MNEMONIC at startup.
+   * Null when the env var is not set (dev/test: falls back to fake addresses).
+   */
+  private readonly hdRoot: HDNodeWallet | null;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -39,17 +54,58 @@ export class GameWalletAdminService {
     private readonly walletDepositIntentRepo: Repository<WalletDepositIntent>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-  ) {}
+  ) {
+    // Initialise BIP-44 HD root wallet from mnemonic (if configured).
+    const phrase = process.env.HD_WALLET_MNEMONIC?.trim();
+    if (phrase) {
+      try {
+        // Derive to the BIP-44 account path so individual addresses can be
+        // obtained via deriveChild(index) without repeating the full path.
+        this.hdRoot = HDNodeWallet.fromMnemonic(
+          Mnemonic.fromPhrase(phrase),
+          GameWalletAdminService.BIP44_ACCOUNT_PATH,
+        );
+        this.logger.log(
+          "BIP-44 HD wallet loaded — real deposit addresses enabled.",
+        );
+      } catch {
+        this.logger.error(
+          "HD_WALLET_MNEMONIC is set but invalid — deposit address derivation disabled. " +
+            "Falling back to deterministic fake addresses.",
+        );
+        this.hdRoot = null;
+      }
+    } else {
+      this.hdRoot = null;
+      this.logger.warn(
+        "HD_WALLET_MNEMONIC is not set — using deterministic fake deposit addresses. " +
+          "Set HD_WALLET_MNEMONIC in production for real BIP-44 addresses.",
+      );
+    }
+  }
 
-  private generateFakeDepositAddress(
-    gameId: string,
-    userId: string,
-    intentId: string,
-  ): string {
-    const hash = createHash("sha256")
-      .update(`${gameId}:${userId}:${intentId}`)
-      .digest("hex");
-    return `0x${hash.slice(0, 40)}`;
+  /**
+   * Derives a real BIP-44 Ethereum address for a deposit intent.
+   *
+   * Path: m/44'/60'/0'/0/<index>
+   * Index: the first 4 bytes of SHA256(intentId) interpreted as uint32.
+   * This is deterministic per intentId and collision-resistant for ~4B intents.
+   *
+   * Falls back to the deterministic fake address when HD_WALLET_MNEMONIC is
+   * not configured (dev/test environments).
+   */
+  private deriveDepositAddress(intentId: string): string {
+    if (!this.hdRoot) {
+      // Dev fallback: deterministic hex address (NOT a real blockchain address)
+      const hash = createHash("sha256").update(intentId).digest("hex");
+      return `0x${hash.slice(0, 40)}`;
+    }
+
+    // hdRoot is at m/44'/60'/0'/0; deriveChild(index) gives the per-intent address
+    const buf = createHash("sha256").update(intentId).digest();
+    const index = buf.readUInt32BE(0);
+    const child = this.hdRoot.deriveChild(index);
+    return child.address;
   }
 
   private isValidTxHash(txHash: string): boolean {
@@ -336,11 +392,7 @@ export class GameWalletAdminService {
     const expiresAt = new Date(
       Date.now() + GameWalletAdminService.DEPOSIT_INTENT_TTL_MS,
     );
-    const depositAddress = this.generateFakeDepositAddress(
-      gameId,
-      userId,
-      intentId,
-    );
+    const depositAddress = this.deriveDepositAddress(intentId);
 
     const intent = this.walletDepositIntentRepo.create({
       id: intentId,

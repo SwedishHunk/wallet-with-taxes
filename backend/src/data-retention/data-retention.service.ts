@@ -142,6 +142,8 @@ export class DataRetentionService {
       consentGivenAt: null,
       lastLoginAt: null,
       isSuspended: false,
+      // Clear TIN per GDPR Article 17 — DAC8 obligation ends when account is anonymized
+      taxIdentificationNumber: null,
     });
     this.logger.debug(`[DataRetention] Anonymized user ${user.id}`);
   }

@@ -506,6 +506,18 @@ export class UsersService {
   }
 
   /**
+   * DAC8 / CARF — Store or update the user's national tax identification
+   * number.  Called after KYC verification or when the user self-submits
+   * their TIN in the settings UI.
+   */
+  async updateTin(userId: string, taxIdentificationNumber: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new AppException("User not found", 404);
+    await this.userRepository.update(userId, { taxIdentificationNumber });
+    return { updated: true };
+  }
+
+  /**
    * GDPR Article 20 — Right to data portability.
    * Returns all personal data held for the requesting user as a structured
    * JSON package. Sensitive fields (passwordHash, encryptedPrivateKey) are
@@ -536,6 +548,7 @@ export class UsersService {
         walletAddress: user.walletAddress,
         custodyMode: user.custodyMode,
         kycStatus: user.kycStatus,
+        taxIdentificationNumber: user.taxIdentificationNumber,
         isAdmin: user.isAdmin,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,

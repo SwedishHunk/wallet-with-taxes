@@ -510,6 +510,22 @@ describe("UsersService", () => {
     });
   });
 
+  it("updateTin updates taxIdentificationNumber for existing user", async () => {
+    userRepo.findOne.mockResolvedValueOnce({ id: "u1" });
+    const result = await service.updateTin("u1", "19900101-1234");
+    expect(result).toEqual({ updated: true });
+    expect(userRepo.update).toHaveBeenCalledWith("u1", {
+      taxIdentificationNumber: "19900101-1234",
+    });
+  });
+
+  it("updateTin throws 404 when user not found", async () => {
+    userRepo.findOne.mockResolvedValueOnce(null);
+    await expect(
+      service.updateTin("u1", "19900101-1234"),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   it("signup handles on-chain wallet failure branch", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     process.env.RPC_URL = "http://localhost:8545";

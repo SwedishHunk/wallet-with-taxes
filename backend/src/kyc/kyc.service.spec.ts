@@ -75,6 +75,38 @@ describe("KycService", () => {
     });
   });
 
+  it("handleWebhook stores taxIdentificationNumber when provided (DAC8)", async () => {
+    const { service, userRepo } = makeService({ id: "u1" });
+
+    const result = await service.handleWebhook({
+      sessionId: "sess-tin",
+      userId: "u1",
+      status: "verified",
+      taxIdentificationNumber: "19900101-1234",
+    });
+
+    expect(result.updated).toBe(true);
+    expect(userRepo.update).toHaveBeenCalledWith("u1", {
+      kycStatus: "verified",
+      taxIdentificationNumber: "19900101-1234",
+    });
+  });
+
+  it("handleWebhook does not add taxIdentificationNumber field when absent", async () => {
+    const { service, userRepo } = makeService({ id: "u1" });
+
+    await service.handleWebhook({
+      sessionId: "sess-no-tin",
+      userId: "u1",
+      status: "verified",
+    });
+
+    const updateArg = (
+      userRepo.update.mock.calls as [string, Record<string, unknown>][]
+    )[0][1];
+    expect(Object.keys(updateArg)).not.toContain("taxIdentificationNumber");
+  });
+
   it("handleWebhook returns updated=false for unknown user", async () => {
     const { service, userRepo } = makeService(null);
 

@@ -28,6 +28,7 @@ import { StudioMemberService } from "./studio-member.service";
 import { StudiosService } from "./studios.service";
 import { User } from "../users/user.entity";
 import { EconomicsModule } from "../economics/economics.module";
+import { AmlModule } from "../aml/aml.module";
 import { KeyManagementService } from "../shared/key-management.service";
 
 @Module({
@@ -48,6 +49,7 @@ import { KeyManagementService } from "../shared/key-management.service";
       User,
     ]),
     EconomicsModule,
+    AmlModule,
   ],
   controllers: [PlatformController, ApiPlatformController, StudiosController],
   providers: [

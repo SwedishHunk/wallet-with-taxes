@@ -61,6 +61,16 @@ export class User {
   @Column({ type: "timestamptz", nullable: true })
   lastLoginAt: Date | null;
 
+  /**
+   * DAC8 / CARF (EU Regulation 2023/2226) — national tax identification number.
+   * Required for EU DAC8 reporting to Skatteverket once reporting thresholds
+   * are exceeded. Collected at KYC step for Swedish personnummer or equivalent
+   * national ID for non-Swedish EU residents.
+   * Format examples: "19900101-1234" (SE personnummer), "DE 123456789" (DE TIN).
+   */
+  @Column({ type: "varchar", nullable: true })
+  taxIdentificationNumber: string | null;
+
   @OneToMany(() => StudioMember, (member) => member.user, { cascade: true })
   studioMemberships: StudioMember[];
 }
