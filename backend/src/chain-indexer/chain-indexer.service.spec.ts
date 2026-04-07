@@ -271,6 +271,8 @@ describe("ChainIndexerService", () => {
         type: "disposal",
         userAddress: "0xbuyer",
         assetAddress: "0xtritoken",
+        tokenId: 0,
+        feeUSD: 0.1,
       }),
     );
   });
@@ -316,11 +318,21 @@ describe("ChainIndexerService", () => {
     expect(taxService.logEvent).toHaveBeenCalledTimes(2);
     expect(taxService.logEvent).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ type: "disposal", userAddress: "0xfrom" }),
+      expect.objectContaining({
+        type: "disposal",
+        userAddress: "0xfrom",
+        tokenId: 0,
+        feeUSD: 0,
+      }),
     );
     expect(taxService.logEvent).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ type: "acquisition", userAddress: "0xto" }),
+      expect.objectContaining({
+        type: "acquisition",
+        userAddress: "0xto",
+        tokenId: 0,
+        feeUSD: 0,
+      }),
     );
   });
 

@@ -12,8 +12,9 @@ import {
   Log,
   WebSocketProvider,
 } from "ethers";
-import { DataSource, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
+import { TaxService } from "../tax/tax.service";
 import { ShopEvent } from "./entities/shop-event.entity";
 import { TOKENSHOP_ABI } from "./tokenshop.abi";
 import { TokenShopSyncState } from "./entities/tokenshop-sync-state.entity";
@@ -67,13 +68,13 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     : null;
 
   constructor(
-    private readonly dataSource: DataSource,
     @InjectRepository(TaxEvent)
     private readonly taxEventRepo: Repository<TaxEvent>,
     @InjectRepository(ShopEvent)
     private readonly shopEventRepo: Repository<ShopEvent>,
     @InjectRepository(TokenShopSyncState)
     private readonly syncStateRepo: Repository<TokenShopSyncState>,
+    private readonly taxService: TaxService,
   ) {}
 
   async onModuleInit() {
@@ -256,6 +257,17 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
       // Detect chain restart (e.g. Anvil wiped): DB says we synced past the
       // current chain tip. Reset to 0 so all events are re-indexed.
       if (Number(syncState.lastSyncedBlock) > latestBlock) {
+        // In production a lower chain tip usually means the RPC node failed over
+        // to a stale replica — wiping tax history would be catastrophic.
+        // Only auto-clear in non-production environments (dev / test).
+        if (process.env.NODE_ENV === "production") {
+          this.logger.error(
+            `[ChainReset] Sync state is ahead of chain tip in production ` +
+              `(lastSynced=${syncState.lastSyncedBlock}, latest=${latestBlock}). ` +
+              `Refusing to clear tax data — investigate the RPC node before resetting.`,
+          );
+          return;
+        }
         this.logger.warn(
           `Chain reset detected (lastSynced=${syncState.lastSyncedBlock}, ` +
             `latest=${latestBlock}). Clearing stale events and re-indexing from block 0.`,
@@ -374,81 +386,96 @@ export class TokenShopListenerService implements OnModuleInit, OnModuleDestroy {
     const taxType = event.name === "Bought" ? "acquisition" : "disposal";
     const shopEventType = event.name === "Bought" ? "BUY" : "SELL";
 
-    await this.dataSource.transaction(async (manager) => {
-      const transactionalTaxRepo = manager.getRepository(TaxEvent);
-      const transactionalShopEventRepo = manager.getRepository(ShopEvent);
-
-      const existingTaxEvent = await transactionalTaxRepo.findOne({
-        where: {
-          source: "tokenshop",
-          txHash: event.txHash,
-          logIndex: event.logIndex,
-        },
-      });
-      if (existingTaxEvent) {
-        return;
-      }
-
-      const existingShopEvent = await transactionalShopEventRepo.findOne({
-        where: {
-          txHash: event.txHash,
-          logIndex: event.logIndex,
-        },
-      });
-      if (existingShopEvent) {
-        return;
-      }
-
-      await transactionalShopEventRepo.save(
-        transactionalShopEventRepo.create({
-          type: shopEventType,
-          blockNumber: event.blockNumber,
-          txHash: event.txHash,
-          logIndex: event.logIndex,
-          user: event.userAddress,
-          asset: normalizedPayAsset,
-          assetSymbol:
-            normalizedPayAsset === this.ethAddress ? "ETH" : normalizedPayAsset,
-          amountIn:
-            event.name === "Bought"
-              ? event.amountInRaw.toString()
-              : event.triAmountRaw.toString(),
-          amountOut:
-            event.name === "Bought"
-              ? event.triAmountRaw.toString()
-              : event.amountInRaw.toString(),
-        }),
-      );
-
-      await transactionalTaxRepo.save(
-        transactionalTaxRepo.create({
-          type: taxType,
-          userAddress: event.userAddress,
-          assetAddress: normalizedAssetAddress,
-          tokenId: 0,
-          amount: triAmount,
-          feeUSD: 0,
-          priceUSD:
-            estimatedUnitPriceUsd !== null &&
-            Number.isFinite(estimatedUnitPriceUsd)
-              ? estimatedUnitPriceUsd
-              : undefined,
-          valuationStatus:
-            estimatedUnitPriceUsd !== null &&
-            Number.isFinite(estimatedUnitPriceUsd)
-              ? "estimated"
-              : "missing",
-          valuationSource:
-            estimatedUnitPriceUsd !== null &&
-            Number.isFinite(estimatedUnitPriceUsd)
-              ? "tokenshop_eth_usd_snapshot"
-              : null,
-          source: "tokenshop",
-          txHash: event.txHash,
-          logIndex: event.logIndex,
-        }),
-      );
+    // Dedup: skip if a TaxEvent for this tx already exists
+    const existingTaxEvent = await this.taxEventRepo.findOne({
+      where: {
+        source: "tokenshop",
+        txHash: event.txHash,
+        logIndex: event.logIndex,
+      },
     });
+    if (existingTaxEvent) {
+      return;
+    }
+
+    // Dedup: skip if a ShopEvent for this tx already exists
+    const existingShopEvent = await this.shopEventRepo.findOne({
+      where: {
+        txHash: event.txHash,
+        logIndex: event.logIndex,
+      },
+    });
+    if (existingShopEvent) {
+      return;
+    }
+
+    // Persist the shop-analytics record
+    await this.shopEventRepo.save(
+      this.shopEventRepo.create({
+        type: shopEventType,
+        blockNumber: event.blockNumber,
+        txHash: event.txHash,
+        logIndex: event.logIndex,
+        user: event.userAddress,
+        asset: normalizedPayAsset,
+        assetSymbol:
+          normalizedPayAsset === this.ethAddress ? "ETH" : normalizedPayAsset,
+        amountIn:
+          event.name === "Bought"
+            ? event.amountInRaw.toString()
+            : event.triAmountRaw.toString(),
+        amountOut:
+          event.name === "Bought"
+            ? event.triAmountRaw.toString()
+            : event.amountInRaw.toString(),
+      }),
+    );
+
+    // Resolve the actual block timestamp so the SEK exchange-rate lookup
+    // uses the correct transaction date, not the server ingestion time.
+    const blockTimestamp = await this.getBlockTimestamp(event.blockNumber);
+
+    // Route through TaxService.logEvent() so that SEK conversion and the
+    // incremental cost-basis table update both run for every tokenshop trade.
+    await this.taxService.logEvent({
+      type: taxType,
+      userAddress: event.userAddress,
+      assetAddress: normalizedAssetAddress,
+      tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
+      amount: triAmount,
+      feeUSD: 0,
+      priceUSD:
+        estimatedUnitPriceUsd !== null && Number.isFinite(estimatedUnitPriceUsd)
+          ? estimatedUnitPriceUsd
+          : undefined,
+      valuationStatus:
+        estimatedUnitPriceUsd !== null && Number.isFinite(estimatedUnitPriceUsd)
+          ? "estimated"
+          : "missing",
+      valuationSource:
+        estimatedUnitPriceUsd !== null && Number.isFinite(estimatedUnitPriceUsd)
+          ? "tokenshop_eth_usd_snapshot"
+          : null,
+      source: "tokenshop",
+      txHash: event.txHash,
+      logIndex: event.logIndex,
+      timestamp: blockTimestamp,
+    });
+  }
+
+  /**
+   * Resolves the wall-clock time of a block from the RPC provider.
+   * Falls back to the current server time if the provider is unavailable or
+   * the block cannot be fetched, which may produce a slightly wrong SEK rate.
+   */
+  private async getBlockTimestamp(blockNumber: number): Promise<Date> {
+    if (!this.provider) return new Date();
+    try {
+      const block = await this.provider.getBlock(blockNumber);
+      return block ? new Date(block.timestamp * 1000) : new Date();
+    } catch {
+      return new Date();
+    }
   }
 
   private normalizePaymentAmount(
