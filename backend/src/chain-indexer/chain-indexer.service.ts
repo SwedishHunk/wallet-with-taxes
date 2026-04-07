@@ -241,6 +241,7 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
         type: "disposal",
         userAddress: buyer.toLowerCase(),
         assetAddress: triAddr.toLowerCase(),
+        tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
         amount: priceEth, // quantity of TRI tokens spent (using ETH unit as proxy)
         priceUSD: priceEth, // total USD value of TRI spent
         feeUSD: feeEth,
@@ -271,6 +272,8 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       type: "disposal",
       userAddress: from.toLowerCase(),
       assetAddress: (process.env.TRI_TOKEN_ADDRESS ?? "").toLowerCase(),
+      tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
+      feeUSD: 0,
       amount,
       txHash: event.transactionHash,
       timestamp,
@@ -280,6 +283,8 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       type: "acquisition",
       userAddress: to.toLowerCase(),
       assetAddress: (process.env.TRI_TOKEN_ADDRESS ?? "").toLowerCase(),
+      tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
+      feeUSD: 0,
       amount,
       txHash: event.transactionHash,
       timestamp,

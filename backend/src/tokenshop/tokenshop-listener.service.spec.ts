@@ -5,7 +5,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ethers } from "ethers";
-import { DataSource } from "typeorm";
 import tokenShopAbi from "../shared/constants/abis/TokenShop.json";
 import { TaxEvent } from "../tax/entities/tax-event.entity";
 import { ShopEvent } from "./entities/shop-event.entity";
@@ -62,7 +61,7 @@ describe("TokenShopListenerService", () => {
   let taxEventRepo: MockRepo<TaxEvent>;
   let shopEventRepo: MockRepo<ShopEvent>;
   let syncStateRepo: MockRepo<TokenShopSyncState>;
-  let dataSource: { transaction: jest.Mock };
+  let taxService: { logEvent: jest.Mock };
   let service: TokenShopListenerService;
   const originalTokenShopEthUsd = process.env.TOKENSHOP_ETH_USD;
 
@@ -71,27 +70,15 @@ describe("TokenShopListenerService", () => {
     taxEventRepo = makeRepo<TaxEvent>();
     shopEventRepo = makeRepo<ShopEvent>();
     syncStateRepo = makeRepo<TokenShopSyncState>();
-    dataSource = {
-      transaction: jest.fn(async (callback) =>
-        callback({
-          getRepository: (entity: unknown) => {
-            if (entity === TaxEvent) {
-              return taxEventRepo;
-            }
-            if (entity === ShopEvent) {
-              return shopEventRepo;
-            }
-            throw new Error("Unexpected repository");
-          },
-        }),
-      ),
+    taxService = {
+      logEvent: jest.fn().mockResolvedValue({}),
     };
 
     service = new TokenShopListenerService(
-      dataSource as unknown as DataSource,
       taxEventRepo as never,
       shopEventRepo as never,
       syncStateRepo as never,
+      taxService as never,
     );
   });
 
@@ -157,21 +144,24 @@ describe("TokenShopListenerService", () => {
       amountIn: ethers.parseEther("2").toString(),
       amountOut: ethers.parseUnits("100", 18).toString(),
     });
-    expect(taxEventRepo.create).toHaveBeenCalledWith({
-      type: "acquisition",
-      userAddress: "0xabc",
-      assetAddress: "0x9999999999999999999999999999999999999999",
-      tokenId: 0,
-      amount: 100,
-      feeUSD: 0,
-      priceUSD: 70,
-      valuationStatus: "estimated",
-      valuationSource: "tokenshop_eth_usd_snapshot",
-      source: "tokenshop",
-      txHash:
-        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      logIndex: 3,
-    });
+    expect(taxService.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "acquisition",
+        userAddress: "0xabc",
+        assetAddress: "0x9999999999999999999999999999999999999999",
+        tokenId: 0,
+        amount: 100,
+        feeUSD: 0,
+        priceUSD: 70,
+        valuationStatus: "estimated",
+        valuationSource: "tokenshop_eth_usd_snapshot",
+        source: "tokenshop",
+        txHash:
+          "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        logIndex: 3,
+        timestamp: expect.any(Date),
+      }),
+    );
   });
 
   it("withholds fiat pricing for non-ETH payment assets", async () => {
@@ -192,7 +182,7 @@ describe("TokenShopListenerService", () => {
       blockNumber: 43,
     });
 
-    expect(taxEventRepo.create).toHaveBeenCalledWith(
+    expect(taxService.logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         priceUSD: undefined,
         valuationStatus: "missing",
@@ -219,7 +209,7 @@ describe("TokenShopListenerService", () => {
     });
 
     expect(shopEventRepo.save).not.toHaveBeenCalled();
-    expect(taxEventRepo.save).not.toHaveBeenCalled();
+    expect(taxService.logEvent).not.toHaveBeenCalled();
   });
 
   it("persistParsedEvent skips duplicates when shop event already exists", async () => {
@@ -241,7 +231,7 @@ describe("TokenShopListenerService", () => {
     });
 
     expect(shopEventRepo.save).not.toHaveBeenCalled();
-    expect(taxEventRepo.save).not.toHaveBeenCalled();
+    expect(taxService.logEvent).not.toHaveBeenCalled();
   });
 
   it("syncOnce ingests bought and sold events and updates sync state", async () => {
@@ -257,6 +247,7 @@ describe("TokenShopListenerService", () => {
 
     (service as any).provider = {
       getBlockNumber: jest.fn().mockResolvedValue(6),
+      getBlock: jest.fn().mockResolvedValue(null),
     };
     (service as any).contract = {
       filters: {
@@ -291,7 +282,7 @@ describe("TokenShopListenerService", () => {
     await (service as any).syncOnce();
 
     expect(shopEventRepo.save).toHaveBeenCalledTimes(2);
-    expect(taxEventRepo.save).toHaveBeenCalledTimes(2);
+    expect(taxService.logEvent).toHaveBeenCalledTimes(2);
     expect(syncStateRepo.save).toHaveBeenCalledWith({
       id: "tokenshop",
       lastSyncedBlock: "6",
