@@ -201,8 +201,10 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
     fee: bigint,
     event: ethers.EventLog,
   ): Promise<void> {
-    const priceEth = parseFloat(ethers.formatEther(price));
-    const feeEth = parseFloat(ethers.formatEther(fee));
+    // price and fee are denominated in ETH — storing ETH quantity as priceUSD
+    // would produce legally wrong tax records. Mark valuation missing until a
+    // price oracle is wired in; TaxService will attempt a CoinGecko lookup.
+    const triAmount = parseFloat(ethers.formatEther(price));
     const timestamp = await this.getBlockTimestamp(event.blockNumber);
 
     // Seller: disposal of the NFT
@@ -212,8 +214,10 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       assetAddress: assetAddress.toLowerCase(),
       tokenId: Number(tokenId),
       amount: 1,
-      priceUSD: priceEth, // priceEth used as proxy; real impl needs USD oracle
-      feeUSD: feeEth,
+      feeUSD: 0, // USD fee unknown without oracle; default to 0
+      valuationStatus: "missing",
+      source: "marketplace",
+      logIndex: event.index,
       txHash: event.transactionHash,
       timestamp,
     });
@@ -225,8 +229,10 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       assetAddress: assetAddress.toLowerCase(),
       tokenId: Number(tokenId),
       amount: 1,
-      priceUSD: priceEth,
       feeUSD: 0,
+      valuationStatus: "missing",
+      source: "marketplace",
+      logIndex: event.index,
       txHash: event.transactionHash,
       timestamp,
     });
@@ -242,9 +248,11 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
         userAddress: buyer.toLowerCase(),
         assetAddress: triAddr.toLowerCase(),
         tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
-        amount: priceEth, // quantity of TRI tokens spent (using ETH unit as proxy)
-        priceUSD: priceEth, // total USD value of TRI spent
-        feeUSD: feeEth,
+        amount: triAmount, // quantity of TRI tokens spent
+        feeUSD: 0,
+        valuationStatus: "missing",
+        source: "marketplace",
+        logIndex: event.index,
         txHash: event.transactionHash,
         timestamp,
       });
@@ -275,6 +283,8 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
       feeUSD: 0,
       amount,
+      source: "tri-transfer",
+      logIndex: event.index,
       txHash: event.transactionHash,
       timestamp,
     });
@@ -286,6 +296,8 @@ export class ChainIndexerService implements OnModuleInit, OnModuleDestroy {
       tokenId: 0, // TRI is ERC-20 — no per-token ID; 0 by convention
       feeUSD: 0,
       amount,
+      source: "tri-transfer",
+      logIndex: event.index,
       txHash: event.transactionHash,
       timestamp,
     });

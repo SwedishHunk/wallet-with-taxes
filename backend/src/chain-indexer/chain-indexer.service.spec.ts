@@ -31,13 +31,13 @@ type ServicePrivate = {
     tokenId: bigint,
     price: bigint,
     fee: bigint,
-    event: { blockNumber: number; transactionHash: string },
+    event: { blockNumber: number; transactionHash: string; index: number },
   ): Promise<void>;
   handleTriTransfer(
     from: string,
     to: string,
     value: bigint,
-    event: { blockNumber: number; transactionHash: string },
+    event: { blockNumber: number; transactionHash: string; index: number },
   ): Promise<void>;
   getBlockTimestamp(blockNumber: number): Promise<Date>;
 };
@@ -223,7 +223,7 @@ describe("ChainIndexerService", () => {
       BigInt(42),
       ethers.parseEther("1.5"),
       ethers.parseEther("0.05"),
-      { blockNumber: 100, transactionHash: "0xtxhash" },
+      { blockNumber: 100, transactionHash: "0xtxhash", index: 5 },
     );
 
     // 2 events: seller disposal + buyer NFT acquisition (TRI disposal skipped — no TRI addr)
@@ -234,6 +234,10 @@ describe("ChainIndexerService", () => {
         type: "disposal",
         userAddress: "0xseller",
         tokenId: 42,
+        feeUSD: 0,
+        valuationStatus: "missing",
+        source: "marketplace",
+        logIndex: 5,
       }),
     );
     expect(taxService.logEvent).toHaveBeenNthCalledWith(
@@ -242,6 +246,9 @@ describe("ChainIndexerService", () => {
         type: "acquisition",
         userAddress: "0xbuyer",
         feeUSD: 0,
+        valuationStatus: "missing",
+        source: "marketplace",
+        logIndex: 5,
       }),
     );
   });
@@ -260,7 +267,7 @@ describe("ChainIndexerService", () => {
       BigInt(7),
       ethers.parseEther("2.0"),
       ethers.parseEther("0.1"),
-      { blockNumber: 101, transactionHash: "0xtxhash2" },
+      { blockNumber: 101, transactionHash: "0xtxhash2", index: 7 },
     );
 
     // 3 events: seller disposal + buyer NFT acquisition + buyer TRI disposal
@@ -272,7 +279,10 @@ describe("ChainIndexerService", () => {
         userAddress: "0xbuyer",
         assetAddress: "0xtritoken",
         tokenId: 0,
-        feeUSD: 0.1,
+        feeUSD: 0,
+        valuationStatus: "missing",
+        source: "marketplace",
+        logIndex: 7,
       }),
     );
   });
@@ -286,6 +296,7 @@ describe("ChainIndexerService", () => {
     await svc.handleTriTransfer(ZERO, "0xto", BigInt(100), {
       blockNumber: 1,
       transactionHash: "0x1",
+      index: 0,
     });
 
     expect(taxService.logEvent).not.toHaveBeenCalled();
@@ -298,6 +309,7 @@ describe("ChainIndexerService", () => {
     await svc.handleTriTransfer("0xfrom", ZERO, BigInt(100), {
       blockNumber: 1,
       transactionHash: "0x1",
+      index: 0,
     });
 
     expect(taxService.logEvent).not.toHaveBeenCalled();
@@ -313,6 +325,7 @@ describe("ChainIndexerService", () => {
     await svc.handleTriTransfer("0xFrom", "0xTo", ethers.parseEther("50"), {
       blockNumber: 200,
       transactionHash: "0xtx2",
+      index: 3,
     });
 
     expect(taxService.logEvent).toHaveBeenCalledTimes(2);
@@ -323,6 +336,8 @@ describe("ChainIndexerService", () => {
         userAddress: "0xfrom",
         tokenId: 0,
         feeUSD: 0,
+        source: "tri-transfer",
+        logIndex: 3,
       }),
     );
     expect(taxService.logEvent).toHaveBeenNthCalledWith(
@@ -332,6 +347,8 @@ describe("ChainIndexerService", () => {
         userAddress: "0xto",
         tokenId: 0,
         feeUSD: 0,
+        source: "tri-transfer",
+        logIndex: 3,
       }),
     );
   });

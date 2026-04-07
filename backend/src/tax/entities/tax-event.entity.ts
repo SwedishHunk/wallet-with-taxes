@@ -6,7 +6,16 @@ import {
   Index,
 } from "typeorm";
 
-@Index(["source", "txHash", "logIndex"], { unique: true })
+// Partial unique index: only deduplicates rows where all three fields are set.
+// PostgreSQL treats NULL != NULL, so a plain unique index on nullable columns
+// never deduplicates on-chain events where any field is NULL. The WHERE clause
+// restricts dedup to rows that carry all three identifiers (on-chain events).
+// Off-chain events (rewards, manual entries) with NULL values are unaffected.
+@Index("UQ_tax_event_dedup", ["source", "txHash", "logIndex"], {
+  unique: true,
+  where:
+    '"source" IS NOT NULL AND "txHash" IS NOT NULL AND "logIndex" IS NOT NULL',
+})
 @Entity()
 export class TaxEvent {
   @PrimaryGeneratedColumn()
